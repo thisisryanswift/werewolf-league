@@ -250,11 +250,15 @@ body:has(.mv-page) {
   min-width: 0;
 }
 .mv-acc {
-  font: 700 14px/1.25 var(--mv-mono);
+  font: 700 15px/1.25 var(--mv-mono);
   border: 2px solid var(--mv-ink);
   padding: 1px 6px;
   background: var(--mv-paper);
   overflow-wrap: anywhere;
+}
+.mv-acc-arrow {
+  font: 900 18px/1 var(--mv-font);
+  font-style: normal;
 }
 .mv-acc-in {
   background: #ffd6dc;

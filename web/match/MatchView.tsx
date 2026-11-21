@@ -189,17 +189,17 @@ function AccusationChips({ seat: s, seats }: { seat: SeatView; seats: SeatView[]
       )}
       {a.by.length > 0 && (
         <span className="mv-acc mv-acc-in" data-testid="accused-by">
-          ← accused by {refs(a.by)}
+          <i className="mv-acc-arrow" aria-hidden="true">←</i> accused by {refs(a.by)}
         </span>
       )}
       {a.accuses.length > 0 && (
         <span className="mv-acc mv-acc-out" data-testid="accuses">
-          → accuses {refs(a.accuses)}
+          <i className="mv-acc-arrow" aria-hidden="true">→</i> accuses {refs(a.accuses)}
         </span>
       )}
       {a.defends.length > 0 && (
         <span className="mv-acc mv-acc-def" data-testid="defends">
-          ♥ defends {refs(a.defends)}
+          <i className="mv-acc-arrow" aria-hidden="true">♥</i> defends {refs(a.defends)}
         </span>
       )}
     </span>
