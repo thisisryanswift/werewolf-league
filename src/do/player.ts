@@ -101,8 +101,9 @@ export class PlayerDO extends DurableObject<Env> {
     const r = await harness.close?.(this.context(seating));
     this.collect(r?.usage);
     if (r?.chain) this.ctx.storage.kv.put("chain", r.chain);
-    this.ctx.storage.kv.put("closed", true);
+    // Report before marking closed, so a failed report makes the Match retry the close.
     if (r?.usage?.length) await this.env.MATCH.getByName(seating.matchId).recordUsage(seating.seat, this.usage);
+    this.ctx.storage.kv.put("closed", true);
   }
 
   async alarm(): Promise<void> {

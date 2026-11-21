@@ -313,10 +313,19 @@ export function managedAgentHarness(opts: ManagedAgentOptions): Harness {
 
     async close(ctx) {
       const chain = ctx.chain as unknown as Chain;
-      if (!chain.setupInteraction) return;
-      // The seat never took a turn, so its setup interaction was never cancelled or read.
-      const setup = await cancelAndRead(chain.setupInteraction, SETUP_CANCEL_TIMEOUT_MS);
-      const usage = setup ? usageOf(ctx, setup) : [];
+      if (!chain.setupInteraction && !chain.inFlight) return;
+      const usage: UsageReading[] = [];
+      // A seat that never took a turn: its setup interaction was never cancelled or read.
+      if (chain.setupInteraction) {
+        const setup = await cancelAndRead(chain.setupInteraction, SETUP_CANCEL_TIMEOUT_MS);
+        if (setup) usage.push(...usageOf(ctx, setup));
+      }
+      // The seat's last interaction (e.g. a cancel whose read timed out): read its final usage once more.
+      if (chain.inFlight) {
+        let it = await api.get(chain.inFlight.id, CANCEL_READ_TIMEOUT_MS).catch(() => null);
+        if (it && ACTIVE.has(it.status)) it = (await cancelAndRead(it.id, SETUP_CANCEL_TIMEOUT_MS)) ?? it;
+        if (it) usage.push(...usageOf(ctx, it));
+      }
       return {
         chain: { ...chain, setupInteraction: undefined } as unknown as Record<string, unknown>,
         ...(usage.length ? { usage } : {}),

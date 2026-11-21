@@ -64,6 +64,10 @@ interface MatchMeta extends Omit<MatchInit, "deadlines"> {
   assigned?: Seat[];
   /** True once the League has acknowledged the result. */
   resultAcked?: boolean;
+  /** Seats not yet closed after the Match finished (their leftover usage is still unread). */
+  closePending?: Seat[];
+  /** True while the League's settled cost is older than the result's (late usage); retried on the alarm. */
+  costDirty?: boolean;
 }
 
 type EventRow = { seq: number; ts: number; kind: string; audience: string; data: string };
@@ -136,26 +140,38 @@ export class MatchDO extends DurableObject<Env> {
     const cost = this.cost(meta);
     this.meta = { ...meta, result: { ...meta.result, cost } };
     this.commit([matchCostEvent(cost)]);
-    if (meta.resultAcked) this.sendCost(meta.matchId, cost);
-  }
-
-  private sendCost(matchId: string, cost: MatchCost): void {
-    this.ctx.waitUntil(
-      this.env.LEAGUE.getByName(LEAGUE_NAME)
-        .updateMatchCost(matchId, cost)
-        .catch(() => {}),
-    );
-  }
-
-  /** Tell every Player the Match is over, so billed leftovers (unused setup interactions) are counted. Best effort. */
-  private closePlayers(meta: MatchMeta): void {
-    for (const s of meta.seats) {
-      this.ctx.waitUntil(
-        this.env.PLAYER.getByName(`${meta.matchId}:${s.seat}`)
-          .close()
-          .catch(() => {}),
-      );
+    if (meta.resultAcked) {
+      this.meta = { ...this.meta!, costDirty: true };
+      this.ctx.waitUntil(this.ctx.storage.setAlarm(Date.now()));
     }
+  }
+
+  /**
+   * After the result: close every Player (so leftovers such as an unused setup
+   * interaction are read and reported) and bring the League's settled cost up to
+   * date. Each is retried on the alarm until it succeeds.
+   */
+  private async finishChores(): Promise<void> {
+    const meta = this.meta!;
+    const closing = meta.closePending ?? [];
+    const dirty = !!meta.costDirty && !!meta.resultAcked;
+    if (!closing.length && !dirty) return;
+    await this.ctx.storage.setAlarm(Date.now() + Number(this.env.LEAGUE_RETRY_MS ?? 2000));
+    const closed = await Promise.allSettled(closing.map((seat) => this.env.PLAYER.getByName(`${meta.matchId}:${seat}`).close()));
+    const failed = closing.filter((_, i) => closed[i]!.status === "rejected");
+    this.meta = { ...this.meta!, closePending: failed };
+    const latest = this.meta!;
+    if (latest.costDirty && latest.resultAcked && latest.result?.cost) {
+      const cost = latest.result.cost;
+      const sent = await this.env.LEAGUE.getByName(LEAGUE_NAME)
+        .updateMatchCost(latest.matchId, cost)
+        .then(() => true)
+        .catch(() => false);
+      // Clear only if no newer usage arrived while the update was in flight.
+      if (sent && JSON.stringify(this.meta!.result?.cost) === JSON.stringify(cost)) this.meta = { ...this.meta!, costDirty: false };
+    }
+    const after = this.meta!;
+    if (!after.closePending?.length && !(after.costDirty && after.resultAcked) && after.resultAcked) await this.ctx.storage.deleteAlarm();
   }
 
   private ruleset(meta: MatchMeta): Ruleset<unknown> {
@@ -325,6 +341,7 @@ export class MatchDO extends DurableObject<Env> {
     if (!meta) return;
     if (meta.status === "finished") {
       if (!meta.resultAcked) await this.deliverResult(meta);
+      await this.finishChores();
       return;
     }
     const ruleset = this.ruleset(meta);
@@ -348,11 +365,11 @@ export class MatchDO extends DurableObject<Env> {
       const cost = this.cost(current);
       if (cost.unpriced.length) console.warn(`Match ${current.matchId}: no price for ${cost.unpriced.join(", ")}; counted at $0`);
       const result: MatchReport = { ...next.result, timeouts: countTimeouts(this.events(), current.seats), cost };
-      const done: MatchMeta = { ...current, status: "finished", result };
+      const done: MatchMeta = { ...current, status: "finished", result, closePending: current.seats.map((s) => s.seat) };
       this.meta = done;
       this.commit([matchCostEvent(cost)]);
-      this.closePlayers(done);
       await this.deliverResult(done);
+      await this.finishChores();
       return;
     }
     await this.dispatch(current, ruleset, next.turns);
@@ -396,8 +413,8 @@ export class MatchDO extends DurableObject<Env> {
     this.meta = { ...current, resultAcked: true };
     // Usage that arrived while the result was in flight: the League settled the older cost.
     const cost = current.result?.cost;
-    if (cost && JSON.stringify(cost) !== JSON.stringify(ack.settlement.result.cost)) this.sendCost(meta.matchId, cost);
-    await this.ctx.storage.deleteAlarm();
+    if (cost && JSON.stringify(cost) !== JSON.stringify(ack.settlement.result.cost)) this.meta = { ...this.meta!, costDirty: true };
+    await this.ctx.storage.deleteAlarm(); // finishChores re-arms it if anything is left
   }
 
   /** Push the public tile summary to the League. Best effort: never holds up the Match. */

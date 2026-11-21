@@ -339,6 +339,17 @@ describe("Managed Agent harness: usage", () => {
     expect(await s.harness.close!({ ...s.ctx, chain: closed!.chain! })).toBeUndefined();
   });
 
+  it("on close, reads the seat's last interaction again, so usage missed at cancel time still counts", async () => {
+    const s = await seat();
+    await s.act(input("BRIEFING-1", "vote", { firstTurn: true }), "vote", { target: 2 });
+    const h = await s.start(input("OBS", "speak"));
+    const id = String(h.interactionId);
+    expect(await s.cancel(h)).toBeUndefined(); // no usage visible at cancel time
+    s.api.bill(id, U2);
+    const closed = await s.harness.close!(s.ctx);
+    expect(closed!.usage).toEqual([{ id, model: "gemini-4-hydrogen", usage: U2 }]);
+  });
+
   it("reports the setup interaction's usage when the first turn cancels it", async () => {
     const s = await seat();
     const setupId = s.api.latest().id;
