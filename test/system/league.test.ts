@@ -120,42 +120,50 @@ describe("League scheduling", () => {
       restore = () => {
         proto.reportMatchResult = original;
       };
-      let lose = true;
+      // Only League-scheduled Matches lose their first ack (other files' one-off Matches report here too).
+      const lost = new Set<string>();
       proto.reportMatchResult = async function (this: LeagueDO, matchId: string, result: MatchResult) {
         const ack = await original.call(this, matchId, result);
         calls.push({ matchId, duplicate: ack.duplicate });
-        if (lose) {
-          lose = false;
+        if (ack.settlement.seats && !lost.has(matchId)) {
+          lost.add(matchId);
           throw new Error("acknowledgement lost");
         }
         return ack;
       };
     });
-    const before = await league();
-    await ok(admin("config", { n: 1, roster: roster(3) }));
-    await ok(admin("resume"));
-    const first = (await waitFor(async () => (await league()).tiles[0])).matchId;
-
-    // The Match redelivers until acknowledged; the League recognises the duplicate.
-    await waitFor(async () => calls.filter((c) => c.matchId === first).length >= 2);
-    expect(calls.filter((c) => c.matchId === first).slice(0, 2).map((c) => c.duplicate)).toEqual([false, true]);
-    // The replacement took the only slot.
-    const mid = await league();
-    expect(mid.tiles.map((t) => t.matchId)).not.toContain(first);
-    expect(mid.tiles).toHaveLength(1);
-
-    // A further redelivery is still a no-op.
-    const again = await stub.reportMatchResult(first, (await snapshot(first)).result!);
-    expect(again.duplicate).toBe(true);
-
-    await drain();
-    restore();
-    const after = await league();
-    // Each Match was settled once: settlements match starts, and the first appears once.
-    expect(after.stats.settled - before.stats.settled).toBe(after.stats.started - before.stats.started);
-    expect(after.recent.filter((r) => r.matchId === first)).toHaveLength(1);
+    try {
+      await lostAckScenario(stub, calls);
+    } finally {
+      restore();
+    }
   });
 });
+
+async function lostAckScenario(stub: DurableObjectStub<LeagueDO>, calls: { matchId: string; duplicate: boolean }[]) {
+  const before = await league();
+  await ok(admin("config", { n: 1, roster: roster(3) }));
+  await ok(admin("resume"));
+  const first = (await waitFor(async () => (await league()).tiles[0])).matchId;
+
+  // The Match redelivers until acknowledged; the League recognises the duplicate.
+  await waitFor(async () => calls.filter((c) => c.matchId === first).length >= 2);
+  expect(calls.filter((c) => c.matchId === first).slice(0, 2).map((c) => c.duplicate)).toEqual([false, true]);
+  // The replacement took the only slot.
+  const mid = await league();
+  expect(mid.tiles.map((t) => t.matchId)).not.toContain(first);
+  expect(mid.tiles).toHaveLength(1);
+
+  // A further redelivery is still a no-op.
+  const again = await stub.reportMatchResult(first, (await snapshot(first)).result!);
+  expect(again.duplicate).toBe(true);
+
+  await drain();
+  const after = await league();
+  // Each Match was settled once: settlements match starts, and the first appears once.
+  expect(after.stats.settled - before.stats.settled).toBe(after.stats.started - before.stats.started);
+  expect(after.recent.filter((r) => r.matchId === first)).toHaveLength(1);
+}
 
 describe("League feed", () => {
   it("sends the snapshot on join, then live tile updates as a Match progresses", async () => {

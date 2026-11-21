@@ -258,7 +258,6 @@ export class LeagueDO extends DurableObject<Env> {
       started++;
     }
     if (started) {
-      this.blocked = null;
       this.live = live;
       this.stats = { ...this.stats, started: this.stats.started + started };
     }
@@ -284,6 +283,7 @@ export class LeagueDO extends DurableObject<Env> {
       const error = outcomes[i];
       if (error === null) {
         if (cur.status === "starting") live[m.matchId] = { ...cur, status: "running" };
+        this.blocked = null; // a start succeeded, so any earlier failure is resolved
         return;
       }
       const failures = cur.startFailures + 1;
