@@ -11,7 +11,7 @@ import { defaultLeagueConfig, patchConfig, type LeagueConfig } from "../core/ros
 import type { MatchSummary } from "../core/ruleset";
 import { buildMatchInit } from "../core/start-match";
 import { getRuleset } from "../rulesets";
-import type { LeagueMessage, LeagueSnapshot, MatchTile, SettledMatch, TileSeat } from "../shared/protocol";
+import type { FeaturedMatch, LeagueMessage, LeagueSnapshot, MatchTile, SettledMatch, TileSeat } from "../shared/protocol";
 
 /** A live League Match: its tile plus what is needed to (re)start it. */
 interface LiveMatch extends MatchTile {
@@ -69,6 +69,16 @@ export class LeagueDO extends DurableObject<Env> {
   private get recent(): SettledMatch[] {
     return this.ctx.storage.kv.get<SettledMatch[]>("recent") ?? [];
   }
+  /** The operator-pinned featured Match, if any. */
+  private get pinned(): SettledMatch | null {
+    return this.ctx.storage.kv.get<SettledMatch>("featured") ?? null;
+  }
+  private get featured(): FeaturedMatch | null {
+    const pinned = this.pinned;
+    if (pinned) return { ...pinned, pinned: true };
+    const latest = this.recent[0];
+    return latest ? { ...latest, pinned: false } : null;
+  }
   private get blocked(): string | null {
     return this.ctx.storage.kv.get<string>("blocked") ?? null;
   }
@@ -97,6 +107,7 @@ export class LeagueDO extends DurableObject<Env> {
         .sort((a, b) => a.startedAt - b.startedAt)
         .map(({ matchId, seed, status, seats, summary, startedAt }) => ({ matchId, seed, status, seats, summary, startedAt })),
       recent: this.recent,
+      featured: this.featured,
       stats: this.stats,
       blocked: this.blocked,
     };
@@ -158,6 +169,23 @@ export class LeagueDO extends DurableObject<Env> {
     this.config = r.config;
     this.blocked = null;
     await this.schedule();
+    return { ok: true, league: this.snapshot() };
+  }
+
+  /**
+   * Pin a finished Match (League or one-off) as the featured Match, or clear
+   * the pin with null so the most recent finished Match is featured.
+   */
+  async setFeatured(matchId: string | null): Promise<{ ok: true; league: LeagueSnapshot } | { ok: false; error: string }> {
+    if (matchId === null) {
+      this.ctx.storage.kv.delete("featured");
+    } else {
+      const s = this.ctx.storage.kv.get<Settlement>(`settled:${matchId}`);
+      if (!s) return { ok: false, error: `Match ${matchId} has not finished` };
+      const pinned: SettledMatch = { matchId, winner: s.result.winner, settledAt: s.settledAt };
+      this.ctx.storage.kv.put("featured", pinned);
+    }
+    this.broadcast();
     return { ok: true, league: this.snapshot() };
   }
 

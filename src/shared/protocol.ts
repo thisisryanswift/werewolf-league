@@ -94,11 +94,19 @@ export interface SettledMatch {
   settledAt: number;
 }
 
+/** The finished Match the grid links to: pinned by an operator, else the most recent. */
+export interface FeaturedMatch extends SettledMatch {
+  /** True if an operator pinned it; false if it is the most recent by default. */
+  pinned: boolean;
+}
+
 export interface LeagueSnapshot {
   config: LeagueConfigView;
   tiles: MatchTile[];
   /** Most recently settled League Matches, newest first. */
   recent: SettledMatch[];
+  /** The featured finished Match, or null before any Match has finished. */
+  featured: FeaturedMatch | null;
   stats: { started: number; settled: number };
   /** Why the League cannot start Matches right now (e.g. a roster that is too small), else null. */
   blocked: string | null;

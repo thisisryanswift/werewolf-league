@@ -1,5 +1,6 @@
 // Home page: a live grid of the League's Match tiles. Each tile links to its Match page.
 import type { MatchTile } from "../../src/shared/protocol";
+import { FeaturedMatchLink, FinishedMatchList } from "../components/FinishedMatches";
 import { useLeagueFeed } from "../useLeagueFeed";
 
 function phaseText(tile: MatchTile): string {
@@ -56,23 +57,13 @@ export function HomePage() {
           </>
         )}
       </p>
+      {league && <FeaturedMatchLink featured={league.featured} />}
       {league?.blocked && <p className="blocked">League can't start Matches: {league.blocked}</p>}
       {league && league.tiles.length === 0 && <p className="muted">No live Matches.</p>}
       <ul className="match-grid">
         {league?.tiles.map((t) => <Tile key={t.matchId} tile={t} />)}
       </ul>
-      {league && league.recent.length > 0 && (
-        <section>
-          <h2>Recently finished</h2>
-          <ul className="recent">
-            {league.recent.map((r) => (
-              <li key={r.matchId}>
-                <a href={`/matches/${r.matchId}`}>Match {r.matchId.slice(0, 8)}</a>: {r.winner} won
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+      {league && <FinishedMatchList recent={league.recent} />}
     </main>
   );
 }

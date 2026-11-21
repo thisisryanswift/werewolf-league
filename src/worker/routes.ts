@@ -4,6 +4,7 @@
 //   POST /api/admin/league/pause     running Matches finish, no new ones start
 //   POST /api/admin/league/resume
 //   POST /api/admin/league/config    partial { n, roster, seats, rulesetConfig }
+//   POST /api/admin/league/featured  { matchId } pins a finished Match on the grid; null unpins
 //   POST /api/admin/matches          start a one-off Match outside the League schedule
 //   GET  /api/matches/:id[/ws]       Match snapshot / Spectator feed
 
@@ -24,13 +25,21 @@ export async function handleApi(request: Request, env: Env, url: URL): Promise<R
   if (url.pathname === "/api/league") return Response.json(await league.snapshot());
   if (url.pathname === "/api/league/ws") return league.fetch(request);
 
-  const adminOp = /^\/api\/admin\/league\/(pause|resume|config)$/.exec(url.pathname);
+  const adminOp = /^\/api\/admin\/league\/(pause|resume|config|featured)$/.exec(url.pathname);
   if (adminOp && request.method === "POST") {
     if (!isAdmin(request, env)) return unauthorized();
     if (adminOp[1] === "pause") return Response.json(await league.pause());
     if (adminOp[1] === "resume") return Response.json(await league.resume());
     const body = await request.json().catch(() => null);
     if (typeof body !== "object" || body === null) return Response.json({ error: "expected a JSON object" }, { status: 400 });
+    if (adminOp[1] === "featured") {
+      const { matchId } = body as { matchId?: unknown };
+      if (matchId !== null && (typeof matchId !== "string" || !/^[\w-]{1,64}$/.test(matchId))) {
+        return Response.json({ error: "matchId must be a Match ID or null" }, { status: 400 });
+      }
+      const f = await league.setFeatured(matchId);
+      return f.ok ? Response.json(f.league) : Response.json({ error: f.error }, { status: 400 });
+    }
     const r = await league.configure(body as Record<string, unknown>);
     return r.ok ? Response.json(r.league) : Response.json({ error: r.error }, { status: 400 });
   }
