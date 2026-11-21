@@ -28,6 +28,8 @@ export interface AgentRecord {
   ratings: Record<string, number>;
   matches: number;
   wins: Record<string, number>;
+  /** Rated Matches played per Side: once per Side the Agent had a seat on in the Match (absent on records from before it; the League backfills it). */
+  played?: Record<string, number>;
   timeouts: number;
   /** Running Brier tally over the Agent's scored beliefs (absent on records from before Calibration). */
   brier?: BrierTally;
@@ -99,16 +101,64 @@ export function applyMatch(opts: {
     const ratings = { ...prev.ratings };
     for (const c of agents) if (c.agentId === agentId) ratings[c.side] = c.after;
     const won = opts.players.some((p) => p.agentId === agentId && p.won);
+    const played = { ...prev.played };
+    for (const side of new Set(opts.players.filter((p) => p.agentId === agentId).map((p) => p.side))) played[side] = (played[side] ?? 0) + 1;
     records[agentId] = {
       name: opts.names[agentId] ?? prev.name,
       ratings,
       matches: prev.matches + 1,
       wins: won ? { ...prev.wins, [opts.winner]: (prev.wins[opts.winner] ?? 0) + 1 } : prev.wins,
+      played,
       timeouts: prev.timeouts + (opts.timeoutsByAgent[agentId] ?? 0),
       brier: addTally(prev.brier, opts.calibrationByAgent?.[agentId]),
     };
   }
   return { records, changes: { players: opts.players, agents } };
+}
+
+/** The part of a stored settlement that says who sat on which Side; older settlements may lack `ratings.players`. */
+export interface PlayedSource {
+  ratings: { players?: { agentId: string; side: string }[] } | null;
+  seats: { seat: number; agentId: string }[] | null;
+  result: { sides: Record<number, string> };
+}
+
+/** Each Agent's (agentId, Side) pairs in one rated settlement, deduplicated; none for an unrated one. */
+function sidesPlayed(s: PlayedSource): Map<string, Set<string>> {
+  const out = new Map<string, Set<string>>();
+  if (!s.ratings) return out;
+  const pairs = Array.isArray(s.ratings.players)
+    ? s.ratings.players.map((p) => [p.agentId, p.side] as const)
+    : (s.seats ?? []).flatMap((x) => (s.result.sides[x.seat] === undefined ? [] : [[x.agentId, s.result.sides[x.seat]!] as const]));
+  for (const [agentId, side] of pairs) {
+    const set = out.get(agentId) ?? new Set<string>();
+    set.add(side);
+    out.set(agentId, set);
+  }
+  return out;
+}
+
+/** True if any record predates per-Side `played` counts and needs `backfillPlayed`. */
+export const needsPlayedBackfill = (records: Record<string, AgentRecord>): boolean => Object.values(records).some((r) => !r.played);
+
+/**
+ * Give every record lacking `played` its count from the stored settlements:
+ * once per rated Match per Side the Agent sat on. Records that already have
+ * `played` are left alone, so running it twice changes nothing.
+ */
+export function backfillPlayed(records: Record<string, AgentRecord>, settlements: Iterable<PlayedSource>): Record<string, AgentRecord> {
+  const missing = Object.keys(records).filter((id) => !records[id]!.played);
+  if (missing.length === 0) return records;
+  const counts: Record<string, Record<string, number>> = Object.fromEntries(missing.map((id) => [id, {}]));
+  for (const s of settlements) {
+    for (const [agentId, sides] of sidesPlayed(s)) {
+      const c = counts[agentId];
+      if (c) for (const side of sides) c[side] = (c[side] ?? 0) + 1;
+    }
+  }
+  const out = { ...records };
+  for (const id of missing) out[id] = { ...records[id]!, played: counts[id]! };
+  return out;
 }
 
 const addTally = (a: BrierTally | undefined, b: BrierTally | undefined): BrierTally => ({
@@ -139,6 +189,7 @@ export function calibrationByAgent(
 export function standing(agentId: string, name: string, record: AgentRecord | undefined, sides: readonly string[]): AgentStanding {
   const ratings = Object.fromEntries(sides.map((s) => [s, record?.ratings[s] ?? INITIAL_RATING]));
   const wins = Object.fromEntries(sides.map((s) => [s, record?.wins[s] ?? 0]));
+  const played = Object.fromEntries(sides.map((s) => [s, record?.played?.[s] ?? 0]));
   return {
     agentId,
     name,
@@ -146,6 +197,7 @@ export function standing(agentId: string, name: string, record: AgentRecord | un
     overall: sides.length ? mean(sides.map((s) => ratings[s]!)) : INITIAL_RATING,
     matches: record?.matches ?? 0,
     wins,
+    played,
     timeouts: record?.timeouts ?? 0,
     calibration: record?.brier?.n ? record.brier.sum / record.brier.n : null,
   };

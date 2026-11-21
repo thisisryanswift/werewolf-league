@@ -241,6 +241,8 @@ export interface AgentStanding {
   matches: number;
   /** Rated Matches won per Side (once per Match, on the Side that won). */
   wins: Record<string, number>;
+  /** Rated Matches played per Side (once per Match per Side the Agent had a seat on). */
+  played: Record<string, number>;
   /** Turns that missed their deadline, summed from each Match result's per-Agent counts. */
   timeouts: number;
   /** Calibration: Brier score over the Agent's village-side beliefs (lower is better); null before any are scored. */
