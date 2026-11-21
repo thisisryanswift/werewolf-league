@@ -204,7 +204,7 @@ describe("a tile", () => {
     expect(v.alive).toBe(5);
     expect(v.drama).toBe(42);
     expect(v.flags).toEqual(["Table split", "Wolves split"]);
-    expect(v.pips.slice(0, 3)).toEqual([
+    expect(v.pips.slice(0, 3)).toMatchObject([
       { seat: 1, alive: true, role: "werewolf" },
       { seat: 2, alive: false, role: "werewolf" },
       { seat: 3, alive: true, role: "seer" },
@@ -216,7 +216,7 @@ describe("a tile", () => {
     expect(v.step).toBe("Night actions");
     expect(v.thinking).toBeNull();
     expect(v.flags).toEqual(["Table split"]);
-    expect(v.pips.slice(0, 2)).toEqual([
+    expect(v.pips.slice(0, 2)).toMatchObject([
       { seat: 1, alive: true, role: null },
       { seat: 2, alive: false, role: null },
     ]);
@@ -226,7 +226,7 @@ describe("a tile", () => {
   it("shows the Day thinking count without Narrator's View, and the latest speech with its speaker", () => {
     const v = tileView(tile("d", { thinking: 3, latestSpeech: { seat: 4, text: "P2 is lying." } }), false);
     expect(v.thinking).toBe(3);
-    expect(v.speech).toEqual({ seat: 4, speaker: "Name4 · Agent4 #1", text: "P2 is lying." });
+    expect(v.speech).toMatchObject({ seat: 4, speaker: "Name4 · Agent4 #1", text: "P2 is lying." });
     expect(v.drama).toBeNull();
   });
 
@@ -241,5 +241,110 @@ describe("a tile", () => {
   it("shows the Match's cost so far only when the summary carries one", () => {
     expect(tileView(tile("c", { cost: 0.4271 } as Partial<TileSummary>), false).cost).toBe("$0.43");
     expect(tileView(tile("c"), false).cost).toBeNull();
+  });
+});
+
+describe("tile face", () => {
+  const nv = { roles: { 1: "werewolf", 2: "werewolf", 3: "seer", 4: "doctor", 5: "villager", 6: "villager", 7: "villager" } };
+  const nightStart = () => tile("ns", { phase: "Night", round: 1, step: "Night actions", narratorView: { ...nv, step: "Wolf Chat" }, thinking: 4 });
+  const speech = () =>
+    tile("sp", { round: 2, alive: [1, 2, 3, 5, 6, 7], latestSpeech: { seat: 3, text: "Kai pushed hardest." }, dramaScore: 0.38, dramaFlags: [pub("table_split")], thinking: 6 });
+  const hotVote = () =>
+    tile("hv", {
+      round: 4,
+      step: "Vote",
+      narratorView: { ...nv, step: "Vote" },
+      alive: [1, 2, 3, 5, 6],
+      latestSpeech: { seat: 2, text: "I'm the real Seer." },
+      dramaScore: 0.95,
+      dramaFlags: [pub("claim_war"), secret("wolf_fooling_table"), pub("table_split"), pub("knife_edge_vote")],
+      timeouts: 1,
+    });
+  const reply = () =>
+    tile("rr", {
+      round: 3,
+      step: "Right of Reply",
+      narratorView: { ...nv, step: "Right of Reply" },
+      latestSpeech: { seat: 5, text: "Explain that." },
+      dramaScore: 0.71,
+      dramaFlags: [secret("wolves_split"), pub("knife_edge_vote")],
+    });
+  const over = (result?: string) =>
+    tile("ov", {
+      phase: "Over",
+      round: null,
+      step: null,
+      narratorView: { ...nv, step: null },
+      alive: [2, 4],
+      latestSpeech: { seat: 2, text: "Good game." },
+      dramaScore: 0.8,
+      dramaFlags: [pub("claim_war")],
+      timeouts: 2,
+      ...(result ? { result } : {}),
+    });
+  const noNarrator = () => tile("nn", { round: 2, step: "Vote", narratorView: { ...nv, step: "Vote" }, latestSpeech: { seat: 4, text: "No sense." }, timeouts: 4 });
+
+  it("puts the Match label, a phase chip and the step on the top line, with short steps for small tiles", () => {
+    expect(tileView(nightStart(), false).kicker).toEqual({ match: "Match ns", chip: "N1", step: "Night actions", stepShort: "Night" });
+    expect(tileView(speech(), true).kicker).toEqual({ match: "Match sp", chip: "D2", step: "Speech Round A", stepShort: "Speech A" });
+    expect(tileView(reply(), true).kicker).toMatchObject({ chip: "D3", step: "Right of Reply", stepShort: "Reply" });
+    expect(tileView(hotVote(), true).kicker).toMatchObject({ chip: "D4", step: "Vote", stepShort: "Vote" });
+    expect(tileView(over(), true).kicker).toMatchObject({ chip: "END", step: null, stepShort: null });
+    expect(tileView(tile("st", null), true).kicker).toMatchObject({ chip: null, step: null });
+  });
+
+  it("headlines the result, else the top visible Drama Flag, else the Night, the vote or the step", () => {
+    expect(tileView(over("Werewolves"), true).headline).toBe("Werewolves win");
+    expect(tileView(over("Village"), true).headline).toBe("Village wins");
+    expect(tileView(over(), true).headline).toBe("Over");
+    expect(tileView(hotVote(), true).headline).toBe("Claim war");
+    expect(tileView(nightStart(), true).headline).toBe("Night falls");
+    expect(tileView(noNarrator(), true).headline).toBe("The table votes");
+    expect(tileView(tile("d"), true).headline).toBe("Speech Round A");
+    expect(tileView(tile("st", null), true).headline).toBe("Starting");
+    // A secret top flag never headlines with Narrator's View off.
+    expect(tileView(reply(), true).headline).toBe("Wolves split");
+    expect(tileView(reply(), false).headline).toBe("Knife edge vote");
+  });
+
+  it("lists at most one further flag on the Also line, marking secret ones, plus a count of the rest", () => {
+    expect(tileView(hotVote(), true).also).toEqual({ flag: { name: "Wolf fooling table", secret: true }, more: 2 });
+    expect(tileView(hotVote(), false).also).toEqual({ flag: { name: "Table split", secret: false }, more: 1 });
+    expect(tileView(speech(), true).also).toBeNull();
+    // Once Over, the result headlines, so the top flag moves to the Also line.
+    expect(tileView(over("Werewolves"), true).also).toEqual({ flag: { name: "Claim war", secret: false }, more: 0 });
+  });
+
+  it("fills Night tiles navy, hot tiles (Drama Score >= 0.70, not Over) yellow, else plain", () => {
+    expect(tileView(nightStart(), true).fill).toBe("night");
+    expect(tileView(hotVote(), true).fill).toBe("hot");
+    expect(tileView(reply(), true).fill).toBe("hot");
+    expect(tileView(speech(), true).fill).toBe("plain");
+    expect(tileView(over("Village"), true).fill).toBe("plain");
+    expect(tileView(tile("st", null), true).fill).toBe("starting");
+    expect(tileView(tile("hn", { phase: "Night", dramaScore: 0.9 }), true).fill).toBe("night");
+  });
+
+  it("shows the Drama Score as a percentage, or a dash with no Narrator data", () => {
+    expect(tileView(hotVote(), false).dramaText).toBe("95%");
+    expect(tileView(noNarrator(), false).dramaText).toBe("—");
+  });
+
+  it("letters pips W/S/D/V only in Narrator's View, marks the dead with ×, and rings the latest speaker until Over", () => {
+    const on = tileView(speech(), true).pips;
+    expect(on.map((p) => p.mark)).toEqual(["W", "W", "S", "×", "V", "V", "V"]);
+    expect(on.filter((p) => p.speaking).map((p) => p.seat)).toEqual([3]);
+    expect(tileView(speech(), false).pips.map((p) => p.mark)).toEqual(["", "", "", "×", "", "", ""]);
+    expect(tileView(over("Werewolves"), true).pips.some((p) => p.speaking)).toBe(false);
+  });
+
+  it("cites the latest speech by Display Name only", () => {
+    expect(tileView(speech(), false).speech).toMatchObject({ name: "Name3", text: "Kai pushed hardest." });
+  });
+
+  it("hides the Night thinking count without Narrator's View", () => {
+    expect(tileView(nightStart(), false).thinking).toBeNull();
+    expect(tileView(nightStart(), true).thinking).toBe(4);
+    expect(JSON.stringify(tileView(nightStart(), false))).not.toMatch(/werewolf|seer|Wolf Chat/i);
   });
 });

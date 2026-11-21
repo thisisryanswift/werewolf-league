@@ -65,6 +65,8 @@ export interface MatchSummary {
   dramaFlags?: TileDramaFlag[];
   /** Measured USD spent on the Match so far (Players and Narrator); absent before any usage is reported. */
   cost?: number;
+  /** The winning Side's display name once the Match is over (e.g. "Werewolves"); absent before. */
+  result?: string;
 }
 
 /**

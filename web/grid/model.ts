@@ -5,6 +5,7 @@
 // by most recent activity, holding each promoted Match for a while so the
 // large tiles don't swap faster than a line can be read.
 import { visibleDramaFlags, type Leaderboard, type LeagueTilesMessage, type MatchTile } from "../../src/shared/protocol";
+import { matchLabel } from "../../src/shared/match-label";
 import { spectatorLabel } from "../../src/shared/seat-label";
 import { formatUsd } from "../cost";
 
@@ -122,7 +123,39 @@ export interface TilePip {
   alive: boolean;
   /** The seat's role in Narrator's View, else null. */
   role: string | null;
+  /** The pip's letter: "×" when dead, the role's initial in Narrator's View, else "". */
+  mark: string;
+  /** The latest speaker (until the Match is over). */
+  speaking: boolean;
 }
+
+/** The tile's top line: "MATCH N · D3 · step". */
+export interface TileKicker {
+  match: string;
+  /** "D3", "N1", "END", or null before the first summary. */
+  chip: string | null;
+  step: string | null;
+  /** The step as small tiles show it ("Speech A", "Reply", "Night"). */
+  stepShort: string | null;
+}
+
+/** A Drama Flag as the tile names it; secret ones only appear in Narrator's View. */
+export interface TileFlag {
+  name: string;
+  secret: boolean;
+}
+
+/** "Night" (navy), "hot" (yellow: Drama Score >= 0.70, not Over), "starting", else "plain". */
+export type TileFill = "night" | "hot" | "starting" | "plain";
+
+/** Drama Score at or above which a live tile turns yellow. */
+export const HOT_DRAMA = 0.7;
+
+const SHORT_STEP: Record<string, string> = { "Night actions": "Night", "Right of Reply": "Reply" };
+/** "Speech Round A" -> "Speech A"; other steps by SHORT_STEP, else unchanged. */
+const shortStep = (step: string) => SHORT_STEP[step] ?? step.replace(/^Speech Round /, "Speech ");
+/** "Werewolves" -> "Werewolves win", "Village" -> "Village wins". */
+const resultLine = (side: string) => `${side} ${/s$/i.test(side) ? "win" : "wins"}`;
 
 export interface TileView {
   /** "Day 2", "Night 1", "Over" or "Starting". */
@@ -141,9 +174,19 @@ export interface TileView {
   /** Players thinking; null at Night without Narrator's View, since it would hint at roles. */
   thinking: number | null;
   timeouts: number;
-  speech: { seat: number; speaker: string; text: string } | null;
+  /** `speaker` is the Spectator label; `name` the Display Name alone (what tiles cite). */
+  speech: { seat: number; speaker: string; name: string; text: string } | null;
   /** The Match's model cost so far, e.g. "$0.43", or null when the summary has none. */
   cost: string | null;
+  over: boolean;
+  kicker: TileKicker;
+  /** The result when Over, else the top visible Drama Flag, else "Night falls" / "The table votes" / the step. */
+  headline: string;
+  /** One more visible flag than the headline shows, plus how many more there are; null if none. */
+  also: { flag: TileFlag; more: number } | null;
+  fill: TileFill;
+  /** "42%", or "—" before the first narration. */
+  dramaText: string;
 }
 
 /** "claim_war" -> "Claim war". */
@@ -158,20 +201,50 @@ export function tileView(tile: MatchTile, narratorView: boolean): TileView {
   const night = s?.phase === "Night";
   const said = s?.latestSpeech ?? null;
   const speaker = said && tile.seats.find((x) => x.seat === said.seat);
+  const over = s?.phase === "Over";
+  const step = (narratorView ? s?.narratorView?.step : undefined) ?? s?.step ?? null;
+  const drama = s?.dramaScore === undefined ? null : Math.round(s.dramaScore * 100);
+  const flags = tileFlags(tile, narratorView).map((f) => ({ name: flagName(f.id), secret: f.visibility === "secret" }));
+  // The result (or "Over") headlines a finished Match, so its flags all move to the Also line.
+  const headlineFlag = over ? undefined : flags[0];
+  const others = headlineFlag ? flags.slice(1) : flags;
+  const speakingSeat = over ? null : (said?.seat ?? null);
   return {
     phase: s === null ? "Starting" : s.round === null || s.phase === "Over" ? s.phase : `${s.phase} ${s.round}`,
     night,
-    step: (narratorView ? s?.narratorView?.step : undefined) ?? s?.step ?? null,
+    step,
     voting: s?.step === "Vote",
-    pips: tile.seats.map((x) => ({ seat: x.seat, alive: alive.has(x.seat), role: narratorView ? (s?.narratorView?.roles[x.seat] ?? null) : null })),
+    pips: tile.seats.map((x) => {
+      const role = narratorView ? (s?.narratorView?.roles[x.seat] ?? null) : null;
+      const living = alive.has(x.seat);
+      return { seat: x.seat, alive: living, role, mark: !living ? "×" : role ? role.charAt(0).toUpperCase() : "", speaking: x.seat === speakingSeat };
+    }),
     alive: alive.size,
     total: tile.seats.length,
-    drama: s?.dramaScore === undefined ? null : Math.round(s.dramaScore * 100),
-    flags: tileFlags(tile, narratorView).map((f) => flagName(f.id)),
+    drama,
+    flags: flags.map((f) => f.name),
     thinking: s === null || (night && !narratorView) ? null : s.thinking,
     timeouts: s?.timeouts ?? 0,
-    speech: said ? { ...said, speaker: speaker ? spectatorLabel(speaker) : `Seat ${said.seat}` } : null,
+    speech: said ? { ...said, speaker: speaker ? spectatorLabel(speaker) : `Seat ${said.seat}`, name: speaker ? speaker.displayName : `Seat ${said.seat}` } : null,
     cost: costText(s),
+    over,
+    kicker: {
+      match: matchLabel(tile),
+      chip: s === null ? null : over ? "END" : `${s.phase.charAt(0)}${s.round ?? ""}`,
+      step: over ? null : step,
+      stepShort: over || step === null ? null : shortStep(step),
+    },
+    headline:
+      s === null
+        ? "Starting"
+        : over
+          ? s.result
+            ? resultLine(s.result)
+            : "Over"
+          : (headlineFlag?.name ?? (night ? "Night falls" : s.step === "Vote" ? "The table votes" : (step ?? s.phase))),
+    also: others.length > 0 ? { flag: others[0]!, more: others.length - 1 } : null,
+    fill: night ? "night" : s === null ? "starting" : !over && (s.dramaScore ?? 0) >= HOT_DRAMA ? "hot" : "plain",
+    dramaText: drama === null ? "—" : `${drama}%`,
   };
 }
 
