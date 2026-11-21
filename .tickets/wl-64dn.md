@@ -1,6 +1,6 @@
 ---
 id: wl-64dn
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-11-21T17:44:22Z
@@ -36,3 +36,9 @@ Replace cost estimates with measured spend.
 - [ ] A real local Match reports a final cost; compare it to the AI Studio usage dashboard if available, and note it
 - [ ] Tile and end screen show cost; the League snapshot shows total spend and spend since resume
 
+
+## Notes
+
+**2026-11-21T19:19:59Z**
+
+Merged into integration/wl-xgp7 (impl/wl-64dn ee5d364). Verification on integration: pnpm test 244/244, typecheck clean. AC1: test/system/usage.test.ts has exact per-Player/Agent/Match/League totals, including timed-out, invalid-retry, setup and Narrator usage, plus the spend cap; harness stub tests cover usage reads on poll, cancel, reconcile, setup and close. AC2: src/core/pricing.ts PRICES with test/core/pricing.test.ts (cached tokens split out). AC3: real local Match 35fc4bd6 (Hydrogen + 3.5 Flash-Lite, village win, 188 s) measured /bin/bash.3214 (Hydrogen /bin/bash.2616, Flash-Lite /bin/bash.0599); 515,660 input tokens (364,256 cached), 25,848 thought, 4,087 output. Not compared with the AI Studio dashboard, which the agent couldn't see; the human can check it. Ran before the setup-billing fix. AC4: tile summary 'cost' (shown in the grid footer), end-screen Cost table (/tmp/wl64/end.png), home 'League spend' line, $/Match leaderboard column, GET /api/league spend {total, sinceResume, byAgent, resumedAt}. New: config spendCap auto-pauses, and resume over the cap is refused. Open P2s: close() re-reads only cancelled final interactions; player close gives up after 5 rounds; aborted narration usage is never read.
