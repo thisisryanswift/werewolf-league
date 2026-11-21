@@ -85,6 +85,8 @@ export type Viewer = { seat: Seat } | { spectator: true; godView: boolean };
 
 export interface Ruleset<S = unknown> {
   id: string;
+  /** The Sides a Player can be on, in display order. Each Agent holds one Side Rating per Side. */
+  sides: readonly string[];
   setup(config: Record<string, unknown>, seed: string, seats: SeatAgent[]): SetupResult<S>;
   /** Which Players must act now, or the final result. */
   nextStep(state: S): Step;
