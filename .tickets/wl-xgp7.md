@@ -231,3 +231,7 @@ Human decisions 15:14: code freeze at 16:30, with 16:30-17:00 for the human's de
 **2026-11-21T20:26:17Z**
 
 Final code review (15:26, main...integration/wl-xgp7, two axes): no P0/P1. Standards P2s: 'game' wording in Agent-facing prompts (src/harness/managed-agent/index.ts:74-75, src/core/analyst.ts:57, src/rulesets/werewolf/narration.ts:13,78; deferred, because changing prompts at the freeze is risky); the Analyst as sentinel seat 0 repeated in match.ts; role-to-side logic duplicated in web/; duplicate event describers (server vs web); EventDescriber alias bypassed in night.ts; devVarsSecret() copied across scripts; large match.ts/league.ts. Spec P2s: thinking and timeout markers hidden with Narrator's View off (fix pass); pause can still launch an already-reserved Match within milliseconds; configure() clears the spend-cap block (fix pass); the one-off admin Match route is unticketed. Fix pass impl/review-fixes: Day-step markers public, role display names in death reveals, spend-cap block clearing.
+
+**2026-11-21T20:34:50Z**
+
+Final review fix pass merged (impl/review-fixes 182d584): Day thinking and timeout markers are public (Night stays Narrator's-View-only); death and role reveals use display names; configure() keeps a spend-cap block unless the cap is lifted. Implementer: 293/293, codex clean. Remaining review P2s are recorded above.

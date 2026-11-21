@@ -2,15 +2,12 @@
 // harness) and scheduling settings. The operator replaces any of it through the
 // admin config route; these are the defaults for a fresh League.
 
-import { DEFAULT_RULESET_ID } from "../rulesets";
+import { DEFAULT_RULESET_ID, LEAGUE_SEED_ROSTERS } from "../rulesets";
 import type { DeadlineConfig } from "./deadlines";
 import type { AgentConfig } from "./harness";
 import type { NarratorConfig } from "./narrator";
 import { narratorConfigError } from "../narrator";
 import { analystConfigError, type AnalystConfig } from "./analyst";
-
-/** The League every Match reports to (one League for the demo). */
-export const LEAGUE_NAME = "default";
 
 export interface LeagueConfig {
   /** Matches kept live at once. */
@@ -60,15 +57,20 @@ export function fakeRoster(): AgentConfig[] {
   }));
 }
 
-/** A fresh League starts paused, so it spends nothing until the operator resumes it. */
-export function defaultLeagueConfig(): LeagueConfig {
+/**
+ * A fresh League starts paused, so it spends nothing until the operator resumes
+ * it. A League with a seed roster (pi-open: the pi Harness Agents) starts on it;
+ * others start on the fake roster.
+ */
+export function defaultLeagueConfig(leagueId?: string): LeagueConfig {
+  const seed = leagueId === undefined ? undefined : LEAGUE_SEED_ROSTERS[leagueId];
   return {
     n: 24,
     paused: true,
     seats: 7,
     rulesetId: DEFAULT_RULESET_ID,
     rulesetConfig: {},
-    roster: fakeRoster(),
+    roster: seed ? seed() : fakeRoster(),
     ...DEFAULT_PACING,
   };
 }

@@ -6,13 +6,16 @@
 // the result, the leaderboard before and after, and checks N=0 starts nothing.
 // Always pauses the League on exit.
 //
-// Usage: [NARRATOR=decisions] node scripts/rehearsal.mjs <baseUrl> [outFile]
+// Usage: [LEAGUE=gemini-managed] [NARRATOR=decisions] node scripts/rehearsal.mjs <baseUrl> [outFile]
 // ADMIN_SECRET comes from the environment. Writes the full evidence JSON to outFile.
 import { writeFileSync } from "node:fs";
 import WebSocket from "ws";
 import { realRoster } from "../src/rulesets/werewolf/roster.ts";
 
 const base = process.argv[2]?.replace(/\/+$/, "");
+// LEAGUE=<id> picks a League (e.g. pi-open); unset uses the single-League routes, which are gemini-managed.
+const LEAGUE_PATH = process.env.LEAGUE ? `/api/leagues/${process.env.LEAGUE}` : "/api/league";
+const ADMIN_PATH = process.env.LEAGUE ? `/api/admin/leagues/${process.env.LEAGUE}` : "/api/admin/league";
 const outFile = process.argv[3] ?? "/tmp/wl-rehearsal.json";
 if (!base) throw new Error("usage: node scripts/rehearsal.mjs <baseUrl> [outFile]");
 const secret = process.env.ADMIN_SECRET;
@@ -26,7 +29,7 @@ const log = (...a) => console.log(`[${secs()}s]`, ...a);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const getJson = async (path) => (await fetch(base + path, { headers: UA })).json();
 async function admin(op, body = {}) {
-  const res = await fetch(`${base}/api/admin/league/${op}`, {
+  const res = await fetch(`${base}${ADMIN_PATH}/${op}`, {
     method: "POST",
     headers: { ...UA, "x-admin-secret": secret, "content-type": "application/json" },
     body: JSON.stringify(body),
@@ -80,14 +83,14 @@ async function finish() {
 }
 
 try {
-  const before = await getJson("/api/league");
+  const before = await getJson(LEAGUE_PATH);
   evidence.leaderboardBefore = before.leaderboard;
   evidence.statsBefore = before.stats;
   if (before.tiles.length > 0) throw new Error(`League already has ${before.tiles.length} live Matches; aborting`);
 
   // League feed, to see the tile appear and the leaderboard message.
   const leagueMsgs = [];
-  const lws = new WebSocket(`${base.replace(/^http/, "ws")}/api/league/ws`, { headers: UA });
+  const lws = new WebSocket(`${base.replace(/^http/, "ws")}${LEAGUE_PATH}/ws`, { headers: UA });
   lws.on("message", (raw) => leagueMsgs.push({ at: Date.now(), msg: JSON.parse(String(raw)) }));
   await new Promise((r) => lws.once("open", r));
 
@@ -105,7 +108,7 @@ try {
   let tile;
   while (!tile) {
     await sleep(250);
-    const s = await getJson("/api/league");
+    const s = await getJson(LEAGUE_PATH);
     if (s.blocked) log(`blocked: ${s.blocked}`);
     if (s.tiles.length > 1) throw new Error(`n=1 but ${s.tiles.length} tiles`);
     tile = s.tiles[0];
@@ -145,7 +148,7 @@ try {
   lws.close();
 
   const final = await getJson(`/api/matches/${matchId}`);
-  const finalAfter = await getJson("/api/league");
+  const finalAfter = await getJson(LEAGUE_PATH);
   evidence.final = final;
   evidence.leaderboardAfter = finalAfter.leaderboard;
   evidence.statsAfter = finalAfter.stats;
@@ -190,7 +193,7 @@ try {
   await admin("config", { n: 0 });
   await admin("resume");
   await sleep(10_000);
-  const n0 = await getJson("/api/league");
+  const n0 = await getJson(LEAGUE_PATH);
   evidence.checks.n0StartsNothing = n0.tiles.length === 0 && n0.stats.started === finalAfter.stats.started;
   await admin("pause");
   await admin("config", { n: 1 });

@@ -6,7 +6,7 @@ import { DurableObject } from "cloudflare:workers";
 import { nextPollDelay } from "../core/deadlines";
 import { isRateLimited, type AgentConfig, type PlayerContext, type TurnHandle, type UsageReading } from "../core/harness";
 import type { TurnAssignment } from "../core/match";
-import { LEAGUE_NAME } from "../core/roster";
+import { leagueStub } from "../core/leagues";
 import type { Seat, ToolCall, ToolSpec } from "../core/ruleset";
 import { ledgerUsage, recordReadings, type ModelUsage, type UsageLedger } from "../core/usage";
 import { harnessFor } from "../harness";
@@ -20,7 +20,7 @@ interface Seating {
   instructions?: string;
   /** See PlayerContext.preamble. */
   preamble?: string;
-  /** The League the Match reports to (429s go there too); absent means LEAGUE_NAME. */
+  /** The League id the Match reports to (429s go there too); absent means the default League. */
   league?: string;
 }
 
@@ -184,7 +184,7 @@ export class PlayerDO extends DurableObject<Env> {
     const last = this.ctx.storage.kv.get<number>("rateLimitReportedAt") ?? 0;
     if (now - last < RATE_LIMIT_REPORT_MS) return Promise.resolve();
     this.ctx.storage.kv.put("rateLimitReportedAt", now);
-    const report = this.env.LEAGUE.getByName(seating.league ?? LEAGUE_NAME)
+    const report = leagueStub(this.env, seating.league)
       .reportRateLimit({ matchId: seating.matchId, seat: seating.seat, agentId: seating.agent.id, source })
       .catch(() => {});
     this.ctx.waitUntil(report);

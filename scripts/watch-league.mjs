@@ -10,6 +10,9 @@ import { readFileSync } from "node:fs";
 import WebSocket from "ws";
 
 const base = process.argv[2] ?? "http://127.0.0.1:8787";
+// LEAGUE=<id> picks a League (e.g. pi-open); unset uses the single-League routes, which are gemini-managed.
+const LEAGUE_PATH = process.env.LEAGUE ? `/api/leagues/${process.env.LEAGUE}` : "/api/league";
+const ADMIN_PATH = process.env.LEAGUE ? `/api/admin/leagues/${process.env.LEAGUE}` : "/api/admin/league";
 function devVarsSecret() {
   try {
     return /^ADMIN_SECRET=(.*)$/m.exec(readFileSync(new URL("../.dev.vars", import.meta.url), "utf8"))?.[1]?.trim();
@@ -23,7 +26,7 @@ const UA = "werewolf-league-smoke/1.0";
 const N = Number(process.env.N ?? 3);
 
 async function admin(op, body = {}, key = secret) {
-  const res = await fetch(`${base}/api/admin/league/${op}`, {
+  const res = await fetch(`${base}${ADMIN_PATH}/${op}`, {
     method: "POST",
     headers: { "x-admin-secret": key, "content-type": "application/json", "user-agent": UA },
     body: JSON.stringify(body),
@@ -33,7 +36,7 @@ async function admin(op, body = {}, key = secret) {
 
 console.log(`admin without secret: ${(await admin("resume", {}, "wrong")).status}`);
 
-const ws = new WebSocket(`${base.replace(/^http/, "ws")}/api/league/ws`, { headers: { "user-agent": UA } });
+const ws = new WebSocket(`${base.replace(/^http/, "ws")}${LEAGUE_PATH}/ws`, { headers: { "user-agent": UA } });
 const snapshots = [];
 // Fold a coalesced "tiles" diff into the snapshot (same as applyLeagueDiff in src/shared/league-feed.ts).
 function fold(prev, msg) {
