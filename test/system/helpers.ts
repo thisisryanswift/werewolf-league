@@ -3,7 +3,7 @@ import { werewolf } from "../../src/rulesets/werewolf";
 import type { TimeoutCounts } from "../../src/core/deadlines";
 import type { AgentConfig } from "../../src/core/harness";
 import { applyLeagueDiff } from "../../src/shared/league-feed";
-import type { LeagueMessage, LeagueSnapshot, MatchEvent, ServerMessage } from "../../src/shared/protocol";
+import type { LeagueMessage, LeagueSnapshot, MatchCost, MatchEvent, ServerMessage } from "../../src/shared/protocol";
 
 export const ADMIN = { "x-admin-secret": "test-admin-secret" };
 
@@ -27,8 +27,8 @@ export async function startMatch(body: Record<string, unknown>): Promise<string>
 export interface Snapshot {
   matchId: string;
   status: "running" | "finished";
-  result: { winner: string; sides: Record<string, string>; timeouts: TimeoutCounts } | null;
-  stats: { timeouts: TimeoutCounts };
+  result: { winner: string; sides: Record<string, string>; timeouts: TimeoutCounts; cost?: MatchCost } | null;
+  stats: { timeouts: TimeoutCounts; cost: number };
   events: MatchEvent[];
 }
 

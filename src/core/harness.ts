@@ -4,6 +4,9 @@
 // persist them between alarms.
 
 import type { ToolCall, ToolSpec, TurnRequest } from "./ruleset";
+import type { UsageReading } from "./usage";
+
+export type { Usage, UsageReading } from "./usage";
 
 /** An Agent from the roster: model + Agent Instructions + harness. */
 export interface AgentConfig {
@@ -45,6 +48,11 @@ export interface TurnInput {
 /** Opaque, JSON-serializable handle to an in-flight turn. */
 export type TurnHandle = Record<string, unknown>;
 
+/**
+ * Usage: every Harness method may return `usage`, readings of the model calls it
+ * saw reach a final status (including cancelled ones, whose tokens were billed).
+ * The same call may be read again later; readings share its ID (see UsageReading).
+ */
 export type PollResult =
   | {
       status: "pending";
@@ -55,14 +63,23 @@ export type PollResult =
       retryAfterMs?: number;
     }
   /** `call: null` means the turn ended without a custom function call. */
-  | { status: "done"; call: ToolCall | null }
-  | { status: "error"; message: string };
+  | { status: "done"; call: ToolCall | null; usage?: UsageReading[] }
+  | { status: "error"; message: string; usage?: UsageReading[] };
+
+/** What `cancel` returns: updated chain state to persist, and the cancelled call's usage. */
+export interface CancelResult {
+  chain?: Record<string, unknown>;
+  usage?: UsageReading[];
+}
 
 export interface Harness {
   /** Prepare the seat's environment at Match start. Returns updated chain state. */
   provision(ctx: PlayerContext): Promise<Record<string, unknown>>;
   /** Start a turn in the background. Returns the handle and updated chain state. */
-  startTurn(ctx: PlayerContext, input: TurnInput): Promise<{ handle: TurnHandle; chain: Record<string, unknown> }>;
+  startTurn(
+    ctx: PlayerContext,
+    input: TurnInput,
+  ): Promise<{ handle: TurnHandle; chain: Record<string, unknown>; usage?: UsageReading[] }>;
   poll(ctx: PlayerContext, handle: TurnHandle): Promise<PollResult>;
   /**
    * Best-effort cancel of an in-flight turn that missed its deadline. Optional. After it,
@@ -70,8 +87,14 @@ export interface Harness {
    * carrying every observation the seat missed. Harnesses may return updated chain
    * state; persist it if returned (then a call that landed just before the cancel is
    * reported to the Agent as "not used"). `startTurn` also settles a turn still in flight.
+   * Returns the cancelled call's usage if it can be read.
    */
-  cancel?(ctx: PlayerContext, handle: TurnHandle): Promise<Record<string, unknown> | void>;
+  cancel?(ctx: PlayerContext, handle: TurnHandle): Promise<CancelResult | void>;
+  /**
+   * The Match is over: settle anything still open that was billed, such as a setup
+   * interaction of a seat that never took a turn, and return its usage. Optional.
+   */
+  close?(ctx: PlayerContext): Promise<CancelResult | void>;
 }
 
 /**

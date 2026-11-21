@@ -6,6 +6,7 @@
 // large tiles don't swap faster than a line can be read.
 import { visibleDramaFlags, type Leaderboard, type LeagueTilesMessage, type MatchTile } from "../../src/shared/protocol";
 import { spectatorLabel } from "../../src/shared/seat-label";
+import { formatUsd } from "../cost";
 
 export type GridSort = "drama" | "alive" | "number";
 export type GridFilter = "all" | "flagged" | "voting" | "night";
@@ -174,8 +175,8 @@ export function tileView(tile: MatchTile, narratorView: boolean): TileView {
   };
 }
 
-/** Cost so far, once wl-64dn adds it to the tile summary (field name to confirm when it merges). */
+/** The Match's measured cost so far (wl-64dn's `MatchSummary.cost`, USD), when the summary carries one. */
 function costText(s: MatchTile["summary"]): string | null {
-  const cost = (s as { cost?: unknown } | null)?.cost;
-  return typeof cost === "number" ? "$" + cost.toFixed(2) : null;
+  const cost = s?.cost;
+  return typeof cost === "number" ? formatUsd(cost) : null;
 }

@@ -8,6 +8,7 @@ import { LeagueGrid } from "../grid/LeagueGrid";
 import { MatchModal } from "../grid/MatchModal";
 import { useMatchRoute } from "../grid/useMatchRoute";
 import { useLeagueFeed } from "../useLeagueFeed";
+import { formatUsd } from "../cost";
 
 export function HomePage() {
   const { league, status, activity } = useLeagueFeed();
@@ -24,6 +25,12 @@ export function HomePage() {
       )}
       {league && (
         <div className="lg-below">
+          {league.spend && (
+            <p className="lg-spend" data-testid="league-spend">
+              League spend {formatUsd(league.spend.total)} ({formatUsd(league.spend.sinceResume)} since resume)
+              {league.config.spendCap != null && ` · cap ${formatUsd(league.config.spendCap)}`}
+            </p>
+          )}
           <Leaderboard data={league.leaderboard} />
           <FinishedMatchList recent={league.recent} />
         </div>

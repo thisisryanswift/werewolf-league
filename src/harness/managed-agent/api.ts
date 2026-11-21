@@ -2,6 +2,8 @@
 // Request shapes are the ones proven by FINDINGS.md and the M1 check (scripts/m1/chain.ts).
 // Errors carry the status and a slice of the response body, never request headers.
 
+import type { UsageReading } from "../../core/usage";
+
 export const API_BASE = "https://generativelanguage.googleapis.com/v1beta/interactions";
 export const AGENT = "antigravity-preview-09-2026";
 
@@ -18,6 +20,8 @@ export interface Interaction {
   status: string;
   environment_id?: string;
   steps?: Step[];
+  /** REST usage: total_input_tokens (includes total_cached_tokens), total_thought_tokens, total_output_tokens. */
+  usage?: Record<string, unknown>;
 }
 
 /** Statuses in which an interaction is still running. */
@@ -62,13 +66,26 @@ export class InteractionsClient {
   create(body: unknown): Promise<Interaction> {
     return this.call("POST", "", body);
   }
-  get(id: string): Promise<Interaction> {
-    return this.call("GET", `/${id}`);
+  /** Get; with `timeoutMs`, give up waiting. */
+  get(id: string, timeoutMs?: number): Promise<Interaction> {
+    return this.call("GET", `/${id}`, undefined, timeoutMs);
   }
   /** Cancel; with `timeoutMs`, give up waiting (the cancel may still land). */
   cancel(id: string, timeoutMs?: number): Promise<Interaction> {
     return this.call("POST", `/${id}/cancel`, {}, timeoutMs);
   }
+}
+
+/** The interaction's billed usage as a generic reading, or null if the API reported none. */
+export function readUsage(it: Interaction, model: string): UsageReading | null {
+  const u = it.usage;
+  if (!u) return null;
+  const n = (k: string) => (typeof u[k] === "number" ? (u[k] as number) : 0);
+  return {
+    id: it.id,
+    model,
+    usage: { input: n("total_input_tokens"), cached: n("total_cached_tokens"), thought: n("total_thought_tokens"), output: n("total_output_tokens") },
+  };
 }
 
 /** Unanswered calls to the seat's own tools. Filesystem calls auto-run and already carry results. */

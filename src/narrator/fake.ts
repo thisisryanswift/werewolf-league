@@ -8,6 +8,7 @@
 //   delayMs: number           — answer after this long (an abort stops the wait)
 //   reportInFlight: true      — add a "fake_max_in_flight" flag whose value is the
 //                               most calls this fake has seen in flight at once for the Match
+//   inputTokens: number       — report this many input tokens per answered call, billed as gemini-decision-1
 
 import type { Narration, NarrationInput, Narrator } from "../core/narrator";
 
@@ -19,6 +20,7 @@ interface FakeNarratorOptions {
   hangAfter?: number;
   delayMs?: number;
   reportInFlight?: boolean;
+  inputTokens?: number;
 }
 
 /** Per-Match call counters, kept across Narrator instances (an instance may be rebuilt). */
@@ -52,7 +54,10 @@ export function fakeNarrator(options: Record<string, unknown> = {}): Narrator {
         const dramaScore = opts.scores?.length ? opts.scores[Math.min(call, opts.scores.length) - 1]! : (opts.dramaScore ?? 0.5);
         const flags = input.questions.flags.map((q) => ({ id: q.id, value: opts.flags?.[q.id] ?? 0, visibility: q.visibility }));
         if (opts.reportInFlight) flags.push({ id: "fake_max_in_flight", value: s.maxInFlight, visibility: "public-safe" });
-        return { dramaScore, flags };
+        const usage = opts.inputTokens
+          ? [{ id: `${input.matchId}:narration:${call}`, model: "gemini-decision-1", usage: { input: opts.inputTokens, cached: 0, thought: 0, output: 0 } }]
+          : undefined;
+        return { dramaScore, flags, ...(usage ? { usage } : {}) };
       } finally {
         s.inFlight -= 1;
       }
