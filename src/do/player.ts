@@ -18,6 +18,8 @@ interface Seating {
   tools: ToolSpec[];
   /** Assembled Agent Instructions for this seat (see PlayerContext). */
   instructions?: string;
+  /** See PlayerContext.preamble. */
+  preamble?: string;
   /** The League the Match reports to (429s go there too); absent means LEAGUE_NAME. */
   league?: string;
 }
@@ -105,6 +107,17 @@ export class PlayerDO extends DurableObject<Env> {
   }
 
   /**
+   * Called by the Match when it gives up on the current turn without a successor (the
+   * Analyst's backstop): drop the turn and cancel it if it is in flight. Idempotent.
+   */
+  async abandon(): Promise<void> {
+    const turn = this.turn;
+    if (!turn) return;
+    this.ctx.storage.kv.delete("turn");
+    if (turn.handle) await this.cancelAndReport(turn.matchId, turn.handle);
+  }
+
+  /**
    * Called by the Match when it is over: let the Harness settle anything still billed
    * (e.g. the setup interaction of a seat that never acted) and report the seat's usage.
    */
@@ -152,7 +165,7 @@ export class PlayerDO extends DurableObject<Env> {
     // An answer that lands after the deadline is too late and counts as a timeout.
     if (Date.now() >= turn.deadlineAt) return this.timeOut(turn);
     const call: ToolCall | null = polled.status === "done" ? polled.call : null;
-    await this.report(turn, call);
+    await this.report(turn, call, polled.status === "done" ? polled.notes : undefined);
   }
 
   /** Poll again after the poll interval (or the Harness's longer hint), or at the deadline if that is sooner. */
@@ -222,8 +235,9 @@ export class PlayerDO extends DurableObject<Env> {
     this.updateTurn(turn.turnId, null);
   }
 
-  private async report(turn: CurrentTurn, call: ToolCall | null): Promise<void> {
-    const res = await this.env.MATCH.getByName(turn.matchId).submitAction(turn.turnId, turn.seat, call, this.usage);
+  /** Report the action, with the seat's notes if the turn wrote any (the Match publishes them to Narrator's View only). */
+  private async report(turn: CurrentTurn, call: ToolCall | null, notes?: string): Promise<void> {
+    const res = await this.env.MATCH.getByName(turn.matchId).submitAction(turn.turnId, turn.seat, call, this.usage, notes);
     if (res.status === "invalid") {
       // Retry the same frozen observation with the error; the Agent corrects itself before the deadline.
       if (this.updateTurn(turn.turnId, { ...turn, handle: null, input: { ...turn.input, error: res.error } })) {

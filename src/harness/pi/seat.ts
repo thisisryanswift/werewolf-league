@@ -42,7 +42,7 @@ export interface PiSeatConfig {
 
 export type PiPoll =
   | { status: "pending" }
-  | { status: "done"; call: ToolCall | null; usage: UsageReading[] }
+  | { status: "done"; call: ToolCall | null; usage: UsageReading[]; notes?: string }
   | { status: "error"; message: string; usage: UsageReading[] };
 
 const SANDBOX_SECTION = [
@@ -198,7 +198,10 @@ export class PiSeatDO extends DurableObject<Env> {
     await this.lifecycle.start();
     const turn = this.turns.get();
     if (!turn || turn.opId !== opId || turn.cancelled) return { status: "error", message: `pi run ${opId} is no longer this seat's turn`, usage: [] };
-    if (turn.accepted) return { status: "done", call: turn.accepted, usage: await this.usage() };
+    if (turn.accepted) {
+      const notes = await this.readNotes();
+      return { status: "done", call: turn.accepted, usage: await this.usage(), ...(notes ? { notes } : {}) };
+    }
     const pending = await this.harness.pending();
     if (pending.some((p) => p.operationId === opId)) return { status: "pending" };
     const result = await this.harness.wait(opId);
@@ -230,6 +233,18 @@ export class PiSeatDO extends DurableObject<Env> {
     }
     const deleted = await this.deleteInstance();
     return { usage, deleted };
+  }
+
+  /** The seat's notes file for Narrator's View (wl-rhpr). Best effort and bounded: never fails a turn. */
+  private async readNotes(): Promise<string | undefined> {
+    const id = this.instance;
+    if (!id) return undefined;
+    try {
+      const r = await this.agent37().exec(id, `cat ${NOTES_PATH} 2>/dev/null | tail -c 4000`, 3_000);
+      return r.exit_code === 0 && r.stdout?.trim() ? r.stdout : undefined;
+    } catch {
+      return undefined;
+    }
   }
 
   private async deleteInstance(): Promise<boolean> {

@@ -1,4 +1,4 @@
-// The Match view: seats with Claim badges and turn markers, Accusation arcs, a
+// The Match view: seats with Claim badges, turn markers and Accusation chips, a
 // feed grouped by Night / Speech Round / Right of Reply / Vote with a tally per
 // vote, Narrator's View panels, and the end-of-Match screen.
 //
@@ -20,6 +20,7 @@ import "./match-view.css";
 import { buildMatchView, panelsFor, playerLabel, type EndScreen, type FeedGroup, type MatchView as View, type SeatView, type VoteTally } from "./model";
 import { NarratorViewContext, MATCH_PANELS, SEAT_SLOTS, useNarratorView, type MatchPanelProps } from "./panels";
 import { formatUsd } from "../cost";
+import { AnalystReport } from "./AnalystReport";
 
 export interface MatchViewProps {
   matchId: string;
@@ -143,55 +144,69 @@ const ROLE_ICON: Record<string, string> = { werewolf: "🐺", seer: "👁", doct
 const upper = (s: string) => s.toUpperCase();
 
 function Seats({ view, panelProps }: { view: View; panelProps: MatchPanelProps }) {
-  const wrap = useRef<HTMLDivElement>(null);
-  const [ys, setYs] = useState<Record<number, number>>({});
-  const [height, setHeight] = useState(0);
-
-  // Arcs are drawn from measured seat positions; re-measure whenever the layout changes.
-  useLayoutEffect(() => {
-    const el = wrap.current;
-    if (!el) return;
-    const measure = () => {
-      const top = el.getBoundingClientRect().top;
-      const next: Record<number, number> = {};
-      el.querySelectorAll<HTMLElement>("[data-seat]").forEach((li) => {
-        const r = li.getBoundingClientRect();
-        next[Number(li.dataset.seat)] = r.top - top + r.height / 2;
-      });
-      setYs(next);
-      setHeight(el.getBoundingClientRect().height);
-    };
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [view.seats.length]);
-
   const acc = view.accusations;
   return (
     <>
-      <div className="mv-acc-label">
+      <div className="mv-acc-label" data-testid="accusations-day">
         {acc ? (
           <>
-            Accusations · Day {acc.cycle} <span className="mv-key mv-key-a">┄ Round A</span> <span className="mv-key mv-key-b">━ Round B</span>
+            Accusations · Day {acc.cycle} <span className="mv-key">🎯 most accused (Round B counts double)</span>
           </>
         ) : (
           "Accusations · none yet"
         )}
       </div>
-      <div className="mv-seatwrap" ref={wrap}>
-        <Arcs links={acc?.links ?? []} ys={ys} height={height} />
-        <ol className="mv-seats" data-testid="seats">
-          {view.seats.map((s) => (
-            <Seat key={s.seat} seat={s} panelProps={panelProps} />
-          ))}
-        </ol>
-      </div>
+      <ol className="mv-seats" data-testid="seats">
+        {view.seats.map((s) => (
+          <Seat key={s.seat} seat={s} seats={view.seats} panelProps={panelProps} />
+        ))}
+      </ol>
     </>
   );
 }
 
-function Seat({ seat: s, panelProps }: { seat: SeatView; panelProps: MatchPanelProps }) {
+/** A seat named in a chip: "P2 Mara", or just "P2" without a Display Name. */
+function seatRef(seats: SeatView[], seat: number): string {
+  const name = seats.find((s) => s.seat === seat)?.displayName;
+  return name ? `P${seat} ${name}` : `P${seat}`;
+}
+
+function AccusationChips({ seat: s, seats }: { seat: SeatView; seats: SeatView[] }) {
+  const a = s.accusations;
+  if (!a.by.length && !a.accuses.length && !a.defends.length && !a.replier) return null;
+  const refs = (list: number[]) => list.map((x) => seatRef(seats, x)).join(" · ");
+  return (
+    <span className="mv-accs" data-testid="accusation-chips">
+      {a.mostAccused && (
+        <span className="mv-acc mv-acc-top" data-testid="most-accused" title="Right of Reply score: Round A counts once, Round B twice">
+          🎯 {a.score}
+        </span>
+      )}
+      {a.replier && (
+        <span className="mv-acc mv-acc-reply" data-testid="replier">
+          Reply
+        </span>
+      )}
+      {a.by.length > 0 && (
+        <span className="mv-acc mv-acc-in" data-testid="accused-by">
+          <i className="mv-acc-arrow" aria-hidden="true">←</i> accused by {refs(a.by)}
+        </span>
+      )}
+      {a.accuses.length > 0 && (
+        <span className="mv-acc mv-acc-out" data-testid="accuses">
+          <i className="mv-acc-arrow" aria-hidden="true">→</i> accuses {refs(a.accuses)}
+        </span>
+      )}
+      {a.defends.length > 0 && (
+        <span className="mv-acc mv-acc-def" data-testid="defends">
+          <i className="mv-acc-arrow" aria-hidden="true">♥</i> defends {refs(a.defends)}
+        </span>
+      )}
+    </span>
+  );
+}
+
+function Seat({ seat: s, seats, panelProps }: { seat: SeatView; seats: SeatView[]; panelProps: MatchPanelProps }) {
   const narratorView = useNarratorView();
   return (
     <li
@@ -224,6 +239,7 @@ function Seat({ seat: s, panelProps }: { seat: SeatView; panelProps: MatchPanelP
             {s.claim.truth && <b className={`mv-truth ${s.claim.truth}`}>{s.claim.truth === "true" ? "TRUE" : "LIE"}</b>}
           </span>
         )}
+        <AccusationChips seat={s} seats={seats} />
         {panelsFor(SEAT_SLOTS, narratorView).map((slot) => (
           <slot.Component key={slot.id} {...panelProps} seat={s} />
         ))}
@@ -235,44 +251,6 @@ function Seat({ seat: s, panelProps }: { seat: SeatView; panelProps: MatchPanelP
         </span>
       )}
     </li>
-  );
-}
-
-const GUTTER = 64;
-
-function Arcs({ links, ys, height }: { links: { from: number; to: number; round: string }[]; ys: Record<number, number>; height: number }) {
-  const x0 = GUTTER - 4;
-  return (
-    <svg className="mv-gutter" width={GUTTER} height={height} viewBox={`0 0 ${GUTTER} ${height}`} aria-hidden="true">
-      <defs>
-        <marker id="mv-ah-a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
-          <path d="M0,0L10,5L0,10z" className="mv-ah-a" />
-        </marker>
-        <marker id="mv-ah-b" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4" markerHeight="4" orient="auto-start-reverse">
-          <path d="M0,0L10,5L0,10z" className="mv-ah-b" />
-        </marker>
-      </defs>
-      {links.map((a, i) => {
-        const y1 = ys[a.from];
-        const y2 = ys[a.to];
-        if (y1 === undefined || y2 === undefined) return null;
-        const b = a.round !== "A";
-        const bulge = Math.min(GUTTER - 8, 14 + Math.abs(y2 - y1) * 0.09 + (b ? 6 : 0));
-        const dy = b ? 6 : -6;
-        return (
-          <path
-            key={i}
-            className={`mv-arc ${b ? "b" : "a"}`}
-            d={`M${x0},${y1 + dy} C${x0 - bulge},${y1 + dy} ${x0 - bulge},${y2 - dy} ${x0 - 2},${y2 - dy}`}
-            markerEnd={`url(#mv-ah-${b ? "b" : "a"})`}
-          >
-            <title>
-              P{a.from} accuses P{a.to} (Round {a.round})
-            </title>
-          </path>
-        );
-      })}
-    </svg>
   );
 }
 
@@ -516,6 +494,7 @@ function End({ end, label, onHide }: { end: EndScreen; label: string; onHide: ()
           </li>
         ))}
       </ul>
+      <AnalystReport end={end} />
       <h4>Cost</h4>
       {end.cost ? (
         <table className="mv-ratings" data-testid="match-cost">
@@ -526,6 +505,12 @@ function End({ end, label, onHide }: { end: EndScreen; label: string; onHide: ()
                 <td>{formatUsd(a.cost)}</td>
               </tr>
             ))}
+            {end.cost.analyst > 0 && (
+              <tr>
+                <th>Analyst</th>
+                <td>{formatUsd(end.cost.analyst)}</td>
+              </tr>
+            )}
             {end.cost.narrator > 0 && (
               <tr>
                 <th>Narrator</th>

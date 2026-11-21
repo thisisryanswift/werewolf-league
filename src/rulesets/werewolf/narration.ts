@@ -59,10 +59,20 @@ const NARRATOR_VIEW_TEXT: Record<string, (d: Record<string, unknown>) => string>
   doctor_saved: (d) => `Night ${d.cycle}: the Doctor's protection saved seat ${d.target} from the Werewolves.`,
 };
 
-export function narrationLog(s: WerewolfState, events: RulesetEvent[]): string {
+/**
+ * The Narrator's View log. `extra` adds lines for event kinds the Narrator skips
+ * (the Analyst's input adds beliefs this way); the Narrator never passes it.
+ */
+export function narrationLog(
+  s: WerewolfState,
+  events: RulesetEvent[],
+  extra: Record<string, (d: Record<string, unknown>, s: WerewolfState) => string | null> = {},
+): string {
   const roles = s.players.map((p) => `- Seat ${p.seat} (${p.label}): ${ROLE_NAMES[p.role]}${p.alive ? "" : ", dead"}`);
   const lines = events
-    .map((e) => (NARRATOR_VIEW_TEXT[e.kind] ? NARRATOR_VIEW_TEXT[e.kind]!(e.data) : describeEvent(e, s)))
+    .map((e) =>
+      extra[e.kind] ? extra[e.kind]!(e.data, s) : NARRATOR_VIEW_TEXT[e.kind] ? NARRATOR_VIEW_TEXT[e.kind]!(e.data) : describeEvent(e, s),
+    )
     .filter((t): t is string => !!t);
   return [
     "A Werewolf game seen with Narrator's View (every secret visible). Two Werewolves hide among the players; the rest are the Village.",

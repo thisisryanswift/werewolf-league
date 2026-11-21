@@ -31,6 +31,8 @@ export interface PlayerContext {
    * sections. Harnesses deliver them at provisioning (managed-agent: /.agents/AGENTS.md).
    */
   instructions?: string;
+  /** Replaces the Harness's Player preamble (the Analyst's run is not a seat in play). */
+  preamble?: string;
   /** Opaque Harness-owned state (environment ID, last interaction ID, ...). */
   chain: Record<string, unknown>;
 }
@@ -64,8 +66,12 @@ export type PollResult =
       /** Poll no sooner than this (the Player DO still wakes for the deadline). */
       retryAfterMs?: number;
     }
-  /** `call: null` means the turn ended without a custom function call. */
-  | { status: "done"; call: ToolCall | null; usage?: UsageReading[] }
+  /**
+   * `call: null` means the turn ended without a custom function call. `notes`: the seat's
+   * private scratchpad as this turn last wrote it, if it did (Narrator's View only, never
+   * shown to Players). Best effort: a Harness that can't read it leaves it out.
+   */
+  | { status: "done"; call: ToolCall | null; usage?: UsageReading[]; notes?: string }
   | { status: "error"; message: string; usage?: UsageReading[] };
 
 /** What `cancel` returns: updated chain state to persist, and the cancelled call's usage. */

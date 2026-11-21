@@ -31,4 +31,6 @@ export const runnerEvents: Record<string, EventRenderer> = {
   turn_timed_out: (d, log) =>
     `${seatLabel(d.seat, log)} timed out on ${d.actionKind}; the default action was applied` +
     (d.by === "backstop" ? " (expired by the Match backstop)." : d.by === "late" ? " (its answer arrived too late)." : "."),
+  // The contents are in the seat's notes drawer (wl-rhpr).
+  notes_updated: (d, log) => `📝 ${seatLabel(d.seat, log)} rewrote its notes.`,
 };

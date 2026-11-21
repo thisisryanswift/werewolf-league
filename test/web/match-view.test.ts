@@ -1,7 +1,9 @@
 // The Match view's model: what a Spectator sees for a given event log and Narrator's View setting.
 import { describe, expect, it } from "vitest";
 import type { MatchEvent, RulesetEvent } from "../../src/shared/protocol";
+import { werewolf } from "../../src/rulesets/werewolf";
 import { agentName, buildMatchView, panelsFor, playerLabel } from "../../web/match/model";
+import { dealt, nightKill, seatsOf, speak, speakUntilVote } from "../werewolf/helpers";
 
 /** Number events into a log, as the Match DO would. */
 function logOf(events: RulesetEvent[]): MatchEvent[] {
@@ -187,6 +189,39 @@ describe("Match view", () => {
     expect(view.feed.flatMap((g) => g.items.map((i) => i.event.kind))).not.toContain("match_cost");
   });
 
+  it("the end screen shows the Analyst's report only in Narrator's View, and the Analyst's cost", () => {
+    const report = {
+      summary: "Wolves won.",
+      turning_points: [
+        { when: "Night 1", what: "A kill." },
+        { when: "Day 1 vote", what: "A miss." },
+      ],
+      mistakes: [{ seat: 3, agent: "Agent3", what: "Voted wrong.", evidence: "Day 1 vote: 'trust me'." }],
+      best_play: { seat: 1, why: "A good lie." },
+      why_winner_won: "Village mistakes.",
+    };
+    const log = logOf([
+      ...night1,
+      ...day1,
+      pub("match_over", { winner: "wolf", reason: "parity", roles: { 1: "werewolf", 2: "werewolf", 3: "seer", 4: "doctor", 5: "villager" } }),
+      pub("match_cost", { total: 0.2, bySeat: {}, narrator: 0, analyst: 0.15, tokens: { input: 1, cached: 0, thought: 0, output: 0 }, unpriced: [] }),
+      priv("analysis", [], { status: "ok", model: "gemini-4-neon", startedAt: 1, finishedAt: 81_001, report }),
+    ]);
+    const on = buildMatchView(log, { narratorView: true });
+    expect(on.end!.analysis).toEqual({ status: "ok", model: "gemini-4-neon", seconds: 81, report });
+    expect(on.end!.cost!.analyst).toBeCloseTo(0.15, 10);
+    expect(buildMatchView(log, { narratorView: false }).end!.analysis).toBeNull();
+    // Not a feed line.
+    expect(on.feed.flatMap((g) => g.items.map((i) => i.event.kind))).not.toContain("analysis");
+    // A recorded failure.
+    const failed = logOf([
+      ...night1,
+      pub("match_over", { winner: "wolf", reason: "parity", roles: {} }),
+      priv("analysis", [], { status: "failed", model: "gemini-4-neon", startedAt: null, finishedAt: 5, reason: "timeout" }),
+    ]);
+    expect(buildMatchView(failed, { narratorView: true }).end!.analysis).toEqual({ status: "failed", model: "gemini-4-neon", seconds: null, reason: "timeout" });
+  });
+
   it("shows each seat's latest Claim, judged true or a lie only when the role is known", () => {
     const log = logOf([...night1, ...day1]);
     const on = buildMatchView(log, { narratorView: true });
@@ -199,19 +234,77 @@ describe("Match view", () => {
     expect(off.seats.find((s) => s.seat === 4)!.claim).toBeNull();
   });
 
-  it("links the latest Day's Accusations between Players", () => {
-    const view = buildMatchView(logOf([...night1, ...day1]), { narratorView: false });
-    expect(view.accusations).toEqual({
-      cycle: 1,
-      links: [
-        { from: 3, to: 1, round: "A" },
-        { from: 1, to: 3, round: "A" },
-        { from: 3, to: 1, round: "B" },
-        { from: 4, to: 1, round: "B" },
-        { from: 1, to: 3, round: "B" },
-      ],
+  it("gives each seat its incoming and outgoing Accusation chips for the current Day, with Narrator's View on or off", () => {
+    const log = logOf([...night1, ...day1.slice(0, 11)]);
+    const off = buildMatchView(log, { narratorView: false });
+    const chips = (seat: number) => off.seats.find((s) => s.seat === seat)!.accusations;
+    expect(off.accusations).toEqual({ cycle: 1 });
+    // Seat 3 accuses seat 1 in both Rounds: listed once.
+    expect(chips(1)).toEqual({ by: [3, 4], accuses: [3], defends: [], score: 5, mostAccused: true, replier: true });
+    expect(chips(3)).toEqual({ by: [1], accuses: [1], defends: [], score: 3, mostAccused: false, replier: false });
+    expect(chips(4)).toEqual({ by: [], accuses: [1], defends: [3], score: 0, mostAccused: false, replier: false });
+    expect(chips(2)).toEqual({ by: [], accuses: [], defends: [], score: 0, mostAccused: false, replier: false });
+    // Accusations are public: Narrator's View changes nothing.
+    expect(buildMatchView(log, { narratorView: true }).seats.map((s) => s.accusations)).toEqual(off.seats.map((s) => s.accusations));
+    expect(buildMatchView(logOf(night1.slice(0, -1)), { narratorView: true }).accusations).toBeNull();
+  });
+
+  it("shows a Right of Reply speech's Accusations as chips without adding them to the reply score", () => {
+    const log = logOf([...night1, ...day1.slice(0, 10), speech(1, "reply", 1, { accuse: [4] })]);
+    const seat4 = buildMatchView(log, { narratorView: false }).seats.find((s) => s.seat === 4)!.accusations;
+    expect(seat4).toMatchObject({ by: [1], score: 0, mostAccused: false });
+  });
+
+  it("weights a third Speech Round's Accusations three times, as the Ruleset does", () => {
+    const log = logOf([...night1, speech(1, "A", 3, { accuse: [2] }), speech(1, "A", 4, { accuse: [2] }), speech(1, "C", 1, { accuse: [4] })]);
+    const view = buildMatchView(log, { narratorView: false });
+    expect(view.seats.find((s) => s.seat === 4)!.accusations).toMatchObject({ score: 3, mostAccused: true });
+    expect(view.seats.find((s) => s.seat === 2)!.accusations).toMatchObject({ score: 2, mostAccused: false });
+  });
+
+  it("keeps the Day's chips through the following Night, resets them when the next Day starts, and keeps the final Day's once Over", () => {
+    const night2 = buildMatchView(logOf([...night1, ...day1]), { narratorView: false });
+    expect(night2.accusations).toEqual({ cycle: 1 });
+    expect(night2.seats.find((s) => s.seat === 1)!.accusations.by).toEqual([3, 4]);
+    const day2 = logOf([...night1, ...day1, pub("night_passed", { cycle: 2, killed: null }), pub("phase_started", { phase: "day", cycle: 2 })]);
+    const fresh = buildMatchView(day2, { narratorView: false });
+    expect(fresh.accusations).toEqual({ cycle: 2 });
+    expect(fresh.seats.every((s) => !s.accusations.by.length && !s.accusations.accuses.length && !s.accusations.mostAccused)).toBe(true);
+    const over = buildMatchView(
+      logOf([
+        ...night1,
+        ...day1,
+        pub("night_passed", { cycle: 2, killed: null }),
+        pub("phase_started", { phase: "day", cycle: 2 }),
+        speech(2, "A", 3, { accuse: [2] }),
+        pub("match_over", { winner: "village", reason: "all_werewolves_dead", roles: {} }),
+      ]),
+      { narratorView: false },
+    );
+    expect(over.accusations).toEqual({ cycle: 2 });
+    expect(over.seats.find((s) => s.seat === 2)!.accusations).toMatchObject({ by: [3], score: 1, mostAccused: true });
+  });
+
+  it("badges the most-accused and tags the Repliers exactly as the Ruleset chose them on a scripted Day", () => {
+    const t = dealt("chips", 7, { replySlots: 2 });
+    const setup = werewolf.setup({ replySlots: 2 }, "chips", seatsOf(7));
+    if (!setup.ok) throw new Error(setup.error);
+    const events: RulesetEvent[] = [...setup.events];
+    const night = nightKill(t.state, null);
+    events.push(...night.events);
+    // Round A: 1 and 2 accuse 5 (2 points), 3 accuses 6 (1). Round B: 4 accuses 6 (2 more: 3), 7 accuses 5 (2 more: 4).
+    const day = speakUntilVote(night.state, (seat, step) => {
+      const a: Record<number, number> = step === 0 ? { 1: 5, 2: 5, 3: 6 } : step === 1 ? { 4: 6, 7: 5 } : {};
+      return a[seat] ? speak("I accuse", { accuse: [a[seat]] }) : null;
     });
-    expect(buildMatchView(logOf(night1), { narratorView: true }).accusations).toBeNull();
+    events.push(...day.events);
+    const chosen = events.filter((e) => e.kind === "replier_chosen");
+    expect(chosen.map((e) => e.data.seat)).toEqual([5, 6]);
+    const view = buildMatchView(logOf(events), { narratorView: false });
+    const badged = view.seats.filter((s) => s.accusations.mostAccused);
+    expect(badged.map((s) => [s.seat, s.accusations.score])).toEqual([[5, chosen[0]!.data.score]]);
+    expect(view.seats.filter((s) => s.accusations.replier).map((s) => s.seat)).toEqual([5, 6]);
+    expect(view.seats.find((s) => s.seat === 6)!.accusations.score).toBe(chosen[1]!.data.score);
   });
 
   it("marks thinking seats and timeouts only in Narrator's View, since Night turns would reveal roles", () => {

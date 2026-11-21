@@ -12,6 +12,7 @@
 import type { DeadlineConfig } from "../core/deadlines";
 import type { AgentConfig } from "../core/harness";
 import type { NarratorConfig } from "../core/narrator";
+import { analystConfigError, type AnalystConfig } from "../core/analyst";
 import { fakeRoster, LEAGUE_NAME } from "../core/roster";
 import { startMatch } from "../core/start-match";
 import { narratorConfigError } from "../narrator";
@@ -65,10 +66,14 @@ export async function handleApi(request: Request, env: Env, url: URL): Promise<R
       agents?: AgentConfig[];
       /** Narrator for this Match, e.g. { id: "fake", options } or { id: "decisions" }; default none. */
       narrator?: NarratorConfig | null;
+      /** Analyst for this Match, e.g. { harness: "managed-agent", model: "gemini-4-neon" }; default none. */
+      analyst?: AnalystConfig | null;
     };
     const agents = body.agents?.length ? body.agents : fakeRoster();
     const narratorError = body.narrator == null ? null : narratorConfigError(body.narrator);
     if (narratorError) return Response.json({ error: narratorError }, { status: 400 });
+    const analystError = body.analyst == null ? null : analystConfigError(body.analyst);
+    if (analystError) return Response.json({ error: analystError }, { status: 400 });
     if (body.matchId !== undefined && !/^[\w-]{1,64}$/.test(body.matchId)) {
       return Response.json({ error: "matchId must be 1-64 word characters or dashes" }, { status: 400 });
     }
@@ -76,6 +81,7 @@ export async function handleApi(request: Request, env: Env, url: URL): Promise<R
       const init = await startMatch(env, { matchId: body.matchId, seed: body.seed, config: body.config,
         deadlines: body.deadlines,
         narrator: body.narrator,
+        analyst: body.analyst,
         agents,
       });
       return Response.json({ matchId: init.matchId, seed: init.seed }, { status: 201 });

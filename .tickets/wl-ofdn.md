@@ -1,6 +1,6 @@
 ---
 id: wl-ofdn
-status: in_progress
+status: closed
 deps: [wl-hozk, wl-64dn]
 links: []
 created: 2026-11-21T18:22:17Z
@@ -43,3 +43,7 @@ After each Match ends, an Analyst (gemini-4-neon on the Managed Agent harness) r
 **2026-11-21T18:36:55Z**
 
 Analyst Instructions drafted (8cd9071, docs/agent-instructions/analyst.md). Key decisions: judge on the Player's own information, not hindsight; blind bad luck isn't a mistake; every mistake cites evidence; at most 5 mistakes, at most 2 per Player, empty allowed; Werewolf deception is never a mistake and can be best play; no Calibration grading and no generalising about models; notes aren't in the input. Keep the 'What the Players were told' summary in sync if werewolf.md changes.
+
+**2026-11-21T20:12:31Z**
+
+Merged into integration/wl-xgp7 (impl/wl-ofdn db8c63a). Typecheck clean. Full suite 264/265, then 258/265, with failures only in timing-sensitive system tests (deadlines 'never answers', league-scale real-clock/sustained-429, usage) while ~38 vitest/workerd processes from parallel implementers were running. Those files pass 25/25 alone, so this is load flakiness, not a regression; rerun the full suite at a quiet moment before the final deploy. AC1-4 evidence per the implementer: test/system/analyst.test.ts (one analysis event per Match, failure reasons, the League never blocked, slot cap overlap), test/web/match-view.test.ts (hidden with Narrator's View off). Real smoke Match 211342fc: Neon analysis took 85.7 s and cost $0.1646 (Match total $0.2814); report at /tmp/wl-ofdn-verify/end.png. The Analyst is OFF by default; enable it with config {analyst:{harness:'managed-agent', model:'gemini-4-neon'}, analystConcurrency:4}. NOTE: Neon runs on the same Managed Agents TPM quota as the Players. Open: no test for the backstop/abandon path; the League snapshot doesn't show the analyst config.

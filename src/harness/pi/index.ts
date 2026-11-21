@@ -54,7 +54,7 @@ export function piHarness(seatFor: SeatResolver): Harness {
     async poll(ctx, handle: TurnHandle): Promise<PollResult> {
       const r = await seatFor(ctx).poll(String(handle.opId));
       if (r.status === "pending") return { status: "pending", handle };
-      if (r.status === "done") return { status: "done", call: r.call, ...withUsage(r.usage) };
+      if (r.status === "done") return { status: "done", call: r.call, ...withUsage(r.usage), ...(r.notes ? { notes: r.notes } : {}) };
       return { status: "error", message: r.message, ...withUsage(r.usage) };
     },
 

@@ -5,6 +5,7 @@
 // Narrator's View off those events are dropped before anything else is derived, so no
 // role, Wolf Chat, Night choice, turn marker or secret Drama Flag can leak.
 import type { AgentRatingChange, MatchEvent } from "../../src/shared/protocol";
+import type { AnalysisEventData, AnalysisReport } from "../../src/shared/analysis";
 import { spectatorLabel } from "../../src/shared/seat-label";
 import { countTimeouts, thinkingSeats, type MatchCostData } from "../../src/shared/turn-events";
 
@@ -36,6 +37,24 @@ export interface SeatView extends SeatInfo {
   thinking: boolean;
   /** Turns that missed their deadline (Narrator's View only). */
   timeouts: number;
+  /** The current Day's Accusations to and from this seat (public: shown in either view). */
+  accusations: SeatAccusations;
+}
+
+/** One seat's part in the current Day's Accusations, from its speak events. */
+export interface SeatAccusations {
+  /** Seats that accused this one (any Speech Round or Right of Reply), first accusation first. */
+  by: number[];
+  /** Seats this one accused. */
+  accuses: number[];
+  /** Seats this one defended. */
+  defends: number[];
+  /** Right of Reply score as the Ruleset counts it: Round A once, Round B twice, replies not at all. */
+  score: number;
+  /** Has the Day's top score (at least 1), which earns the first Right of Reply. */
+  mostAccused: boolean;
+  /** Chosen for a Right of Reply this Day. */
+  replier: boolean;
 }
 
 export interface ClaimView {
@@ -78,12 +97,22 @@ export interface EndScreen {
   ratings: (AgentRatingChange & { name: string })[] | null;
   /** Final measured cost in USD (the latest `match_cost` event); null if the Match reported none. */
   cost: EndCost | null;
+  /**
+   * The post-Match Analyst's report or recorded failure (the `analysis` event). Null until
+   * it arrives, and always with Narrator's View off: the event is Narrator's-View-only.
+   */
+  analysis: EndAnalysis | null;
 }
 
+export type EndAnalysis =
+  | { status: "ok"; model: string; seconds: number | null; report: AnalysisReport }
+  | { status: "failed"; model: string; seconds: number | null; reason: string };
+
 export interface EndCost {
-  /** Players plus Narrator. */
+  /** Players plus Narrator plus Analyst. */
   total: number;
   narrator: number;
+  analyst: number;
   /** Each Agent's share (the sum of its seats), in seat order of first appearance. */
   agents: { agentId: string; name: string; cost: number }[];
   tokens: { input: number; cached: number; thought: number; output: number };
@@ -95,8 +124,8 @@ export interface MatchView {
   feed: FeedGroup[];
   /** Null until the Match is over. */
   end: EndScreen | null;
-  /** The latest Day's Accusations (Speech Rounds only), in log order; null before any. */
-  accusations: { cycle: number; links: { from: number; to: number; round: string }[] } | null;
+  /** The Day the seats' Accusation chips are for (the latest one); null before the first Day. */
+  accusations: { cycle: number } | null;
 }
 
 export const isNarratorViewOnly = (e: MatchEvent): boolean => e.audience !== "all";
@@ -145,6 +174,7 @@ export function buildMatchView(events: MatchEvent[], opts: { narratorView: boole
     const claim = e.kind === "speech" ? (e.data.claim as Omit<ClaimView, "truth"> | null) : null;
     if (claim) claims.set(Number(e.data.seat), { role: claim.role, results: claim.results ?? [] });
   }
+  const day = dayAccusations(log, setup);
   const thinking = new Set(thinkingSeats(log));
   const timeouts = countTimeouts(log, setup).bySeat;
   const seats = setup.map((s): SeatView => {
@@ -157,6 +187,7 @@ export function buildMatchView(events: MatchEvent[], opts: { narratorView: boole
       claim: claim ? { ...claim, truth: claimTruth(claim, role, roles) } : null,
       thinking: thinking.has(s.seat),
       timeouts: timeouts[s.seat] ?? 0,
+      accusations: day.bySeat.get(s.seat)!,
     };
   });
   let status: MatchView["status"] = { phase: null, cycle: 0, alive: seats.filter((s) => s.alive).length, total: seats.length };
@@ -164,18 +195,44 @@ export function buildMatchView(events: MatchEvent[], opts: { narratorView: boole
     if (e.kind === "phase_started") status = { ...status, phase: e.data.phase as "night" | "day", cycle: Number(e.data.cycle) };
     if (e.kind === "match_over") status = { ...status, phase: "over" };
   }
-  return { seats, status, feed: groupFeed(log), end: endScreen(log, seats), accusations: latestAccusations(log) };
+  return { seats, status, feed: groupFeed(log), end: endScreen(log, seats), accusations: day.cycle === null ? null : { cycle: day.cycle } };
 }
 
-function latestAccusations(log: MatchEvent[]): MatchView["accusations"] {
-  const speeches = log.filter((e) => e.kind === "speech" && e.data.round !== "reply" && (e.data.accuse as number[]).length);
-  const last = speeches.at(-1);
-  if (!last) return null;
-  const cycle = Number(last.data.cycle);
-  const links = speeches
-    .filter((e) => Number(e.data.cycle) === cycle)
-    .flatMap((e) => (e.data.accuse as number[]).map((to) => ({ from: Number(e.data.seat), to, round: String(e.data.round) })));
-  return { cycle, links };
+/** Right of Reply weight of a round, as the Ruleset scores it: Round A counts 1, B 2, C 3…; a reply counts 0. */
+const replyWeight = (round: string) => (/^[A-Z]$/.test(round) ? round.charCodeAt(0) - 64 : 0);
+
+/** Each seat's Accusations on the latest Day; they reset when a new Day starts. */
+function dayAccusations(log: MatchEvent[], setup: SeatInfo[]): { cycle: number | null; bySeat: Map<number, SeatAccusations> } {
+  const start = log.filter((e) => e.kind === "phase_started" && e.data.phase === "day").at(-1);
+  const cycle = start ? Number(start.data.cycle) : null;
+  const bySeat = new Map<number, SeatAccusations>(
+    setup.map((s) => [s.seat, { by: [], accuses: [], defends: [], score: 0, mostAccused: false, replier: false }]),
+  );
+  const add = (list: number[], seat: number) => {
+    if (!list.includes(seat)) list.push(seat);
+  };
+  for (const e of log) {
+    if (cycle === null || Number(e.data.cycle) !== cycle) continue;
+    if (e.kind === "replier_chosen") {
+      const r = bySeat.get(Number(e.data.seat));
+      if (r) r.replier = true;
+    }
+    if (e.kind !== "speech") continue;
+    const seat = Number(e.data.seat);
+    const from = bySeat.get(seat);
+    const weight = replyWeight(String(e.data.round));
+    for (const to of ((e.data.accuse ?? []) as number[]).map(Number)) {
+      if (from) add(from.accuses, to);
+      const target = bySeat.get(to);
+      if (!target) continue;
+      add(target.by, seat);
+      target.score += weight;
+    }
+    if (from) for (const d of ((e.data.defend ?? []) as number[]).map(Number)) add(from.defends, d);
+  }
+  const top = Math.max(0, ...[...bySeat.values()].map((r) => r.score));
+  if (top >= 1) for (const r of bySeat.values()) r.mostAccused = r.score === top;
+  return { cycle, bySeat };
 }
 
 function endScreen(log: MatchEvent[], seats: SeatView[]): EndScreen | null {
@@ -194,7 +251,18 @@ function endScreen(log: MatchEvent[], seats: SeatView[]): EndScreen | null {
     roles: seats.map((s) => ({ seat: s.seat, label: playerLabel(s), role: roles[s.seat] ?? s.role ?? "?", alive: s.alive })),
     ratings: agents && agents.map((a) => ({ ...a, name: nameOf(a.agentId) })),
     cost: endCost(log, seats),
+    analysis: endAnalysis(log),
   };
+}
+
+function endAnalysis(log: MatchEvent[]): EndAnalysis | null {
+  const e = log.find((x) => x.kind === "analysis");
+  if (!e) return null;
+  const d = e.data as unknown as AnalysisEventData;
+  const seconds = d.startedAt != null ? Math.round((d.finishedAt - d.startedAt) / 1000) : null;
+  return d.status === "ok"
+    ? { status: "ok", model: d.model, seconds, report: d.report }
+    : { status: "failed", model: d.model, seconds, reason: d.reason };
 }
 
 function endCost(log: MatchEvent[], seats: SeatView[]): EndCost | null {
@@ -208,11 +276,11 @@ function endCost(log: MatchEvent[], seats: SeatView[]): EndCost | null {
     if (row) row.cost += usd;
     else agents.push({ agentId: s.agentId, name: agentName(s), cost: usd });
   }
-  return { total: Number(d.total), narrator: Number(d.narrator ?? 0), agents, tokens: d.tokens };
+  return { total: Number(d.total), narrator: Number(d.narrator ?? 0), analyst: Number(d.analyst ?? 0), agents, tokens: d.tokens };
 }
 
 /** Runner bookkeeping that is shown as seat markers (or on the end screen), never as feed lines. */
-const MARKER_KINDS = new Set(["turn_started", "step_resolved", "match_cost"]);
+const MARKER_KINDS = new Set(["turn_started", "step_resolved", "match_cost", "analysis"]);
 const VOTE_KINDS = new Set(["votes_revealed", "beliefs_recorded", "no_elimination"]);
 const RESULT_KINDS = new Set(["match_over", "ratings_settled"]);
 

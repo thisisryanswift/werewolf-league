@@ -24,7 +24,7 @@
 
 import type { AgentConfig, Harness, PlayerContext, PollResult, TurnHandle, TurnInput, UsageReading } from "../../core/harness";
 import type { ToolSpec } from "../../core/ruleset";
-import { ACTIVE, AGENT, ApiError, type Fetch, type Interaction, InteractionsClient, pendingCalls, readUsage } from "./api";
+import { ACTIVE, AGENT, ApiError, type Fetch, type Interaction, InteractionsClient, notesWritten, pendingCalls, readUsage } from "./api";
 
 export const MANAGED_AGENT_HARNESS_ID = "managed-agent";
 export const DEFAULT_MODEL = "gemini-4-hydrogen";
@@ -128,6 +128,17 @@ function environmentConfig(ctx: PlayerContext) {
 
 const toolNames = (ctx: PlayerContext) => ctx.tools.map((t) => t.name);
 
+/** The turn's notes for the poll result. Best effort (wl-rhpr): reading them never fails a turn. */
+function notesOf(ctx: PlayerContext, it: Interaction): { notes?: string } {
+  try {
+    const notes = notesWritten(it);
+    return notes === undefined ? {} : { notes };
+  } catch (err) {
+    console.warn(`managed-agent seat ${ctx.seat}: could not read notes: ${String(err)}`);
+    return {};
+  }
+}
+
 export function managedAgentHarness(opts: ManagedAgentOptions): Harness {
   if (!opts.apiKey) throw new Error("GEMINI_API_KEY is not set; the managed-agent harness cannot run");
   // Late-bound so the Worker's global fetch is used at call time.
@@ -195,7 +206,7 @@ export function managedAgentHarness(opts: ManagedAgentOptions): Harness {
 
   function freshInput(ctx: PlayerContext, chain: Chain, error: string | undefined): string {
     // The Agent Instructions are not repeated here: they stay mounted in the environment.
-    const parts = [PREAMBLE];
+    const parts = [ctx.preamble ?? PREAMBLE];
     const restart = chain.transcript.length > 1;
     if (restart || chain.note) parts.push([chain.note, restart ? NOTE_RESTART : null].filter(Boolean).join(" "));
     parts.push(markEarlier(chain.transcript));
@@ -224,7 +235,7 @@ export function managedAgentHarness(opts: ManagedAgentOptions): Harness {
       const setup = await api.create({
         ...base(ctx),
         environment: environmentConfig(ctx),
-        input: `${PREAMBLE}\n\nSetup only: your sandbox is being prepared. Do nothing; the Match starts soon.`,
+        input: `${ctx.preamble ?? PREAMBLE}\n\nSetup only: your sandbox is being prepared. Do nothing; the Match starts soon.`,
       });
       const environment = setup.environment_id ?? (await api.get(setup.id)).environment_id;
       if (!environment) throw new Error(`setup interaction ${setup.id} returned no environment_id`);
@@ -316,7 +327,7 @@ export function managedAgentHarness(opts: ManagedAgentOptions): Harness {
       const withUsage = usage.length ? { usage } : {};
       if (it.status === "requires_action" || it.status === "completed") {
         const call = it.status === "requires_action" ? pendingCalls(it, toolNames(ctx))[0] : undefined;
-        return { status: "done", call: call ? { name: call.name, args: call.args } : null, ...withUsage };
+        return { status: "done", call: call ? { name: call.name, args: call.args } : null, ...withUsage, ...notesOf(ctx, it) };
       }
       return { status: "error", message: `interaction ${id} ended ${it.status}`, ...withUsage };
     },
