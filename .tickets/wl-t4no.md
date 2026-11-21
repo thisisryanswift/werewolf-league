@@ -51,3 +51,16 @@ Pre-rehearsal real local Match (orchestrator-run smoke on integration @ d8ac2bf,
 - ODD 1: model names leak to Players. Seat labels are '<Agent name> #n' and Agents quote them ('I accuse Hydrogen #3'). wl-e9tp (Display Names) fixes this; the rehearsal must not run before it lands.
 - ODD 2: beliefs_recorded stores only normalized ballots, so raw sums and genuinely uniform vs empty/zero ballots can't be told apart. Two ballots were uniform (seat 7 wolf all 0.2; seat 5 all 0.4). Normalized sums were correct (2.0 village, 1.0 wolf W-1). No self-ratings, no missing seats, nothing over 1. Wolf 4 rated its partner lowest (0.125).
 Artifacts: /tmp/wl-smoke/ (events.json, wrangler.log, analyze.mjs).
+
+**2026-11-21T17:19:27Z**
+
+ONE-TABLE REHEARSAL PASSED on the deployed app (https://werewolf-league.rswift.workers.dev, version 1f2c7abb, built from impl/wl-t4no 5bb9a5a). Match 1c1ac7f6-860a-40b8-a381-5964d59e4dd0 with the real roster (Hydrogen x1, 3.6 Flash x1, 3.5 Flash-Lite x1, 3.8 Flash x4) and the Narrator (decisions) on.
+- Real Agents: all six tools ran on the real API. wrangler tail (/tmp/wl-t4no/tail.jsonl): 493 invocations, no exceptions. All 14 speeches had text, 0 timeouts.
+- Result and leaderboard: wolf win by parity on N2. One ratings_settled event and one leaderboard push. Leaderboard after: 3.6 Flash 1208, Flash-Lite 1192, Hydrogen 1192, 3.8 Flash 1184; Calibration shown (Flash-Lite 0.291, 3.8 Flash 0.246). The featured link points to this Match.
+- Join/leave/rejoin: joined at seq 58 (log 1..77), left, rejoined 30 s later (1..120). Contiguous, no duplicates or gaps; the merged log equals GET /api/matches/:id.
+- TIMINGS (from resume): time to first public speech 63.8 s; time to result 200.8 s (~3.3 min). Step p50 13.2 s, p90 26.9 s, max 41.9 s (vote, 6 voters).
+- Set-N and pause/resume on the deployed app: N=1 gave exactly 1 tile; paused, the Match finished with no replacement; N=0 resumed for 10 s started nothing; a wrong secret got 401. The League is now PAUSED, N=1.
+- No secrets in the repo. No model names in any speech or Wolf Chat. Display Names showed on the deployed Match page ('Wren · 3.5 Flash-Lite'). Player-input hiding is covered by wl-e9tp's tests.
+- Behaviour: speeches 179-326 chars; wolves rated their partners low (0.15/0.05); every vote had a reason; 7 Accusations, Right of Reply worked; the Narrator emitted 11 drama and 11 drama_secret events. Oddity: the Doctor (Flash-Lite) protected a wolf on N1.
+- Fixes on the branch: realRoster() carries no instructions, so the per-role Ruleset default is mounted (codex P1 resolved); apply-roster.mjs normalizes a trailing slash (P2); new scripts/rehearsal.mjs.
+Pending: the ramp test, then the chosen demo N and fallback N. Suggested roster: keep all four Agents. Evidence: /tmp/wl-t4no/rehearsal1.{json,log}.
