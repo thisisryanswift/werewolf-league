@@ -1,0 +1,55 @@
+// Scripted Fake Harness: replaces Gemini in tests and local demos.
+// Behaviour comes from the Agent's `options` (all JSON, so it survives DO hops):
+//   script: "first-legal" (default) — call the required tool with the first legal target
+//           "passive"               — vote Abstain, otherwise end the turn with no call (default action)
+//           "silent"                — never finish a turn
+//   prefer: seat[]      — for targeted actions, pick the first preferred seat that is legal
+//   invalidFirst: bool  — answer every turn with an illegal call first, then a legal one on retry
+//   delayPolls: number  — report "pending" this many polls before answering
+
+import type { Harness, PollResult, TurnInput } from "../core/harness";
+import type { ToolCall } from "../core/ruleset";
+
+interface FakeOptions {
+  script?: "first-legal" | "passive" | "silent";
+  prefer?: number[];
+  invalidFirst?: boolean;
+  delayPolls?: number;
+}
+
+function decide(opts: FakeOptions, input: TurnInput): ToolCall | null | "never" {
+  const { turn } = input;
+  if (opts.script === "silent") return "never";
+  if (opts.invalidFirst && !input.error) return { name: turn.actionKind, args: { target: "not-a-seat" } };
+  const preferred = opts.prefer?.find((s) => turn.legalTargets.includes(s));
+  const extra = turn.actionKind === "vote" ? { beliefs: {}, reason: "scripted" } : {};
+  if (preferred !== undefined) return { name: turn.actionKind, args: { target: preferred, ...extra } };
+  if (opts.script === "passive") {
+    return turn.actionKind === "vote" && turn.legalTargets.includes("abstain")
+      ? { name: "vote", args: { target: "abstain", ...extra } }
+      : null;
+  }
+  const first = turn.legalTargets[0];
+  return first === undefined ? null : { name: turn.actionKind, args: { target: first, ...extra } };
+}
+
+export const fakeHarness: Harness = {
+  async provision(ctx) {
+    return { ...ctx.chain, environment: `fake-env-${ctx.matchId}-${ctx.seat}`, turns: 0 };
+  },
+  async startTurn(ctx, input) {
+    const opts = (ctx.agent.options ?? {}) as FakeOptions;
+    const turns = Number(ctx.chain.turns ?? 0) + 1;
+    return {
+      handle: { decision: decide(opts, input), pollsLeft: opts.delayPolls ?? 0 },
+      chain: { ...ctx.chain, turns },
+    };
+  },
+  async poll(_ctx, handle): Promise<PollResult> {
+    const decision = handle.decision as ToolCall | null | "never";
+    const pollsLeft = Number(handle.pollsLeft ?? 0);
+    if (decision === "never") return { status: "pending", handle };
+    if (pollsLeft > 0) return { status: "pending", handle: { ...handle, pollsLeft: pollsLeft - 1 } };
+    return { status: "done", call: decision };
+  },
+};
