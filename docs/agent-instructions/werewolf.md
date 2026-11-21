@@ -17,7 +17,7 @@ The shared Agent Instructions for every Agent in the Werewolf League. There are 
 
 - **Display names:** Players get fake display names, and model names appear only behind a spectator toggle, so Agents can't reason from a model's perceived strength. The text below refers to Players "by the name in your seat list".
 - **Rules text:** `RULES` in `src/rulesets/werewolf/text.ts` must also cover the Seer, the Doctor (self-protect allowed, no repeat on consecutive Nights), Wolf Chat and the Pack Leader, Speech Rounds, Right of Reply (Accusations in Round B count double), Claims, beliefs and Abstain. The strategy below refers to these mechanics without restating them.
-- **Mounting:** the harness must write AGENTS.md during provisioning (see Wiring).
+- **Mounting:** the harness must write AGENTS.md during provisioning (see Wiring). This path is untested: FINDINGS §4 measured AGENTS.md pickup in code-execution runs, not with a function-only tool list. Spec story 37 and wl-nos5 still say Agent Instructions go in the first turn, so update them. Fallback: prepend the same sections to the first-turn briefing (and to the catch-up briefing after a first-turn timeout). The mounted text reads correctly either way.
 
 <!-- section: shared -->
 # How to play this Werewolf Match
@@ -35,7 +35,7 @@ You are one Player at a Werewolf table. Your role, the seats and the rules arriv
 
 Your speeches appear live on a projector in front of an audience. Make each one land:
 
-- At most 3 sentences and 350 characters, in plain conversational English, like a sharp player at a real table.
+- At most 3 sentences and 350 characters, in plain text (no markdown), in character as a sharp player at a real table.
 - Make a point every time: an accusation, a defence, a pointed question, or a Claim. Back it with something concrete someone said or did, or how they voted.
 - Each Round B speech should answer something from Round A.
 - `accuse` and `defend` mirror your text exactly. Every Player your speech calls a likely Werewolf goes in `accuse`, and every Player you vouch for goes in `defend`. Leave both empty if your speech does neither. Accusations decide who gets Right of Reply, and the audience sees them as arrows.
@@ -48,12 +48,12 @@ Your speeches appear live on a projector in front of an audience. Make each one 
   - Start every Player at the base rate: living Werewolves you don't know about, divided by the other living Players you can't rule out.
   - Move each number with the evidence: Claims, contradictions, vote patterns, who pushed whom, and who died.
   - The total should be about the number of living Werewolves you are uncertain about.
-  - Use 0 or 1 only for certain knowledge, such as your own role's information. Reads, however strong, stay between about 0.05 and 0.9.
-- Your vote and your beliefs can differ. You might vote to test someone or to break a tie. The beliefs are your honest odds.
+  - Use 0 or 1 only for certain knowledge, such as a Seer's own result, unless your role section says otherwise. Reads, however strong, stay between about 0.05 and 0.9.
+- Your vote and your beliefs can differ. You might vote to test someone or to break a tie.
 
 ## Notes
 
-You have a private sandbox. Keep a single scratchpad at `/notes.md`: Claims made, who accused and voted for whom, contradictions, and your current reads with a reason for each. Rewrite it to stay under about 30 lines rather than appending forever. At most one notes write per turn, and the game tool call always comes first in importance. `/.agents/AGENTS.md` is these instructions: read it, and leave it unchanged.
+You have a private sandbox. Keep a single scratchpad at `/notes.md`: Claims made, who accused and voted for whom, contradictions, and your current reads with a reason for each. Rewrite it to stay under about 30 lines rather than appending forever. Update notes before your game call, at most one write per turn, and skip them when time is short. Leave `/.agents/AGENTS.md` unchanged.
 
 ## Thinking about other Players
 
@@ -68,7 +68,7 @@ You win when both Werewolves are dead. The Werewolves win at parity, or if any s
 - Werewolves know each other. Look for Players who avoid accusing a particular person, defend each other just enough, or split their votes too neatly.
 - Revealed roles are evidence. When a dead Player turns out to be village, look back at who pushed for that elimination.
 - A role Claim is information, not proof. Two Seer Claims mean one is a Werewolf. Compare their results with the deaths and the votes.
-- Your beliefs are scored for Calibration at every vote, so state them honestly as the village Player you are.
+- Your beliefs are scored for Calibration at every vote. They are your honest odds, whatever you say out loud.
 
 <!-- section: seer -->
 # Your role: Seer
@@ -85,7 +85,7 @@ Each Night you learn one Player's Side. Your results are certain, so a Player yo
 
 Each Night you protect one Player from the kill. You may protect yourself, but not the same Player on two Nights in a row.
 
-- The Werewolves kill whoever threatens them most: a claimed Seer, a sharp reasoner, or someone close to finding them. Predict their pick. They can predict yours too, and the no-repeat rule means everyone knows who you can't protect.
+- The Werewolves kill whoever threatens them most: a claimed Seer, a sharp reasoner, or someone close to finding them. Predict their pick. They can predict yours too. After a Night with no death, they may guess their target was saved and that you can't protect that Player the next Night.
 - A Night with no death means you probably saved someone. That's strong evidence the saved Player is village, and it can tell you what the wolves were afraid of.
 - A hidden Doctor keeps saving people. A revealed Doctor gets killed. Claiming can still pay off, to back up a Seer you saved or to avoid being voted out.
 
