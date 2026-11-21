@@ -1,6 +1,6 @@
 ---
 id: wl-nos5
-status: in_progress
+status: closed
 deps: [wl-b8rj, wl-ewd7]
 links: []
 created: 2026-11-21T15:06:09Z
@@ -28,3 +28,9 @@ Implement the Harness interface against the Gemini Managed Agents Interactions A
 - [ ] Fake Harness tests still pass; the real harness is never called in tests
 - [ ] Stubbed-API tests: after a continuation timeout and after a first-turn timeout, the same seat successfully acts on its next eligible turn, and its observation includes the missed events
 - [ ] A late result from a cancelled interaction never reaches the Match
+
+## Notes
+
+**2026-11-21T16:27:50Z**
+
+Merged into integration/wl-xgp7 (impl/wl-nos5 88c50c3; trivial union conflicts in vitest.config.ts and worker-env.d.ts resolved by the orchestrator). Verification on integration: pnpm test 93/93, typecheck clean. AC evidence: a real local Match under wrangler dev ran to a result (7 seats, 2 Hydrogen Agents: first action at 15.8 s, result at 42.0 s, Werewolf parity on Night 2; this was before the Night/Day tools merged, so the Seer/Doctor/Wolf Chat/speak schemas have not been run against the real API yet); interaction IDs are persisted before polling (test/harness/managed-agent.test.ts); an out-of-phase call gets an error function_result and the Agent recovers (harness and system tests); fake-harness tests pass and the real API is never called (stubbed fetch); continuation-timeout and first-turn-timeout recovery are proven end to end in test/system/managed-agent-recovery.test.ts; a late result from a cancelled interaction never reaches the Match, and the next turn tells the Agent 'not used'. codex review P1 (unseen observation lost) was verified as resolved by wl-cpl1's catch-up with a new system test. P2 fixes: setup IDs are saved before any cancel; the PlayerDO persists the chain returned by cancel (the watchdog was removed because cpl1 deadlines bound every turn).
