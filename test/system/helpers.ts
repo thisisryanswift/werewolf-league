@@ -1,4 +1,5 @@
 import { exports } from "cloudflare:workers";
+import type { TimeoutCounts } from "../../src/core/deadlines";
 import type { AgentConfig } from "../../src/core/harness";
 import type { MatchEvent, ServerMessage } from "../../src/shared/protocol";
 
@@ -21,7 +22,8 @@ export async function startMatch(body: Record<string, unknown>): Promise<string>
 export interface Snapshot {
   matchId: string;
   status: "running" | "finished";
-  result: { winner: string; sides: Record<string, string> } | null;
+  result: { winner: string; sides: Record<string, string>; timeouts: TimeoutCounts } | null;
+  stats: { timeouts: TimeoutCounts };
   events: MatchEvent[];
 }
 
