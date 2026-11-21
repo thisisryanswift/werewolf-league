@@ -1,6 +1,6 @@
 ---
 id: wl-pbkx
-status: open
+status: in_progress
 deps: [wl-jb4x, wl-kh5w]
 links: []
 created: 2026-11-21T16:34:58Z
@@ -8,7 +8,7 @@ type: task
 priority: 2
 assignee: Ryan Swift
 parent: wl-xgp7
-tags: [stretch, ready-for-human]
+tags: [stretch, ready-for-agent]
 ---
 # Narrator: Drama Score and Drama Flags (stretch)
 
@@ -38,3 +38,9 @@ Add a Narrator behind an interface:
 - [ ] At most one Narrator call per Match is in flight
 - [ ] The Decisions implementation is exercised for real only in the rehearsal or a manual smoke test
 
+
+## Notes
+
+**2026-11-21T16:43:58Z**
+
+Go decision (human, ~12:10 on 2026-11-21): proceed now; retagged ready-for-agent.
