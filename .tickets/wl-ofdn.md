@@ -24,7 +24,7 @@ After each Match ends, an Analyst (gemini-4-neon on the Managed Agent harness) r
   - mistakes [{seat, agent, what, evidence}], e.g. a Doctor protecting a Werewolf, or the village eliminating its own Seer;
   - best_play {seat, why};
   - why_winner_won.
-  Its own AGENTS.md instructions are mounted at provisioning (wl-cizy mechanism).
+  Its instructions come from docs/agent-instructions/analyst.md: everything below the `<!-- section: analyst -->` marker is mounted as /.agents/AGENTS.md at provisioning (wl-cizy mechanism). The tool list is function-only, just submit_report. Field limits (at most 5 mistakes, at most 2 per Player, 2-4 turning points) come from that file. Enforce them in the submit_report schema (maxItems) too.
 - **Runtime:** reuse the Player DO plus Harness machinery for the polling, deadline and timeout handling. An Analyst is a seat-less run with a long deadline (e.g. 5 min). Persist the interaction ID first. Cap concurrent Analyst runs per League (configurable, default 4); extras queue. Usage and cost are recorded via wl-64dn.
 - **Storage:** the report is stored as an analysis Match event after match_over. It's shown on the end screen and in finished Matches (Narrator's View only, since it discusses roles).
 - **Isolation:** the Analyst never affects play, ratings, Calibration or the Narrator. A failed or timed-out analysis is recorded and skipped.
@@ -37,3 +37,9 @@ After each Match ends, an Analyst (gemini-4-neon on the Managed Agent harness) r
 - [ ] Real Match: a Neon report appears on the end screen with at least one concrete mistake backed by evidence
 - [ ] The report is hidden when Narrator's View is off
 
+
+## Notes
+
+**2026-11-21T18:36:55Z**
+
+Analyst Instructions drafted (8cd9071, docs/agent-instructions/analyst.md). Key decisions: judge on the Player's own information, not hindsight; blind bad luck isn't a mistake; every mistake cites evidence; at most 5 mistakes, at most 2 per Player, empty allowed; Werewolf deception is never a mistake and can be best play; no Calibration grading and no generalising about models; notes aren't in the input. Keep the 'What the Players were told' summary in sync if werewolf.md changes.
