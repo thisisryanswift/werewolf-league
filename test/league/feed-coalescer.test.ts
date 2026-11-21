@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { FeedCoalescer } from "../../src/core/league-feed";
-import type { LeagueSnapshot, LeagueTilesMessage, MatchTile } from "../../src/shared/protocol";
+import type { LeagueMessage, LeagueSnapshot, LeagueTilesMessage, MatchTile } from "../../src/shared/protocol";
 
 const tile = (matchId: string, speech: string | null = null): MatchTile => ({
   matchId,
@@ -19,12 +19,15 @@ const tile = (matchId: string, speech: string | null = null): MatchTile => ({
   startedAt: 1,
 });
 
+/** The tile diffs of a "tiles" message. */
+const tilesOf = (m: LeagueMessage | undefined) => (m?.type === "tiles" ? m.tiles : undefined);
+
 /** A coalescer over a mutable League state, with a manual clock and timer queue. */
 function rig(intervalMs = 500) {
   let now = 0;
   const timers: { at: number; fn: () => void }[] = [];
   const state = { tiles: [] as MatchTile[], stats: { started: 0, settled: 0 } };
-  const sent: LeagueTilesMessage[] = [];
+  const sent: LeagueMessage[] = [];
   let rev = 0;
   const feed = new FeedCoalescer({
     intervalMs: () => intervalMs,
@@ -59,8 +62,8 @@ describe("League feed coalescer", () => {
     expect(sent.length).toBeLessThanOrEqual(3);
     expect(sent.length).toBeGreaterThanOrEqual(2);
     // The last message carries the final line as a small diff.
-    expect(sent.at(-1)!.tiles).toEqual([{ matchId: "m1", summary: { latestSpeech: { seat: 1, text: "line 99" } } }]);
-    expect(sent.map((m) => m.rev)).toEqual(sent.map((_, i) => i + 1));
+    expect(tilesOf(sent.at(-1))).toEqual([{ matchId: "m1", summary: { latestSpeech: { seat: 1, text: "line 99" } } }]);
+    expect(sent.map((m) => (m as LeagueTilesMessage).rev)).toEqual(sent.map((_, i) => i + 1));
   });
 
   it("sends removed tiles and changed League-wide fields, and nothing when nothing changed", () => {
@@ -84,18 +87,24 @@ describe("League feed coalescer", () => {
     state.tiles = [tile("m1", "b")];
     feed.changed(); // pending
     feed.flushNow(); // a client joins: everyone is brought up to "b" first
-    expect(sent.at(-1)!.tiles).toEqual([{ matchId: "m1", summary: { latestSpeech: { seat: 1, text: "b" } } }]);
+    expect(tilesOf(sent.at(-1))).toEqual([{ matchId: "m1", summary: { latestSpeech: { seat: 1, text: "b" } } }]);
     // A change back to "a" is a real diff against the joined client's "b".
     state.tiles = [tile("m1", "a")];
     feed.changed();
     advance(600);
-    expect(sent.at(-1)!.tiles).toEqual([{ matchId: "m1", summary: { latestSpeech: { seat: 1, text: "a" } } }]);
+    expect(tilesOf(sent.at(-1))).toEqual([{ matchId: "m1", summary: { latestSpeech: { seat: 1, text: "a" } } }]);
   });
 
-  it("sends every tile whole when it has no baseline (e.g. after an eviction)", () => {
-    const { feed, state, sent } = rig(500);
+  it("resyncs clients with the whole snapshot when it has no baseline (e.g. after an eviction)", () => {
+    const { feed, state, sent, advance } = rig(500);
+    // Clients may still show tiles that settled while the baseline was lost: only a full snapshot drops them.
     state.tiles = [tile("m1")];
     feed.changed();
-    expect(sent[0]!.tiles).toEqual([tile("m1")]);
+    expect(sent).toEqual([{ type: "league", league: { tiles: [tile("m1")], stats: { started: 0, settled: 0 } } }]);
+    // After the resync, changes go out as diffs again.
+    state.tiles = [];
+    feed.changed();
+    advance(600);
+    expect(sent.at(-1)).toEqual({ type: "tiles", rev: 1, tiles: [], removed: ["m1"] });
   });
 });

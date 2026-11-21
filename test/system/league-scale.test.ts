@@ -4,7 +4,7 @@
 // back to it, so faking its clock never touches the default League other test
 // files use. The clock is faked per instance and the alarm driven by hand where
 // time matters.
-import { env, runDurableObjectAlarm, runInDurableObject } from "cloudflare:test";
+import { env, evictDurableObject, runDurableObjectAlarm, runInDurableObject } from "cloudflare:test";
 import { exports } from "cloudflare:workers";
 import { afterEach, describe, expect, it } from "vitest";
 import type { LeagueDO } from "../../src/do/league";
@@ -321,6 +321,39 @@ describe("League feed at scale", () => {
     }
     // The grid ends up with the last line.
     expect(feed.latest().tiles.find((t) => t.matchId === tile.matchId)!.summary!.latestSpeech).toEqual({ seat: 1, text: `line ${burst - 1}` });
+    feed.close();
+    await drain();
+  });
+
+  it("resyncs connected grid clients after the League loses its feed baseline (hibernation)", { timeout: 90_000 }, async () => {
+    // Agents that never answer, on a long first turn: both Matches sit still while the League hibernates.
+    await admin("config", {
+      ...UNPACED,
+      ...SHORT,
+      n: 2,
+      deadlines: { firstTurnMs: 5_000, turnMs: 500, graceMs: 100 },
+      roster: slowRoster("resync", { script: "silent" }),
+    });
+    const feed = await connectScaleLeague();
+    await admin("resume");
+    const [gone, kept] = await waitFor(async () => {
+      const tiles = feed.latest().tiles.filter((t) => t.status === "running");
+      return tiles.length === 2 && tiles;
+    });
+    await admin("pause"); // no replacement Match, so the settled tile's slot stays empty
+
+    // The League hibernates (the client stays connected) and loses its in-memory diff baseline.
+    await evictDurableObject(stub());
+    // The first change after waking: a Match settles.
+    const sides = Object.fromEntries(gone!.seats.map((s) => [s.seat, s.seat === 1 ? "wolf" : "village"]));
+    await stub().reportMatchResult(gone!.matchId, { winner: "village", sides, timeouts: { bySeat: {}, byAgent: {} } });
+
+    // The client ends up with exactly the live tiles: the settled one is gone.
+    const live = (await league()).tiles.map((t) => t.matchId);
+    expect(live).toEqual([kept!.matchId]);
+    await waitFor(async () => feed.latest().stats.settled === (await league()).stats.settled);
+    await sleep(200); // let any trailing message go out
+    expect(feed.latest().tiles.map((t) => t.matchId)).toEqual(live);
     feed.close();
     await drain();
   });
