@@ -68,3 +68,15 @@ Pending: the ramp test, then the chosen demo N and fallback N. Suggested roster:
 **2026-11-21T17:44:22Z**
 
 Human decision 2026-11-21: run the ramp test after wl-64dn (real usage/cost tracking) lands, and enforce the $50 ramp cap from measured League spend instead of the per-Match estimate. Estimated cost of rehearsal Match 1c1ac7f6 (no usage was recorded): ~$0.30-0.80.
+
+**2026-11-21T19:49:10Z**
+
+RAMP TEST (deployed version 0c6e4eb9, built from impl/wl-t4no a972bb4, scripts/ramp.mjs; real roster; Narrator decisions on; spendCap 49; 6 min hold per step).
+| N | started | settled | 429s | step latency p50/p90/max (s) | timeouts/turns | spend delta | $/finished Match |
+| 4 | 5 | 5 | 0 | 12.8/23.5/44.3 | 0/339 | $2.35 | $0.32 |
+| 8 | 18 | 14 | 0 | 12.0/23.1/39.8 | 0/689 | $5.24 | $0.36 |
+| 12 (stopped ~3.3 min) | 11 | 9 | 30 (35 after drain) | 12.0/24.6/55.2 | 0/513 | $3.89 | $0.39 |
+Not run: 16/24/36. Stop reason: repeated 429 backoffs at N=12, all from startTurn (interaction create) across Hydrogen, 3.8 Flash and 3.6 Flash, which suggests a project-wide quota rather than a per-model one. No turn timed out.
+TOTALS: 39 Matches, measured spend $13.71 of the $50 cap (Hydrogen $5.32, 3.6 Flash $3.95, 3.8 Flash $2.99, Flash-Lite $1.33). Match duration p50 184 s (117-393). Managed Agent launches over the 38 logged ramp Matches (19:24-19:45 UTC, 20.9 min): 266 environments plus setup interactions, and 1,772 turn interactions (lower bound; invalid-call retries and 429 re-creates are not logged).
+CHOSEN: demo N=8 (0 429s, 0 timeouts, ~$0.87/min, about $52/h); fallback N=4 (~$0.39/min). N=12 only after a quota increase or a longer poll interval (hypothesis: PLAYER_POLL_MS=1000 adds about 84 GET/s at N=12). ROSTER: keep all four Agents (Hydrogen, 3.8 Flash, 3.6 Flash, 3.5 Flash-Lite).
+Anomaly: Match 6553818a seat 5's D1 Round A speech was skipped without a turn_timed_out event (possibly a 429 or no-call path; follow up). Final state: League PAUSED with N=8 set, spendCap 49. Artifacts: /tmp/wl-t4no/ramp.{json,log}.
