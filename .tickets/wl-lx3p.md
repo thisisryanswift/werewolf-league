@@ -1,6 +1,6 @@
 ---
 id: wl-lx3p
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-11-21T20:09:09Z
@@ -39,3 +39,7 @@ The Accusation arcs in the Match modal's seat list don't work: every arc shares 
 **2026-11-21T20:25:56Z**
 
 Merged into integration/wl-xgp7 (impl/wl-lx3p d1ea5f1). Typecheck clean; web and werewolf tests pass on integration (implementer's full suite had only the known timing flakes). AC1-3 met: test/web/match-view.test.ts (chips per seat, reset at a new Day, final Day once Over, identical with Narrator's View on and off; badge and Reply tags equal replier_chosen; Round C weighting); live check at 1920x1080 with no arcs and no chip overflow (/tmp/wl-lx3p-verify/midday-narrator-on.png). AC4 OPEN: docs/help/how-to-play.md line 26 still says 'Arcs' and needs the human's copy edit (suggested text is in the implementer report).
+
+**2026-11-21T20:27:10Z**
+
+AC4 met: how-to-play.md now describes the chips (human-approved text). All ACs met.

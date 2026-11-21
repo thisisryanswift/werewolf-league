@@ -80,3 +80,7 @@ Verified 2026-11-21 13:30 via OpenRouter's public model list: google/gemini-4-hy
 **2026-11-21T20:04:43Z**
 
 Human go (~15:00): build it now. The spike is on prototype/pi-spike (prototypes/pi-spike/{spike.ts,FINDINGS.md}); credentials AGENT37_API_KEY and OPENROUTER_API_KEY are in .dev.vars. Built in parallel with wl-2lfo and merged after it. Timebox: report by 16:00. wl-9u76 (League comparison) dropped for today per the human.
+
+**2026-11-21T20:29:39Z**
+
+Pi harness merged into integration/wl-xgp7 (impl/wl-zst1 c35b5b7). Verification on integration: install, typecheck and build clean; harness, architecture and vocabulary tests pass (implementer full suite 289/289). AC1-7 evidence: test/harness/pi.test.ts (11); src/harness/pi/ (adapter, PiSeatDO per ADR-0003, Agent37 client); real local smokes with pi seats mixed with managed seats: Haiku 5.5 $0.0075 for 3 seats, DeepSeek V4.1 Flash $0.0031, Hydrogen via OpenRouter $0.145 (needs thinkingLevel low), all village wins in 80-108 s, 0 timeouts; notes via sandbox bash (16 notes_updated); sandboxes deleted on close. Deploy needs OPENROUTER_API_KEY and AGENT37_API_KEY as Wrangler secrets. NOT YET: the pi-open League seeded with piRoster() (waits on wl-2lfo). Open P2s: the pause sweep deletes wl-pi-* sandboxes older than 2 h, which could hit a live Match running over 2 h; the 32-bit hash in sandbox names; the notes-capture commit was not codex-reviewed; mid-run eviction recovery untested.
