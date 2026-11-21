@@ -132,8 +132,18 @@ const Tile = memo(function Tile({ tile, narratorView, big }: { tile: MatchTile; 
         <span className="t-main">
           <span className="t-kick">
             <span className="t-id">{k.match}</span>
-            {k.chip && <span className="t-chip">{k.chip}</span>}
-            {step && <span className="t-step">{step}</span>}
+            {k.chip && (
+              <>
+                <span aria-hidden="true">·</span>
+                <span className="t-chip">{k.chip}</span>
+              </>
+            )}
+            {step && (
+              <>
+                <span aria-hidden="true">·</span>
+                <span className="t-step">{step}</span>
+              </>
+            )}
           </span>
           <span className="t-headline" title={v.headline}>
             {v.headline}

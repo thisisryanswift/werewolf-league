@@ -232,7 +232,8 @@ export function tileView(tile: MatchTile, narratorView: boolean): TileView {
       match: matchLabel(tile),
       chip: s === null ? null : over ? "END" : `${s.phase.charAt(0)}${s.round ?? ""}`,
       step: over ? null : step,
-      stepShort: over || step === null ? null : shortStep(step),
+      // Small tiles say just "Night", never the Narrator's View Night step.
+      stepShort: over || step === null ? null : night ? "Night" : shortStep(step),
     },
     headline:
       s === null

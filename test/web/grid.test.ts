@@ -286,6 +286,7 @@ describe("tile face", () => {
 
   it("puts the Match label, a phase chip and the step on the top line, with short steps for small tiles", () => {
     expect(tileView(nightStart(), false).kicker).toEqual({ match: "Match ns", chip: "N1", step: "Night actions", stepShort: "Night" });
+    expect(tileView(nightStart(), true).kicker).toEqual({ match: "Match ns", chip: "N1", step: "Wolf Chat", stepShort: "Night" });
     expect(tileView(speech(), true).kicker).toEqual({ match: "Match sp", chip: "D2", step: "Speech Round A", stepShort: "Speech A" });
     expect(tileView(reply(), true).kicker).toMatchObject({ chip: "D3", step: "Right of Reply", stepShort: "Reply" });
     expect(tileView(hotVote(), true).kicker).toMatchObject({ chip: "D4", step: "Vote", stepShort: "Vote" });

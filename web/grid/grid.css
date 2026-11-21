@@ -28,7 +28,7 @@
   --lg-tile-height: 120px;
   --lg-tile-height-big: 200px;
   --lg-gap: 12px;
-  --lg-pip: 19px;
+  --lg-pip: 20px;
   --lg-pip-big: 22px;
   /* modal */
   --lg-dialog-width: min(1600px, 96vw);
@@ -245,7 +245,7 @@ body:has(.lg-page) {
 .t-kick {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   min-width: 0;
   font: 700 14px/1.2 var(--lg-mono);
   text-transform: uppercase;
@@ -284,7 +284,7 @@ body:has(.lg-page) {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  min-width: 3.2em;
+  min-width: 2.3em;
   font: 900 24px/1 var(--lg-font);
   white-space: nowrap;
 }
@@ -353,12 +353,12 @@ body:has(.lg-page) {
   border: 2px solid var(--lg-ink);
   background: var(--lg-teal);
   color: var(--lg-ink);
-  font: 900 12px/1 var(--lg-mono);
+  font: 900 14px/1 var(--lg-mono);
 }
 .lg-tile.big .pip {
   width: var(--lg-pip-big);
   height: var(--lg-pip-big);
-  font-size: 13px;
+  font-size: 14px;
 }
 .pip.dead {
   background: var(--lg-paper);
