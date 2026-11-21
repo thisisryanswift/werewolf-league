@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { dealtWolves, fakeAgent, finished, snapshot, startMatch, waitFor } from "./helpers";
 
@@ -50,6 +51,38 @@ describe("deadlines and default actions", () => {
     });
     expect(live.stats.timeouts.bySeat[2]).toBeGreaterThan(0);
     expect(live.result).toBeNull();
+  });
+});
+
+describe("the Match backstop", () => {
+  it("expires the turns of a Player DO that never reports back, and the Match continues", async () => {
+    const seed = "backstop";
+    const wolves = dealtWolves(seed);
+    const seat = wolves[0]!; // acts on Night 1
+    // The seat never answers, so only a missing report (not a fast answer) can explain a backstop expiry.
+    const agents = Array.from({ length: 7 }, (_, i) =>
+      i + 1 === seat ? fakeAgent("lost", { script: "silent" }) : fakeAgent(`a-${i + 1}`),
+    );
+    const matchId = await startMatch({ seed, agents, deadlines });
+
+    // Fault: once its first turn is dispatched, the seat's Player DO loses all its state
+    // and never wakes, so it never reports anything for this or any later turn.
+    await waitFor(async () => {
+      const s = await snapshot(matchId);
+      return s.events.some((e) => e.kind === "turn_started" && e.data.seat === seat);
+    });
+    await runInDurableObject(env.PLAYER.getByName(`${matchId}:${seat}`), async (_instance, state) => {
+      await state.storage.deleteAlarm();
+      await state.storage.deleteAll();
+    });
+
+    const done = await finished(matchId);
+    const started = done.events.filter((e) => e.kind === "turn_started" && e.data.seat === seat);
+    const timedOut = done.events.filter((e) => e.kind === "turn_timed_out");
+    expect(started.length).toBeGreaterThan(0);
+    expect(timedOut.map((e) => [e.data.seat, e.data.by])).toEqual(started.map(() => [seat, "backstop"]));
+    expect(done.stats.timeouts.bySeat[seat]).toBe(started.length);
+    expect(done.events.at(-1)?.kind).toBe("match_over");
   });
 });
 
