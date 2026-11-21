@@ -367,6 +367,20 @@ export class MatchDO extends DurableObject<Env> {
   }
 
   /**
+   * Validate only: is `call` legal for this seat's open turn `turnId`? Records nothing (the
+   * Player's submitAction does). Used by harnesses that check calls mid-run (pi).
+   */
+  async validateAction(turnId: string, seat: Seat, call: ToolCall): Promise<{ ok: true } | { ok: false; error: string }> {
+    const meta = this.meta;
+    const turn = this.step?.turns.find((t) => t.turnId === turnId && t.seat === seat);
+    if (!meta || !turn || turn.action !== undefined || Date.now() >= turn.deadlineAt) {
+      return { ok: false, error: "This turn is over; your call was not used." };
+    }
+    const v = this.ruleset(meta).validate(this.rulesetState, seat, call);
+    return v.ok ? { ok: true } : { ok: false, error: v.error };
+  }
+
+  /**
    * Publish a seat's notes to Narrator's View if they changed (wl-rhpr). Best effort and
    * synchronous: anything unreadable is skipped, and it never fails or delays the turn.
    */

@@ -5,7 +5,7 @@
 import { describe, expect, it } from "vitest";
 import type { AgentConfig, Harness, PlayerContext, TurnHandle, TurnInput } from "../../src/core/harness";
 import type { ToolSpec, TurnRequest } from "../../src/core/ruleset";
-import { managedAgentHarness } from "../../src/harness/managed-agent";
+import { managedAgentHarness, PREAMBLE } from "../../src/harness/managed-agent";
 import { inputText, StubInteractionsApi } from "./stub-interactions-api";
 
 const TOOLS: ToolSpec[] = [
@@ -415,6 +415,12 @@ describe("Managed Agent harness: Agent notes (wl-rhpr)", () => {
     const callId = `fs_${it.steps.length}`;
     it.steps.push({ type: "function_call", id: callId, name: "write_to_file", arguments: args }, { type: "function_result", call_id: callId, result: "ok" });
   }
+
+  it("the preamble allows a /notes.md write before the one game call", () => {
+    expect(PREAMBLE).toContain("/notes.md");
+    expect(PREAMBLE).toContain("exactly one game tool");
+    expect(PREAMBLE).not.toMatch(/Act only by calling the game tools/);
+  });
 
   it("reports the latest /notes.md content the turn wrote, with the game call", async () => {
     const s = await seat();

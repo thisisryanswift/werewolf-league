@@ -40,7 +40,7 @@ const PACED = { ...UNPACED, startsPerWindow: 1, startWindowMs: 500 };
 const ids = (s: LeagueSnapshot) => s.leaderboard.rows.filter((r) => r.matches > 0).map((r) => r.agentId);
 
 describe("multiple Leagues", () => {
-  it("seeds gemini-managed (the default) and pi-open, which starts empty and paused", async () => {
+  it("seeds gemini-managed (the default) and pi-open, which starts paused on the pi Harness roster", async () => {
     const res = await exports.default.fetch("http://test/api/leagues");
     const list = (await res.json()) as { default: string; leagues: { id: string; name: string; paused: boolean }[] };
     expect(list.default).toBe("gemini-managed");
@@ -49,11 +49,9 @@ describe("multiple Leagues", () => {
     const pi = await league("pi-open");
     expect(pi.league).toMatchObject({ id: "pi-open" });
     expect(pi.config.paused).toBe(true);
-    expect(pi.config.roster).toEqual([]);
-    // Resuming an empty League starts nothing.
-    await ok(admin("pi-open", "resume"));
-    expect((await league("pi-open")).tiles).toEqual([]);
-    await ok(admin("pi-open", "pause"));
+    expect(pi.tiles).toEqual([]);
+    expect(pi.config.roster.map((a) => a.name)).toEqual(["Hydrogen · Pi", "Claude Haiku 5.5 · Pi", "DeepSeek V4.1 Flash · Pi"]);
+    expect(pi.config.roster.every((a) => a.harness === "pi")).toBe(true);
 
     expect((await exports.default.fetch("http://test/api/leagues/nope")).status).toBe(404);
     expect((await admin("nope", "pause")).status).toBe(404);

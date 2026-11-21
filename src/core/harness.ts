@@ -45,6 +45,8 @@ export interface TurnInput {
   firstTurn: boolean;
   /** Error from the Match when the previous call was invalid; the Agent should retry. */
   error?: string;
+  /** The Match's turn ID, set by the Player DO (pi checks calls against it mid-run). */
+  turnId?: string;
 }
 
 /** Opaque, JSON-serializable handle to an in-flight turn. */

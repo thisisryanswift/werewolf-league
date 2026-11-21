@@ -23,6 +23,7 @@ import { startMatch } from "../core/start-match";
 import { narratorConfigError } from "../narrator";
 import { DEFAULT_LEAGUE_ID, LEAGUES } from "../shared/leagues";
 import { isAdmin } from "./auth";
+import { sweepSandboxes } from "../harness/pi";
 
 const unauthorized = () => Response.json({ error: "unauthorized" }, { status: 401 });
 const noSuchLeague = (id: string) => Response.json({ error: `no such League: ${id}` }, { status: 404 });
@@ -60,7 +61,13 @@ export async function handleApi(request: Request, env: Env, url: URL): Promise<R
     if (!isLeagueId(id)) return noSuchLeague(id);
     const league = leagueStub(env, id);
     const op = adminOp[2];
-    if (op === "pause") return Response.json(await league.pause());
+    if (op === "pause") {
+      const paused = await league.pause();
+      // Best effort and bounded: pause never waits long on the sandbox provider.
+      // Age-based (stale sandboxes only), so it is safe whichever League is paused.
+      await Promise.race([sweepSandboxes(env.AGENT37_API_KEY), new Promise((r) => setTimeout(r, 5_000))]);
+      return Response.json(paused);
+    }
     if (op === "resume") return Response.json(await league.resume());
     const body = await request.json().catch(() => null);
     if (typeof body !== "object" || body === null) return Response.json({ error: "expected a JSON object" }, { status: 400 });

@@ -3,10 +3,12 @@
 import type { AgentConfig, Harness } from "../core/harness";
 import { fakeHarness } from "./fake";
 import { MANAGED_AGENT_HARNESS_ID, managedAgentHarness } from "./managed-agent";
+import { PI_HARNESS_ID, piHarness, piSeatsFrom } from "./pi";
 
 const HARNESSES: Record<string, (env: Env) => Harness> = {
   fake: () => fakeHarness,
   [MANAGED_AGENT_HARNESS_ID]: (env) => managedAgentHarness({ apiKey: env.GEMINI_API_KEY }),
+  [PI_HARNESS_ID]: (env) => piHarness(piSeatsFrom(env)),
 };
 
 export function harnessFor(agent: AgentConfig, env: Env): Harness {

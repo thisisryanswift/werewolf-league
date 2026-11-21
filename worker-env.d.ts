@@ -8,6 +8,7 @@ declare namespace Cloudflare {
     LEAGUE: DurableObjectNamespace<import("./src/do/league").LeagueDO>;
     MATCH: DurableObjectNamespace<import("./src/do/match").MatchDO>;
     PLAYER: DurableObjectNamespace<import("./src/do/player").PlayerDO>;
+    PI_SEAT: DurableObjectNamespace<import("./src/harness/pi/seat").PiSeatDO>;
     ASSETS: Fetcher;
     /** Shared secret for admin endpoints (`x-admin-secret` header). Secret; never in wrangler.jsonc. */
     ADMIN_SECRET?: string;
@@ -17,6 +18,10 @@ declare namespace Cloudflare {
     LEAGUE_RETRY_MS: string;
     /** Gemini API key for the managed-agent harness. Secret: .dev.vars / Wrangler secret only. */
     GEMINI_API_KEY?: string;
+    /** OpenRouter key for pi seats' models. Secret: .dev.vars / Wrangler secret only. */
+    OPENROUTER_API_KEY?: string;
+    /** Agent37 key for pi seats' sandboxes. Secret: .dev.vars / Wrangler secret only. */
+    AGENT37_API_KEY?: string;
   }
 }
 type Env = Cloudflare.Env;

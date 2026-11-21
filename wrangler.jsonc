@@ -3,6 +3,8 @@
   "name": "werewolf-league",
   "main": "src/worker/index.ts",
   "compatibility_date": "2026-11-01",
+  // The pi harness (agents, pi-ai) needs Node built-ins.
+  "compatibility_flags": ["nodejs_compat"],
   // Agent Instructions (docs/agent-instructions/*.md) are bundled as text modules.
   "rules": [{ "type": "Text", "globs": ["**/*.md"], "fallthrough": true }],
   "assets": {
@@ -15,11 +17,14 @@
     "bindings": [
       { "name": "LEAGUE", "class_name": "LeagueDO" },
       { "name": "MATCH", "class_name": "MatchDO" },
-      { "name": "PLAYER", "class_name": "PlayerDO" }
+      { "name": "PLAYER", "class_name": "PlayerDO" },
+      // Hosts Pi Durable for one pi seat (ADR-0003).
+      { "name": "PI_SEAT", "class_name": "PiSeatDO" }
     ]
   },
   "migrations": [
-    { "tag": "v1", "new_sqlite_classes": ["LeagueDO", "MatchDO", "PlayerDO"] }
+    { "tag": "v1", "new_sqlite_classes": ["LeagueDO", "MatchDO", "PlayerDO"] },
+    { "tag": "v2", "new_sqlite_classes": ["PiSeatDO"] }
   ],
   "vars": {
     // How often a Player DO polls its Harness for a finished turn.
