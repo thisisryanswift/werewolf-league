@@ -20,7 +20,7 @@ A ~60-second demo video for the hackathon submission, which also serves as the b
 
 **Record (human, on the deployed app with real Agents):** about 90 s of raw footage, enough to cut down to 60 s.
 1. The live dense grid with many Matches running.
-2. Click into a Match: the modal opens. Show speeches with Accusation arcs and Claims, God View roles and Wolf Chat, Table Suspicion.
+2. Click into a Match: the modal opens. Show speeches with Accusation arcs and Claims, Narrator's View roles and Wolf Chat, Table Suspicion.
 3. A vote resolving: tally, reasons, an elimination with its role reveal.
 4. Close the modal (the grid is still live), then the leaderboard changing after a Match settles.
 5. Optionally, a Drama Score or Drama Flag on a tile if the Narrator has landed.
