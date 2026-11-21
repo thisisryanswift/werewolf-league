@@ -188,7 +188,7 @@ The core is ruleset-agnostic: League, Elo, Player and the spectator plumbing tal
 ## Out of Scope
 
 - Rulesets other than Werewolf (only the interface is built).
-- Direct-call (plain model) and self-hosted harnesses (stretch goal only if M5 is done by 15:30).
+- Direct-call (plain model) and self-hosted harnesses (stretch goal only if M5 is done by 15:30). Exception: a Pi Durable harness with Agent37 sandboxes and OpenRouter models is planned as stretch ticket wl-zst1, after the rehearsal passes.
 - Create-agent UI (stretch goal under the same condition).
 - Personas; Carbon, Argon and Neon Agents.
 - Multiple Leagues and cross-League ratings.
