@@ -48,6 +48,14 @@ export class FeedCoalescer {
     }, wait);
   }
 
+  /**
+   * Send pending changes now, outside the interval. Call before sending a joining
+   * client the snapshot, so the baseline later diffs use equals what it received.
+   */
+  flushNow(): void {
+    this.flush();
+  }
+
   private flush(): void {
     this.lastFlush = this.deps.now();
     const current = this.deps.snapshot();

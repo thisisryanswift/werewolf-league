@@ -228,6 +228,8 @@ export class LeagueDO extends DurableObject<Env> {
     if (request.headers.get("Upgrade") !== "websocket") return new Response("expected websocket", { status: 426 });
     const pair = new WebSocketPair();
     const [client, server] = [pair[0], pair[1]];
+    // Bring existing clients up to date first, so the feed's diff baseline is the snapshot this client gets.
+    this.feed.flushNow();
     // Subscribe and send the snapshot in one synchronous step.
     this.ctx.acceptWebSocket(server);
     const msg: LeagueMessage = { type: "league", league: this.snapshot() };
@@ -394,6 +396,8 @@ export class LeagueDO extends DurableObject<Env> {
     // After a failed start (whose slot may have been freed), try again after the retry delay.
     if (retry) wakes.push(Math.max(now + this.retryMs, until));
     else if (live.some((m) => m.status === "starting")) wakes.push(Math.max(now, until));
+    // Even with nothing to start, wake when a backoff ends so the feed publishes it.
+    if (now < until) wakes.push(until);
     if (!config.paused && live.length < config.n) {
       const { nextAt } = startBudget(this.starts, now, config, until);
       if (nextAt !== null) wakes.push(nextAt);

@@ -77,6 +77,21 @@ describe("League feed coalescer", () => {
     expect(sent).toHaveLength(1);
   });
 
+  it("flushes pending changes before a client joins, so later diffs start from the join snapshot", () => {
+    const { feed, state, sent, advance } = rig(500);
+    state.tiles = [tile("m1", "a")];
+    feed.changed(); // leading message
+    state.tiles = [tile("m1", "b")];
+    feed.changed(); // pending
+    feed.flushNow(); // a client joins: everyone is brought up to "b" first
+    expect(sent.at(-1)!.tiles).toEqual([{ matchId: "m1", summary: { latestSpeech: { seat: 1, text: "b" } } }]);
+    // A change back to "a" is a real diff against the joined client's "b".
+    state.tiles = [tile("m1", "a")];
+    feed.changed();
+    advance(600);
+    expect(sent.at(-1)!.tiles).toEqual([{ matchId: "m1", summary: { latestSpeech: { seat: 1, text: "a" } } }]);
+  });
+
   it("sends every tile whole when it has no baseline (e.g. after an eviction)", () => {
     const { feed, state, sent } = rig(500);
     state.tiles = [tile("m1")];
