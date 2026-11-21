@@ -72,9 +72,21 @@ The Werewolf who picks the kill on a Night when the wolves name different target
 **Wolf Chat**:
 The private conversation the Werewolves have during Night. Spectators can see it, but no village player can.
 
-**Accused**:
-The player chosen by the Day nomination vote, who gives one rebuttal before the final yes/no elimination vote.
-_Avoid_: Nominee, suspect
+**Speech Round**:
+A step of the Day in which every living player speaks at the same time, having seen all earlier rounds.
+
+**Right of Reply**:
+The step after the Speech Rounds in which the most-accused players each speak once, in order.
+
+**Replier**:
+A player chosen for Right of Reply.
+_Avoid_: Accused, nominee
+
+**Accusation**:
+A structured claim within a speech that a named player is a Werewolf.
+
+**Claim**:
+A player's public statement of their own role, and for a Seer their inspection results. A Claim may be a lie.
 
 ## Spectating
 
