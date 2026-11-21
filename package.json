@@ -7,7 +7,7 @@
     "build": "vite build",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p web/tsconfig.json",
-    "cf-typegen": "wrangler types"
+    "smoke:fake": "node scripts/watch-fake-match.mjs"
   },
   "devDependencies": {
     "@cloudflare/vitest-plugin": "^1.8.2",
