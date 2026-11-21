@@ -1,7 +1,7 @@
 ---
 id: wl-t4no
 status: in_progress
-deps: [wl-nos5, wl-kh5w, wl-lvtw, wl-jb4x, wl-cizy, wl-e9tp]
+deps: [wl-nos5, wl-kh5w, wl-lvtw, wl-jb4x, wl-cizy, wl-e9tp, wl-64dn]
 links: []
 created: 2026-11-21T15:06:09Z
 type: task
@@ -64,3 +64,7 @@ ONE-TABLE REHEARSAL PASSED on the deployed app (https://werewolf-league.rswift.w
 - Behaviour: speeches 179-326 chars; wolves rated their partners low (0.15/0.05); every vote had a reason; 7 Accusations, Right of Reply worked; the Narrator emitted 11 drama and 11 drama_secret events. Oddity: the Doctor (Flash-Lite) protected a wolf on N1.
 - Fixes on the branch: realRoster() carries no instructions, so the per-role Ruleset default is mounted (codex P1 resolved); apply-roster.mjs normalizes a trailing slash (P2); new scripts/rehearsal.mjs.
 Pending: the ramp test, then the chosen demo N and fallback N. Suggested roster: keep all four Agents. Evidence: /tmp/wl-t4no/rehearsal1.{json,log}.
+
+**2026-11-21T17:44:22Z**
+
+Human decision 2026-11-21: run the ramp test after wl-64dn (real usage/cost tracking) lands, and enforce the $50 ramp cap from measured League spend instead of the per-Match estimate. Estimated cost of rehearsal Match 1c1ac7f6 (no usage was recorded): ~$0.30-0.80.
