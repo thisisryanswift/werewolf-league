@@ -19,12 +19,13 @@ describe("a 7-seat fake Match with every role", () => {
     const { wolves, plain, seer, doctor } = dealFor(seed);
     const [w1, w2] = wolves as [number, number];
     const [a, b, c] = plain as [number, number, number];
-    // The wolves always split (w1 wants a, w2 wants b); the Doctor guards a, then b; the
-    // Seer inspects w1. Village seats abstain on votes so the Match is decided at Night.
+    // The wolves want different targets (w1: a then c, w2: b then c), so Nights 1 and 2 split.
+    // The Doctor guards a, then b (also its Day votes); the Seer inspects w1 (and votes for w1).
+    // Plain Villagers abstain.
     const agents = Array.from({ length: 7 }, (_, i) => {
       const seat = i + 1;
-      if (seat === w1) return fakeAgent(`wolf-${seat}`, { say: `w${seat} says hi`, prefer: [a, b, c] });
-      if (seat === w2) return fakeAgent(`wolf-${seat}`, { say: `w${seat} says hi`, prefer: [b, a, c] });
+      if (seat === w1) return fakeAgent(`wolf-${seat}`, { say: `w${seat} says hi`, prefer: [a, c, b] });
+      if (seat === w2) return fakeAgent(`wolf-${seat}`, { say: `w${seat} says hi`, prefer: [b, c, a] });
       if (seat === seer) return fakeAgent(`seer-${seat}`, { script: "passive", prefer: [w1] });
       if (seat === doctor) return fakeAgent(`doc-${seat}`, { script: "passive", prefer: [a, b] });
       return fakeAgent(`vil-${seat}`, { script: "passive" });
@@ -42,11 +43,15 @@ describe("a 7-seat fake Match with every role", () => {
     ]);
     for (const e of of("wolf_chat")) expect(e.audience).toEqual(wolves);
 
-    // Pack Leader: every Night the wolves split, and the leader alternates while both live.
+    // Pack Leader: the wolves split on Nights 1 and 2, the leader decides, and the role alternates.
     const decided = of("kill_decided");
     expect(decided.length).toBeGreaterThanOrEqual(2);
     const [d1, d2] = decided;
     expect(d1!.data.packLeader).not.toBe(d2!.data.packLeader);
+    for (const d of [d1!, d2!]) {
+      const targets = of("kill_chosen").filter((k) => k.data.cycle === d.data.cycle).map((k) => k.data.target);
+      expect(new Set(targets).size).toBe(2);
+    }
     for (const d of decided) {
       const proposals = of("kill_chosen").filter((k) => k.data.cycle === d.data.cycle);
       expect(proposals.find((k) => k.data.seat === d.data.packLeader)?.data.target).toBe(d.data.target);
