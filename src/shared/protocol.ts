@@ -197,12 +197,14 @@ export interface LeagueSpend {
  * and its `match_cost` event); while it runs, only the total is shown.
  */
 export interface MatchCost {
-  /** Players plus Narrator. */
+  /** Players plus Narrator plus Analyst. */
   total: number;
   bySeat: Record<number, number>;
   byAgent: Record<string, number>;
   /** The Narrator's calls: in the total, in no Agent's cost. */
   narrator: number;
+  /** The post-Match Analyst's run: in the total, in no Agent's cost. Absent on Matches costed before it existed. */
+  analyst?: number;
   /** Tokens over every call; `input` includes `cached`. */
   tokens: { input: number; cached: number; thought: number; output: number };
   /** Models billed with no row in the price table (counted at $0). */

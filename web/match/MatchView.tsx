@@ -19,6 +19,7 @@ import "./match-view.css";
 import { buildMatchView, panelsFor, playerLabel, type EndScreen, type FeedGroup, type MatchView as View, type SeatView, type VoteTally } from "./model";
 import { NarratorViewContext, MATCH_PANELS, SEAT_SLOTS, useNarratorView, type MatchPanelProps } from "./panels";
 import { formatUsd } from "../cost";
+import { AnalystReport } from "./AnalystReport";
 
 export interface MatchViewProps {
   matchId: string;
@@ -513,6 +514,7 @@ function End({ end, onHide }: { end: EndScreen; onHide: () => void }) {
           </li>
         ))}
       </ul>
+      <AnalystReport end={end} />
       <h4>Cost</h4>
       {end.cost ? (
         <table className="mv-ratings" data-testid="match-cost">
@@ -523,6 +525,12 @@ function End({ end, onHide }: { end: EndScreen; onHide: () => void }) {
                 <td>{formatUsd(a.cost)}</td>
               </tr>
             ))}
+            {end.cost.analyst > 0 && (
+              <tr>
+                <th>Analyst</th>
+                <td>{formatUsd(end.cost.analyst)}</td>
+              </tr>
+            )}
             {end.cost.narrator > 0 && (
               <tr>
                 <th>Narrator</th>

@@ -18,6 +18,8 @@ interface Seating {
   tools: ToolSpec[];
   /** Assembled Agent Instructions for this seat (see PlayerContext). */
   instructions?: string;
+  /** See PlayerContext.preamble. */
+  preamble?: string;
   /** The League the Match reports to (429s go there too); absent means LEAGUE_NAME. */
   league?: string;
 }
