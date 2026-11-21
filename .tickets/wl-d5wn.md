@@ -1,6 +1,6 @@
 ---
 id: wl-d5wn
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-11-21T16:37:39Z
@@ -32,3 +32,9 @@ This is a follow-up to wl-kh5w (closed with default N 6 and a basic grid) for th
 - [ ] Whole-system test: a burst of Match events produces a bounded number of League feed pushes carrying per-tile diffs
 - [ ] Tile summaries include the fields listed above
 
+
+## Notes
+
+**2026-11-21T18:43:52Z**
+
+Merged into integration/wl-xgp7 (impl/wl-d5wn 9686770). Verification on integration: pnpm test 200/200, typecheck clean (the implementer also passed the full suite twice). AC evidence in test/system/league-scale.test.ts: default N 24, up to 36 accepted, 37 gets 400, set-N live; ramp from empty starts exactly [4,4,4,4,4,4] per 30 s window; a 429 pauses starts for the backoff, including the provisioning path; a burst of 100 updateTile calls gives bounded tiles diffs with no full tiles; tile summary fields. codex P1s fixed: pause or lowering N during a backoff releases held Matches; sustained 429s renew the backoff (reported at most every 2 s); held Matches use up the start window. Matches report to their own League (MatchInit.league), which fixed test cross-talk. OPEN after the review cap: P1 league-feed.ts:69, after League DO hibernation the diff baseline is lost, so the next diff resends tiles but no removals and settled tiles linger on connected clients (fix: send a full league snapshot when there is no baseline); P2 a released reservation's timestamp still uses start budget; P2 held Matches launch together if startsPerWindow was lowered meanwhile.
