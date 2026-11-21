@@ -70,6 +70,8 @@ export function LeaderboardPage() {
 function RatingCharts({ history }: { history: RatingsHistory }) {
   if (history.points.length === 0) return <RatingChart history={history} />;
   const domain = sharedDomain(history, METRICS.map((m) => m.metric));
+  // Tall enough that every Agent's end label fits at 24px apart (7 Agents need the minimum).
+  const height = Math.max(270, history.agents.length * 24 + 64);
   return (
     <div className="lg-chart-stack">
       {METRICS.map((m, i) => (
@@ -78,7 +80,7 @@ function RatingCharts({ history }: { history: RatingsHistory }) {
           history={history}
           metric={m.metric}
           yTitle={m.yTitle}
-          height={i === METRICS.length - 1 ? 290 : 270}
+          height={i === METRICS.length - 1 ? height + 20 : height}
           domain={domain}
           legend={i === 0}
           xTitle={i === METRICS.length - 1}
