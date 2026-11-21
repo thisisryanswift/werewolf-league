@@ -34,7 +34,7 @@ export function ratingsHistory(opts: {
 }): RatingsHistory {
   const cap = opts.cap ?? RATINGS_HISTORY_CAP;
   const rated = [...opts.settlements]
-    .filter((s) => s.ratings && s.ratings.agents.length > 0)
+    .filter((s) => Array.isArray(s.ratings?.agents) && s.ratings.agents.length > 0)
     .sort((a, b) => a.settledAt - b.settledAt || (a.matchNumber ?? 0) - (b.matchNumber ?? 0))
     .slice(-cap);
 

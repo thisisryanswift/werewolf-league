@@ -9,9 +9,10 @@ import { niceTicks, OVERFLOW_COLOR, ratingDomain, SERIES_COLORS, spreadLabels } 
 
 const W = 1800;
 const H = 620;
-const M = { top: 20, right: 230, bottom: 56, left: 110 };
-const PW = W - M.left - M.right;
+const M = { top: 20, bottom: 56, left: 110 };
 const PH = H - M.top - M.bottom;
+/** Right gutter wide enough for the longest "Name 1234" end label (about 11.5 units per character at 20px). */
+const rightFor = (names: string[]) => Math.min(700, Math.max(230, 40 + Math.max(0, ...names.map((n) => n.length + 5)) * 11.5));
 
 export const colorOf = (i: number) => SERIES_COLORS[i] ?? OVERFLOW_COLOR;
 
@@ -20,6 +21,8 @@ export function RatingChart({ history }: { history: RatingsHistory }) {
   const [hover, setHover] = useState<number | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
 
+  const right = rightFor(agents.map((a) => a.name));
+  const PW = W - M.left - right;
   const geo = useMemo(() => {
     const all = points.flatMap((p) => Object.values(p.overall));
     const [y0, y1] = ratingDomain(all, INITIAL_RATING);
@@ -30,7 +33,7 @@ export function RatingChart({ history }: { history: RatingsHistory }) {
     const yTicks = niceTicks(y0, y1, 6);
     const xTickIdx = n <= 1 ? [0] : niceTicks(0, n - 1, 10).filter((i) => Number.isInteger(i));
     return { x, y, yTicks, xTickIdx };
-  }, [points]);
+  }, [points, PW]);
 
   if (points.length === 0) return <p className="lg-chart-empty">No rated Matches yet. Lines appear as Matches settle.</p>;
 
