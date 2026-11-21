@@ -1,0 +1,91 @@
+/* Help buttons in the grid header and their dialogs. The dialogs reuse .lg-dialog
+   (border, shadow, backdrop) but size to their copy, which flows in columns so it
+   fits a 1080p projector without scrolling. */
+.lg-help {
+  background: var(--lg-paper);
+  border: 3px solid var(--lg-ink);
+  box-shadow: 3px 3px 0 var(--lg-ink);
+  padding: 3px 10px;
+  font: 800 14px/1.4 var(--lg-font);
+  color: inherit;
+  cursor: pointer;
+}
+.lg-help:focus-visible,
+.lg-help-close:focus-visible,
+.lg-help-body a:focus-visible {
+  outline: 3px solid var(--lg-red);
+  outline-offset: 2px;
+}
+.lg-dialog.lg-help-dialog {
+  height: fit-content; /* not auto: a modal dialog is inset: 0, so auto would stretch it */
+  max-height: var(--lg-dialog-height);
+  background: var(--lg-paper);
+  color: var(--lg-ink);
+  font-family: var(--lg-font);
+}
+.lg-help-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+.lg-help-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 20px;
+  background: var(--lg-header);
+  border-bottom: var(--lg-border) solid var(--lg-ink);
+}
+.lg-help-bar h2 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+.lg-help-close {
+  background: var(--lg-paper);
+  border: 3px solid var(--lg-ink);
+  box-shadow: 3px 3px 0 var(--lg-ink);
+  padding: 4px 12px;
+  font: 800 15px/1.4 var(--lg-font);
+  color: inherit;
+  cursor: pointer;
+}
+.lg-help-body {
+  overflow: auto;
+  padding: 16px 24px 20px;
+  columns: 3 420px;
+  column-gap: 36px;
+  column-rule: 3px solid var(--lg-ink);
+  font-size: 19px;
+  line-height: 1.45;
+}
+.lg-help-body h3 {
+  margin: 0 0 6px;
+  font-size: 21px;
+  font-weight: 900;
+  text-transform: uppercase;
+  break-after: avoid;
+}
+.lg-help-body p,
+.lg-help-body ul,
+.lg-help-body ol {
+  margin: 0 0 12px;
+  break-inside: avoid;
+}
+.lg-help-body ul,
+.lg-help-body ol {
+  padding-left: 1.3em;
+}
+.lg-help-body li {
+  margin-bottom: 4px;
+}
+.lg-help-body a {
+  color: inherit;
+  font-weight: 800;
+}
+/* Keep a question with the list that answers it. */
+.lg-help-body p:has(+ ul, + ol) {
+  break-after: avoid;
+  margin-bottom: 4px;
+}

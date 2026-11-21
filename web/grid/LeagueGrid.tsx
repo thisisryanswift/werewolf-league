@@ -4,6 +4,8 @@
 import { memo, useMemo, useRef, useState } from "react";
 import type { LeagueSnapshot, MatchTile } from "../../src/shared/protocol";
 import { FeaturedMatchLink } from "../components/FinishedMatches";
+import { landedFeatures } from "../help/features";
+import { HelpButtons } from "../help/HelpButtons";
 import type { FeedStatus } from "../useMatchFeed";
 import { arrangeGrid, tileView, topAgents, type GridFilter, type GridSort, type PromotionHold } from "./model";
 import { matchHash } from "./route";
@@ -39,6 +41,9 @@ export function LeagueGrid({ league, status, activity, narratorView, onNarratorV
     held.current = g.held;
     return g;
   }, [league.tiles, sort, filter, narratorView, activity]);
+  // Keyed by content so the help dialogs re-render only when a feature lands.
+  const landedKey = [...landedFeatures(league.tiles)].join(",");
+  const landed = useMemo(() => new Set(landedKey.split(",").filter(Boolean)), [landedKey]);
 
   return (
     <div className="lg">
@@ -62,6 +67,7 @@ export function LeagueGrid({ league, status, activity, narratorView, onNarratorV
           <span className={`lg-feed lg-feed-${status}`} data-testid="feed-status" title="Live connection to the League">
             {status === "live" ? "● live" : status}
           </span>
+          <HelpButtons landed={landed} />
           <button type="button" className={`lg-narrator${narratorView ? " on" : ""}`} aria-pressed={narratorView} data-testid="grid-narrator-view" onClick={() => onNarratorViewChange(!narratorView)}>
             {narratorView ? "◉ Narrator's View on" : "○ Narrator's View off"}
           </button>
