@@ -10,6 +10,9 @@
 //                                                                            the League acknowledges a rated (League-scheduled) result
 //   match_cost     MatchCostData (MatchCost minus byAgent)  audience "all"    committed when the Match finishes, and again if usage
 //                                                                            arrives later (e.g. the last narration); the latest one wins
+//   notes_updated  { seat, text, truncated }               audience []       committed when a seat's reported notes (its private
+//                                                                            /notes.md) change; Narrator's View only, never sent
+//                                                                            to Agents or the Narrator (wl-rhpr)
 
 import type { MatchCost, RatingChanges, RulesetEvent } from "./protocol";
 
@@ -22,7 +25,23 @@ export function matchCostEvent(cost: MatchCost): RulesetEvent {
   return { kind: "match_cost", audience: "all", data: { ...data } };
 }
 
-export const RUNNER_EVENT_KINDS: ReadonlySet<string> = new Set(["turn_started", "turn_timed_out", "step_resolved", "ratings_settled", "match_cost"]);
+export const RUNNER_EVENT_KINDS: ReadonlySet<string> = new Set([
+  "turn_started",
+  "turn_timed_out",
+  "step_resolved",
+  "ratings_settled",
+  "match_cost",
+  "notes_updated",
+]);
+
+/** Notes longer than this many characters are cut (about 2 KB). */
+export const NOTES_MAX_CHARS = 2000;
+
+/** A seat's notes as a Narrator's-View-only event (addressed to nobody), cut to NOTES_MAX_CHARS. */
+export function notesUpdatedEvent(seat: number, notes: string): RulesetEvent {
+  const truncated = notes.length > NOTES_MAX_CHARS;
+  return { kind: "notes_updated", audience: [], data: { seat, text: truncated ? `${notes.slice(0, NOTES_MAX_CHARS)}…` : notes, truncated } };
+}
 
 /** The Match end event reporting each Player's and each Agent's rating change; null for an unrated Match. */
 export function ratingsSettledEvent(changes: RatingChanges | null): RulesetEvent | null {

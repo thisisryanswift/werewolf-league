@@ -36,7 +36,7 @@ import { atLeast, ledgerUsage, mergeModelUsage, recordReadings, type ModelUsage 
 import { narratorFor } from "../narrator";
 import { getRuleset } from "../rulesets";
 import type { MatchCost, MatchEvent, RulesetEvent, ServerMessage, TileSummary } from "../shared/protocol";
-import { matchCostEvent, ratingsSettledEvent, thinkingSeats } from "../shared/turn-events";
+import { matchCostEvent, notesUpdatedEvent, ratingsSettledEvent, thinkingSeats } from "../shared/turn-events";
 import type { SettleAck } from "./league";
 
 /**
@@ -297,8 +297,9 @@ export class MatchDO extends DurableObject<Env> {
    * A Player reports its turn's action (`null` = no valid action, use the default),
    * with its cumulative usage, which counts even if the action is stale or invalid.
    */
-  async submitAction(turnId: string, seat: Seat, call: ToolCall | null, usage?: ModelUsage): Promise<SubmitResult> {
+  async submitAction(turnId: string, seat: Seat, call: ToolCall | null, usage?: ModelUsage, notes?: string): Promise<SubmitResult> {
     if (this.recordSeatUsage(seat, usage)) this.lateCost();
+    this.recordNotes(seat, notes);
     const meta = this.meta;
     const step = this.step;
     const turn = step?.turns.find((t) => t.turnId === turnId && t.seat === seat);
@@ -320,6 +321,22 @@ export class MatchDO extends DurableObject<Env> {
     this.step = step;
     await this.armAlarm(meta, step);
     return { status: "accepted" };
+  }
+
+  /**
+   * Publish a seat's notes to Narrator's View if they changed (wl-rhpr). Best effort and
+   * synchronous: anything unreadable is skipped, and it never fails or delays the turn.
+   */
+  private recordNotes(seat: Seat, notes: unknown): void {
+    try {
+      if (typeof notes !== "string" || !this.meta) return;
+      const last = this.ctx.storage.kv.get<Record<string, string>>("notes") ?? {};
+      if (last[seat] === notes) return;
+      this.ctx.storage.kv.put("notes", { ...last, [seat]: notes });
+      this.commit([notesUpdatedEvent(seat, notes)]);
+    } catch (err) {
+      console.warn(`Match ${this.meta?.matchId}: seat ${seat}'s notes were not published: ${String(err)}`);
+    }
   }
 
   /** A Player reports that its turn missed the deadline; the Ruleset's default applies. */

@@ -19,6 +19,8 @@
 //   pollEveryMs: number — ask the Player DO to poll no more often than this (keeps big test Leagues cheap)
 //   rateLimitPolls: number — the first this-many polls of every turn are refused with a 429 (sustained 429s)
 //   rateLimitProvision: bool — the seat's first provision attempt throws a 429 (later attempts succeed)
+//   notes: unknown[]    — turn n's answer reports notes[n-1] as the seat's notes (null or past the end: no
+//                         write). Not type-checked, so tests can send unreadable notes.
 
 import type { Harness, PlayerContext, PollResult, TurnHandle, TurnInput, Usage, UsageReading } from "../core/harness";
 import type { ToolCall } from "../core/ruleset";
@@ -39,6 +41,7 @@ interface FakeOptions {
   pollEveryMs?: number;
   rateLimitProvision?: boolean;
   rateLimitPolls?: number;
+  notes?: unknown[];
 }
 
 /** The scripted setup usage, while the seat's setup is still unreported. */
@@ -121,6 +124,7 @@ export const fakeHarness: Harness = {
         rateLimited: opts.rateLimitTurns?.includes(turns) ?? false,
         rateLimitPollsLeft: opts.rateLimitPolls ?? 0,
         pollEveryMs: opts.pollEveryMs ?? 0,
+        notes: opts.notes?.[turns - 1] ?? null,
       },
       chain: { ...ctx.chain, turns, setupPending: false },
     };
@@ -134,7 +138,8 @@ export const fakeHarness: Harness = {
     if (handle.rateLimited) return { status: "pending", handle: { ...handle, rateLimited: false }, rateLimited: true, retryAfterMs };
     if (decision === "never") return { status: "pending", handle, retryAfterMs };
     if (pollsLeft > 0) return { status: "pending", handle: { ...handle, pollsLeft: pollsLeft - 1 }, retryAfterMs };
-    return { status: "done", call: decision, ...usageOf(ctx, handle) };
+    const notes = handle.notes === null || handle.notes === undefined ? {} : { notes: handle.notes as string };
+    return { status: "done", call: decision, ...usageOf(ctx, handle), ...notes };
   },
   async cancel(ctx, handle) {
     return usageOf(ctx, handle);
