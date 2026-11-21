@@ -92,15 +92,19 @@ body:has(.lg-page) {
   box-shadow: 3px 3px 0 var(--lg-ink);
   padding: 3px 10px;
 }
+/* The live and finished counters sit at the start of the chips row, at chip size. */
 .lg-count {
-  font-size: 15px;
+  font: 700 13px/1 var(--lg-font);
+  padding: 5px 10px;
 }
 .lg-count b {
-  font-size: 20px;
+  font-weight: 900;
+}
+.lg-spacer {
+  margin-left: auto;
 }
 .lg-feed {
   font: 700 13px/1.4 var(--lg-mono);
-  margin-left: auto;
 }
 .lg-feed-reconnecting,
 .lg-feed-connecting {

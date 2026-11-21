@@ -1,5 +1,5 @@
-// The dense live grid (after prototype variant E): a header with live counts
-// and the Narrator's View toggle; sort and filter chips; then the three promoted
+// The dense live grid (after prototype variant E): a header with the help and
+// Narrator's View buttons; live counts, sort and filter chips; then the three promoted
 // large tiles and the rest, filled to 21 cards with recently finished Matches.
 // Each card links to #match=<id>.
 import { memo, useMemo, useRef, useState } from "react";
@@ -51,21 +51,25 @@ export function LeagueGrid({ league, status, activity, narratorView, onNarratorV
         <div className="lg-row">
           <h1>Werewolf League</h1>
           <LeagueSwitcher current={league.league.id} />
-          <span className="lg-count" data-testid="live-count">
-            <b>{league.tiles.length}</b> {league.config.paused ? "live · paused" : `of ${league.config.n} live`}
-          </span>
-          <span className="lg-count">
-            <b>{league.stats.settled.toLocaleString()}</b> finished
-          </span>
-          <span className={`lg-feed lg-feed-${status}`} data-testid="feed-status" title="Live connection to the League">
-            {status === "live" ? "● live" : status}
-          </span>
+          <span className="lg-spacer" />
+          {/* Shown only while the feed is down, so a stalled grid explains itself. */}
+          {status !== "live" && (
+            <span className={`lg-feed lg-feed-${status}`} data-testid="feed-status" title="Live connection to the League">
+              {status}
+            </span>
+          )}
           <HelpButtons landed={landed} />
           <button type="button" className={`lg-narrator${narratorView ? " on" : ""}`} aria-pressed={narratorView} data-testid="grid-narrator-view" onClick={() => onNarratorViewChange(!narratorView)}>
             {narratorView ? "◉ Narrator's View on" : "○ Narrator's View off"}
           </button>
         </div>
         <div className="lg-row lg-ctrls">
+          <span className="lg-count" data-testid="live-count">
+            <b>{league.tiles.length}</b> {league.config.paused ? "live · paused" : `of ${league.config.n} live`}
+          </span>
+          <span className="lg-count">
+            <b>{league.stats.settled.toLocaleString()}</b> finished
+          </span>
           <span className="lg-lbl">Sort</span>
           {SORTS.map((s) => {
             const unavailable = s.key === "drama" && !grid.hasDrama;
