@@ -164,6 +164,13 @@ describe("League spend", () => {
     expect(paused.spend.total).toBeGreaterThanOrEqual(start + 0.01);
     expect(paused.config.spendCap).toBeCloseTo(start + 0.01, 10);
     await waitFor(async () => (await league()).tiles.length === 0);
-    await admin("config", { spendCap: null });
+    // Resuming while the cap is still reached starts nothing; raising or clearing the cap allows it.
+    const refused = (await admin("resume")) as LeagueSnapshot;
+    expect(refused.config.paused).toBe(true);
+    expect(refused.blocked).toMatch(/spend cap/i);
+    expect(refused.tiles).toHaveLength(0);
+    await admin("config", { spendCap: null, n: 0 });
+    expect(((await admin("resume")) as LeagueSnapshot).config.paused).toBe(false);
+    await admin("pause");
   });
 });

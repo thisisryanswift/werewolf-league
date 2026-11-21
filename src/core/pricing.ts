@@ -16,6 +16,10 @@ export interface ModelPrice {
 
 export const PRICES: Record<string, ModelPrice> = {
   "gemini-4-hydrogen": { input: 1.5, cached: 0.075, output: 7.5 },
+  // Carbon and Argon double on 2026-12-01; Neon as priced in FINDINGS round 2.
+  "gemini-4-neon": { input: 3, cached: 0.15, output: 15 },
+  "gemini-4-carbon": { input: 2, cached: 0.1, output: 10 },
+  "gemini-4-argon": { input: 2, cached: 0.1, output: 10 },
   "gemini-3.8-flash": { input: 0.75, cached: 0.075, output: 3.75 },
   "gemini-3.6-flash": { input: 0.75, cached: 0.075, output: 3.75 },
   "gemini-3.5-flash-lite": { input: 0.3, cached: 0.03, output: 2.5 },

@@ -23,6 +23,10 @@ describe("pricing", () => {
     expect(PRICES["gemini-3.5-flash-lite"]).toEqual({ input: 0.3, cached: 0.03, output: 2.5 });
     expect(PRICES["gemini-decision-1"]).toEqual({ input: 0.1, cached: 0.1, output: 0 });
     for (const a of realRoster()) expect(PRICES[a.model!], a.model).toBeDefined();
+    // Other Managed Agent models an operator may put on a roster.
+    expect(PRICES["gemini-4-neon"]).toEqual({ input: 3, cached: 0.15, output: 15 });
+    expect(PRICES["gemini-4-carbon"]).toEqual({ input: 2, cached: 0.1, output: 10 });
+    expect(PRICES["gemini-4-argon"]).toEqual({ input: 2, cached: 0.1, output: 10 });
   });
 
   it("prices per-model token totals and names any model without a price instead of billing it at $0 silently", () => {

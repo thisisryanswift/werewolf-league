@@ -30,6 +30,8 @@ interface SpendRecord {
   settled: number;
   /** Settled League Matches only. */
   byAgent: Record<string, number>;
+  /** Costed League Matches per Agent (the cost-per-Match denominator; older uncosted Matches are excluded). */
+  matchesByAgent?: Record<string, number>;
   resumedAt: number | null;
   /** Total spend when the League was last resumed. */
   totalAtResume: number;
@@ -69,6 +71,7 @@ export interface SettleAck {
 }
 
 const MAX_START_FAILURES = 3;
+const SPEND_CAP_BLOCKED = "League spend has reached the spend cap; raise or clear spendCap to resume";
 const RECENT = 12;
 
 export class LeagueDO extends DurableObject<Env> {
@@ -140,17 +143,27 @@ export class LeagueDO extends DurableObject<Env> {
     if (!cost) return;
     const r = this.spendRecord;
     const byAgent = { ...r.byAgent };
+    const matchesByAgent = { ...r.matchesByAgent };
     if (leagueMatch) {
-      for (const [id, usd] of Object.entries(cost.byAgent)) byAgent[id] = (byAgent[id] ?? 0) + usd - (previous?.byAgent[id] ?? 0);
+      for (const [id, usd] of Object.entries(cost.byAgent)) {
+        byAgent[id] = (byAgent[id] ?? 0) + usd - (previous?.byAgent[id] ?? 0);
+        if (!previous) matchesByAgent[id] = (matchesByAgent[id] ?? 0) + 1;
+      }
     }
-    this.spendRecord = { ...r, settled: r.settled + cost.total - (previous?.total ?? 0), byAgent };
+    this.spendRecord = { ...r, settled: r.settled + cost.total - (previous?.total ?? 0), byAgent, matchesByAgent };
+  }
+
+  private get capReached(): boolean {
+    const cap = this.config.spendCap;
+    return cap != null && this.spend.total >= cap;
   }
 
   /** The operator's spend cap: once total spend reaches it, the League pauses (running Matches finish). */
   private enforceSpendCap(): void {
     const c = this.config;
-    if (c.paused || c.spendCap == null || this.spend.total < c.spendCap) return;
+    if (c.paused || !this.capReached) return;
     this.config = { ...c, paused: true };
+    this.blocked = SPEND_CAP_BLOCKED;
   }
 
   private get retryMs(): number {
@@ -189,11 +202,11 @@ export class LeagueDO extends DurableObject<Env> {
     const records = this.agents;
     const names = new Map<string, string>(Object.entries(records).map(([id, r]) => [id, r.name]));
     for (const a of c.roster) names.set(a.id, a.name);
-    const spent = this.spendRecord.byAgent;
-    const rows = rankStandings([...names].map(([id, name]) => standing(id, name, records[id], sides))).map((r) => ({
-      ...r,
-      costPerMatch: r.matches > 0 && spent[r.agentId] !== undefined ? spent[r.agentId]! / r.matches : null,
-    }));
+    const { byAgent: spent, matchesByAgent: costed = {} } = this.spendRecord;
+    const rows = rankStandings([...names].map(([id, name]) => standing(id, name, records[id], sides))).map((r) => {
+      const n = costed[r.agentId] ?? 0;
+      return { ...r, costPerMatch: n > 0 ? (spent[r.agentId] ?? 0) / n : null };
+    });
     return { sides, rows };
   }
 
@@ -254,6 +267,13 @@ export class LeagueDO extends DurableObject<Env> {
   }
 
   async resume(): Promise<LeagueSnapshot> {
+    // Over the cap, stay paused: resuming would start Matches the budget can't cover.
+    if (this.capReached) {
+      this.blocked = SPEND_CAP_BLOCKED;
+      this.broadcast();
+      return this.snapshot();
+    }
+    if (this.blocked === SPEND_CAP_BLOCKED) this.blocked = null;
     if (this.config.paused) this.spendRecord = { ...this.spendRecord, resumedAt: Date.now(), totalAtResume: this.spend.total };
     this.config = { ...this.config, paused: false };
     await this.schedule();

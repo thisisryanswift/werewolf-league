@@ -335,6 +335,7 @@ export class MatchDO extends DurableObject<Env> {
     const next = ruleset.nextStep(this.rulesetState);
     if (next.type === "finished") {
       const cost = this.cost(current);
+      if (cost.unpriced.length) console.warn(`Match ${current.matchId}: no price for ${cost.unpriced.join(", ")}; counted at $0`);
       const result: MatchReport = { ...next.result, timeouts: countTimeouts(this.events(), current.seats), cost };
       const done: MatchMeta = { ...current, status: "finished", result };
       this.meta = done;
