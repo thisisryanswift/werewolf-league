@@ -35,7 +35,7 @@ The core is ruleset-agnostic: League, Elo, Player and the spectator plumbing tal
 7. As a Spectator, I want to close the Match modal (Esc, a backdrop click or the back button) at any time without affecting the Match, while the grid keeps updating underneath, so that I can drop in and out freely.
 8. As a Spectator, I want God View on by default, showing every Player's role and the Wolf Chat, so that I can enjoy the dramatic irony.
 9. As a Spectator, I want to turn God View off, so that I can play along with only the public information.
-10. As a Spectator, I want each Player labelled with its Agent and a copy number (e.g. "Hydrogen #2") when an Agent fills several seats, so that I can tell copies apart.
+10. As a Spectator, I want each Player shown with its Display Name, Agent and copy number (e.g. "Mara · Hydrogen #2"), so that I can tell copies apart. Players see only Display Names, so that model identity never biases play.
 11. As a Spectator, I want speeches in a Speech Round shown in the same order the agents were shown them, so that what I see matches what they saw.
 12. As a Spectator, I want Accusations shown as visual links between Players, so that I can see who suspects whom.
 13. As a Spectator, I want Claims (e.g. "I am the Seer; P3 is a Werewolf") shown as badges, so that I can follow claim wars and spot lies in God View.
@@ -68,7 +68,7 @@ The core is ruleset-agnostic: League, Elo, Player and the spectator plumbing tal
 36. As the operator, I want each Player's sandbox provisioned at Match start, so that the first turn doesn't wait on sandbox creation.
 
 ### Werewolf rules
-37. As a Player, I want my first turn to give me the rules, my Agent Instructions, my secret role, the seat list and (for Werewolves) my partner, so that I can play.
+37. As a Player, I want my Agent Instructions mounted as /.agents/AGENTS.md in my sandbox, and my first turn to give me the rules, my secret role, the seat list (by Display Name) and (for Werewolves) my partner, so that I can play.
 38. As a Player, I want each later observation to contain only what's new since my last turn, the required action and the legal targets, so that turns are fast and cheap.
 39. As a Player, I want the same tool set for my role for the whole Match, so that the agent API accepts every continuation (ADR-0002).
 40. As a Player, I want an out-of-phase or illegal tool call to return an error naming the required action, so that I can correct myself before the deadline.
@@ -137,6 +137,14 @@ The core is ruleset-agnostic: League, Elo, Player and the spectator plumbing tal
 **Deadlines.** Per-turn deadline 60 s, first turn 90 s, both configurable. Simultaneous steps wait for every Player or its deadline. Timeouts are recorded per Player/Agent.
 
 **Ratings.** Side Ratings start at 1200, team-average Elo, K=32, one update per Player to its Agent's Side Rating, dead Players share their team's result; Overall Rating = mean of the two Side Ratings. Beliefs are normalized to sum to the number of living wolves (clamped to [0,1]); Brier is averaged over village Players' vote-time beliefs about the other living players' true wolf status. The God View suspicion meter is the table's mean normalized belief per Player.
+
+**Agent Instructions (wl-cizy).**
+- **Source:** `docs/agent-instructions/werewolf.md`. Its sections are shared, village, seer, doctor and werewolf; the text is strategy only, and the rules stay in the Ruleset briefing.
+- **Assembly:** the Ruleset names each seat's section keys, the Match assembles them, and the Harness mounts the result as `/.agents/AGENTS.md` at provisioning. The first-turn input is the fallback if a function-only agent doesn't follow the mounted file.
+- **Notes:** the `/notes.md` scratchpad is kept as a deliberate Managed Agents feature.
+- **Speech limits** (≤3 sentences, ≤350 characters, plain text) are enforced by the instructions only; the rehearsal checks them.
+
+**Display Names (wl-e9tp).** Each seat gets a seeded fake Display Name. Players only ever see Display Names, and spectators see "Display Name · Agent #n".
 
 **Roster (initial).** One Agent each for Hydrogen, 3.8 Flash, 3.6 Flash and 3.5 Flash-Lite, on the Managed Agent harness with shared agents.md-style Agent Instructions and no personas. Carbon, Argon and Neon are excluded. 3.8 Flash is kept only if the M1 sanity check shows its game-sized turns aren't much slower than Hydrogen's.
 
