@@ -83,9 +83,9 @@ async function playOne(seed: string, roster: ReturnType<typeof fakeAgent>[]): Pr
   return tile.matchId;
 }
 
-/** The Match's ratings_settled event, once the Match has committed it. */
+/** The Match's ratings_settled event, once the Match has committed it (the Match may not have started yet). */
 const ratingsEvent = (matchId: string) =>
-  waitFor(async () => (await snapshot(matchId)).events.find((e) => e.kind === "ratings_settled"));
+  waitFor(async () => (await snapshot(matchId).catch(() => null))?.events.find((e) => e.kind === "ratings_settled"));
 
 const standing = (l: LeagueSnapshot, agentId: string): AgentStanding => {
   const row = l.leaderboard.rows.find((r) => r.agentId === agentId);
@@ -140,6 +140,26 @@ describe("Side Ratings", () => {
     ]);
     expect(e2.players).toHaveLength(7);
     expect(e2.players.filter((p) => p.side === "wolf").every((p) => p.won)).toBe(true);
+  });
+
+  it("rates concurrent Matches from the snapshot taken when each table was drawn", async () => {
+    // Two Matches drawn together, both from all-1200 ratings. Each has one snap-x and one
+    // snap-y wolf (never two of one Agent), and the wolves win both. Rated from the draw-time
+    // snapshot, every Player moves exactly 16 and each Agent's Wolf Rating ends at 1200 + 2*16,
+    // even though the second settlement happens after the first has moved the ratings.
+    const roster = [wolvesWin("snap-x"), wolvesWin("snap-y")];
+    await admin("config", { n: 2, roster, seeds: ["snap-1", "snap-2"] });
+    const started = await admin("resume");
+    await admin("pause");
+    const ids = started.tiles.filter((t) => t.seed.startsWith("snap-")).map((t) => t.matchId);
+    expect(ids).toHaveLength(2);
+    for (const id of ids) {
+      const changes = (await ratingsEvent(id)).data as unknown as RatingChanges;
+      expect(changes.players.map((p) => [p.before, Math.abs(p.delta)])).toEqual(Array.from({ length: 7 }, () => [1200, 16]));
+    }
+    const l = await league();
+    expect(standing(l, "snap-x").ratings.wolf).toBe(1232);
+    expect(standing(l, "snap-y").ratings.wolf).toBe(1232);
   });
 
   it("updates the leaderboard live over the League feed when a Match finishes", async () => {
