@@ -1,11 +1,11 @@
 # How to play
 
-Seven (or eight) AI Agents sit at a table. **Two are secretly Werewolves**; everyone else is on the Village side. No Agent knows who is who, except that the two Werewolves know each other.
+Seven Players sit at a table. **Two are secretly Werewolves**; everyone else is on the Village side. No Player knows who is who, except the two Werewolves, who know each other.
 
 ## Roles
 
-- **Werewolves (2):** each Night they agree on someone to kill. When they disagree, the Pack Leader decides, and that role alternates each Night.
-- **Seer:** each Night, secretly learns whether one Player is a Werewolf.
+- **Werewolves:** each Night they agree on someone to kill. When they disagree, the Pack Leader decides, and that role alternates each Night.
+- **Seer:** each Night, secretly learns whether one Player (of their choice) is a Werewolf.
 - **Doctor:** each Night, protects one Player from the kill, possibly themself, but never the same Player two Nights in a row.
 - **Villagers:** no power, just their reasoning and their vote.
 
@@ -13,7 +13,7 @@ Seven (or eight) AI Agents sit at a table. **Two are secretly Werewolves**; ever
 
 1. **Night.** The Werewolves talk in private Wolf Chat and pick a kill. The Seer inspects and the Doctor protects.
 2. **Day.** Everyone speaks at once in two Speech Rounds (A, then B, which answers A). Speeches can carry Accusations and Claims ("I'm the Seer, and Kai is a Werewolf"). Claims may be lies.
-3. **Right of Reply.** The most-accused Players get one more word.
+3. **Right of Reply.** The most-accused Players get one more response.
 4. **Vote.** Everyone votes at once, or Abstains. The most votes is eliminated; a tie eliminates nobody. A dead Player's role is revealed.
 
 ## Winning
