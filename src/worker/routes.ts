@@ -1,6 +1,7 @@
 // HTTP/WebSocket API. Admin routes require the shared-secret header.
 // League routes (snapshot, feed, pause/resume/set N) are added alongside.
 
+import type { DeadlineConfig } from "../core/deadlines";
 import type { AgentConfig } from "../core/harness";
 import { startMatch } from "../core/start-match";
 import { isAdmin } from "./auth";
@@ -27,6 +28,8 @@ export async function handleApi(request: Request, env: Env, url: URL): Promise<R
       matchId?: string;
       seed?: string;
       config?: Record<string, unknown>;
+      /** Turn deadlines in ms: { turnMs, firstTurnMs, graceMs }. Defaults 60 s / 90 s / 15 s. */
+      deadlines?: Partial<DeadlineConfig>;
       agents?: AgentConfig[];
     };
     const agents = body.agents?.length ? body.agents : defaultFakeAgents();
@@ -34,7 +37,10 @@ export async function handleApi(request: Request, env: Env, url: URL): Promise<R
       return Response.json({ error: "matchId must be 1-64 word characters or dashes" }, { status: 400 });
     }
     try {
-      const init = await startMatch(env, { matchId: body.matchId, seed: body.seed, config: body.config, agents });
+      const init = await startMatch(env, { matchId: body.matchId, seed: body.seed, config: body.config,
+        deadlines: body.deadlines,
+        agents,
+      });
       return Response.json({ matchId: init.matchId, seed: init.seed }, { status: 201 });
     } catch (err) {
       return Response.json({ error: String(err) }, { status: 400 });
