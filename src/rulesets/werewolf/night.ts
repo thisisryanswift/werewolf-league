@@ -167,7 +167,7 @@ function applyAct(s: WerewolfState, actions: Record<Seat, ToolCall | null>): { s
   const saved = chosen !== null && chosen === protectedSeat;
   if (saved) {
     const doctor = actTurns(s).find((t) => t.actionKind === "protect")!.seat;
-    // God View only: an empty audience reaches no seat.
+    // Narrator's View only: an empty audience reaches no seat.
     events.push({ kind: "doctor_saved", audience: [], data: { cycle: s.cycle, seat: doctor, target: chosen } });
   }
   const killed = saved ? null : chosen;

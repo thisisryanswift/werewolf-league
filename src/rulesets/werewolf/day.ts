@@ -248,7 +248,7 @@ function applyVote(s: WerewolfState, actions: Record<Seat, ToolCall | null>): Ap
 
   const events: RulesetEvent[] = [
     { kind: "votes_revealed", audience: "all", data: { cycle: s.cycle, votes: ballots } },
-    // God View only: a ballot normalized to the wolves among the voter's others would reveal them.
+    // Narrator's View only: a ballot normalized to the wolves among the voter's others would reveal them.
     { kind: "beliefs_recorded", audience: [], data: { cycle: s.cycle, ballots: beliefBallots } },
   ];
 

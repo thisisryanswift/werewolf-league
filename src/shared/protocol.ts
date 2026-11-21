@@ -1,6 +1,6 @@
 // Wire protocol shared by the Worker and the frontend. Ruleset-agnostic.
 
-/** Who may see an event: everyone, or only these seats (God View sees all). */
+/** Who may see an event: everyone, or only these seats (Narrator's View sees all). */
 export type EventAudience = "all" | number[];
 
 /** An event as produced by a Ruleset (or the Match runner). */
@@ -37,9 +37,9 @@ export function mergeEvents(existing: MatchEvent[], incoming: MatchEvent[]): Mat
 
 /**
  * A ruleset-agnostic summary of a live Match for its grid tile. The Ruleset
- * supplies the public fields (and `godView`); the Match runner adds the Narrator's
- * Drama fields. `godView` and secret Drama Flags are sent to every Spectator and
- * hidden client-side when God View is off (see `visibleDramaFlags`), like private
+ * supplies the public fields (and `narratorView`); the Match runner adds the Narrator's
+ * Drama fields. `narratorView` and secret Drama Flags are sent to every Spectator and
+ * hidden client-side when Narrator's View is off (see `visibleDramaFlags`), like private
  * Match events.
  */
 export interface MatchSummary {
@@ -54,10 +54,10 @@ export interface MatchSummary {
   /** The Ruleset's name for the current step within the phase (e.g. "Vote"), or null. */
   step: string | null;
   /**
-   * Private information for God View only (e.g. each seat's role). Like the
-   * Match feed, it is sent to every Spectator and hidden client-side when God View is off.
+   * Private information for Narrator's View only (e.g. each seat's role). Like the
+   * Match feed, it is sent to every Spectator and hidden client-side when Narrator's View is off.
    */
-  godView?: { roles: Record<number, string>; step?: string | null };
+  narratorView?: { roles: Record<number, string>; step?: string | null };
   /** Narrator Drama Score from 0 (calm) to 1 (explosive); absent before the first narration. */
   dramaScore?: number;
   /** Active Drama Flags of the latest narration; absent before the first narration. */
@@ -77,7 +77,7 @@ export interface TileSummary extends MatchSummary {
   timeouts: number;
 }
 
-/** Public-safe Drama Flags are shown to everyone; secret ones only in God View. */
+/** Public-safe Drama Flags are shown to everyone; secret ones only in Narrator's View. */
 export type DramaFlagVisibility = "public-safe" | "secret";
 
 /** An active Drama Flag on a tile (set by the Narrator). */
@@ -86,9 +86,9 @@ export interface TileDramaFlag {
   visibility: DramaFlagVisibility;
 }
 
-/** The Drama Flags a Spectator may see: all of them in God View, else only public-safe ones. */
-export function visibleDramaFlags<F extends { visibility: DramaFlagVisibility }>(flags: F[], godView: boolean): F[] {
-  return godView ? flags : flags.filter((f) => f.visibility === "public-safe");
+/** The Drama Flags a Spectator may see: all of them in Narrator's View, else only public-safe ones. */
+export function visibleDramaFlags<F extends { visibility: DramaFlagVisibility }>(flags: F[], narratorView: boolean): F[] {
+  return narratorView ? flags : flags.filter((f) => f.visibility === "public-safe");
 }
 
 /** One seat of a Match as shown on a tile. */

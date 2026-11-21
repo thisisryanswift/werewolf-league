@@ -1,5 +1,5 @@
 // The League grid's model (pure): which tiles show, in what order, which three
-// are promoted to large tiles, and what each tile shows for a God View setting.
+// are promoted to large tiles, and what each tile shows for a Narrator's View setting.
 // Before the Narrator has scored any Match, the grid degrades: drama sorting
 // falls back to Match number, the flagged filter is hidden, and promotion goes
 // by most recent activity, holding each promoted Match for a while so the
@@ -13,7 +13,7 @@ export type GridFilter = "all" | "flagged" | "voting" | "night";
 export interface GridOptions {
   sort: GridSort;
   filter: GridFilter;
-  godView: boolean;
+  narratorView: boolean;
   /** When each Match last had activity (any increasing number), for promotion without Drama Scores. */
   activity?: Record<string, number>;
   /** Clock time (ms) for holding promoted Matches without Drama Scores; omit for no hold. */
@@ -49,13 +49,13 @@ const PROMOTED = 3;
 /** How long a Match stays promoted by activity before a more active one may replace it. */
 export const PROMOTION_HOLD_MS = 10_000;
 
-/** The Drama Flags a Spectator may see on a tile (secret ones only in God View). */
-export const tileFlags = (tile: MatchTile, godView: boolean) => visibleDramaFlags(tile.summary?.dramaFlags ?? [], godView);
+/** The Drama Flags a Spectator may see on a tile (secret ones only in Narrator's View). */
+export const tileFlags = (tile: MatchTile, narratorView: boolean) => visibleDramaFlags(tile.summary?.dramaFlags ?? [], narratorView);
 
-const FILTERS: Record<GridFilter, (t: MatchTile, godView: boolean) => boolean> = {
+const FILTERS: Record<GridFilter, (t: MatchTile, narratorView: boolean) => boolean> = {
   all: () => true,
-  flagged: (t, godView) => tileFlags(t, godView).length > 0,
-  // The public step: in God View it can name Night steps, but voting is public anyway.
+  flagged: (t, narratorView) => tileFlags(t, narratorView).length > 0,
+  // The public step: in Narrator's View it can name Night steps, but voting is public anyway.
   voting: (t) => t.summary?.step === "Vote",
   night: (t) => t.summary?.phase === "Night",
 };
@@ -65,7 +65,7 @@ export function arrangeGrid(tiles: MatchTile[], options: GridOptions): GridArran
   const sort = options.sort === "drama" && !hasDrama ? "number" : options.sort;
   const filters: GridFilter[] = hasDrama ? ["all", "flagged", "voting", "night"] : ["all", "voting", "night"];
   const filter = filters.includes(options.filter) ? options.filter : "all";
-  const shown = tiles.filter((t) => FILTERS[filter](t, options.godView));
+  const shown = tiles.filter((t) => FILTERS[filter](t, options.narratorView));
   // Match number is start order: the feed keeps tiles in it.
   const number = new Map(tiles.map((t, i) => [t.matchId, i]));
   const byNumber = (a: MatchTile, b: MatchTile) => number.get(a.matchId)! - number.get(b.matchId)!;
@@ -119,7 +119,7 @@ export function topAgents(board: Leaderboard, count: number) {
 export interface TilePip {
   seat: number;
   alive: boolean;
-  /** The seat's role in God View, else null. */
+  /** The seat's role in Narrator's View, else null. */
   role: string | null;
 }
 
@@ -127,7 +127,7 @@ export interface TileView {
   /** "Day 2", "Night 1", "Over" or "Starting". */
   phase: string;
   night: boolean;
-  /** The step tag (God View may name the Night step), or null. */
+  /** The step tag (Narrator's View may name the Night step), or null. */
   step: string | null;
   voting: boolean;
   pips: TilePip[];
@@ -137,7 +137,7 @@ export interface TileView {
   drama: number | null;
   /** Display names of the Drama Flags this Spectator may see. */
   flags: string[];
-  /** Players thinking; null at Night without God View, since it would hint at roles. */
+  /** Players thinking; null at Night without Narrator's View, since it would hint at roles. */
   thinking: number | null;
   timeouts: number;
   speech: { seat: number; speaker: string; text: string } | null;
@@ -151,7 +151,7 @@ export const flagName = (id: string) => {
   return words.charAt(0).toUpperCase() + words.slice(1);
 };
 
-export function tileView(tile: MatchTile, godView: boolean): TileView {
+export function tileView(tile: MatchTile, narratorView: boolean): TileView {
   const s = tile.summary;
   const alive = new Set(s?.alive ?? tile.seats.map((x) => x.seat));
   const night = s?.phase === "Night";
@@ -160,14 +160,14 @@ export function tileView(tile: MatchTile, godView: boolean): TileView {
   return {
     phase: s === null ? "Starting" : s.round === null || s.phase === "Over" ? s.phase : `${s.phase} ${s.round}`,
     night,
-    step: (godView ? s?.godView?.step : undefined) ?? s?.step ?? null,
+    step: (narratorView ? s?.narratorView?.step : undefined) ?? s?.step ?? null,
     voting: s?.step === "Vote",
-    pips: tile.seats.map((x) => ({ seat: x.seat, alive: alive.has(x.seat), role: godView ? (s?.godView?.roles[x.seat] ?? null) : null })),
+    pips: tile.seats.map((x) => ({ seat: x.seat, alive: alive.has(x.seat), role: narratorView ? (s?.narratorView?.roles[x.seat] ?? null) : null })),
     alive: alive.size,
     total: tile.seats.length,
     drama: s?.dramaScore === undefined ? null : Math.round(s.dramaScore * 100),
-    flags: tileFlags(tile, godView).map((f) => flagName(f.id)),
-    thinking: s === null || (night && !godView) ? null : s.thinking,
+    flags: tileFlags(tile, narratorView).map((f) => flagName(f.id)),
+    thinking: s === null || (night && !narratorView) ? null : s.thinking,
     timeouts: s?.timeouts ?? 0,
     speech: said ? { ...said, speaker: speaker ? spectatorLabel(speaker) : `Seat ${said.seat}` } : null,
     cost: costText(s),
