@@ -24,9 +24,9 @@ function latestSpeech(events: RulesetEvent[]): MatchSummary["latestSpeech"] {
 const roundName = (round: number) => String.fromCharCode(64 + round); // 1 -> "A"
 
 /** The step tag. Night is one public tag: naming Wolf Chat would show that two Werewolves live. */
-function stepTag(s: WerewolfState, godView: boolean): string | null {
+function stepTag(s: WerewolfState, narratorView: boolean): string | null {
   if (s.phase === "over") return null;
-  if (s.phase === "night") return godView && s.night.step === "wolf_chat" ? "Wolf Chat" : "Night actions";
+  if (s.phase === "night") return narratorView && s.night.step === "wolf_chat" ? "Wolf Chat" : "Night actions";
   if (s.day.step === "speech") return `Speech Round ${roundName(s.day.round)}`;
   return s.day.step === "reply" ? "Right of Reply" : "Vote";
 }
@@ -38,7 +38,7 @@ export function summary(s: WerewolfState, publicEvents: RulesetEvent[]): MatchSu
     step: stepTag(s, false),
     alive: alive(s).map((p) => p.seat),
     latestSpeech: latestSpeech(publicEvents),
-    godView: {
+    narratorView: {
       roles: Object.fromEntries(s.players.map((p) => [p.seat, p.role])),
       step: stepTag(s, true),
     },

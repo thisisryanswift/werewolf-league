@@ -425,12 +425,12 @@ body:has(.mv-page) {
   border-left-color: #999;
   font-style: italic;
 }
-.mv-row.god {
+.mv-row.narrator {
   background: var(--mv-lilac);
   color: var(--mv-ink);
   border-left-color: #7a4dd8;
 }
-.mv-gv {
+.mv-nv {
   font: 900 11px/1 var(--mv-mono);
   background: var(--mv-ink);
   color: var(--mv-lilac);

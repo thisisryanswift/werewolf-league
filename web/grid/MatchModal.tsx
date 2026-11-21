@@ -10,13 +10,13 @@ const closedBySupported = typeof HTMLDialogElement !== "undefined" && "closedBy"
 
 export interface MatchModalProps {
   matchId: string;
-  godView: boolean;
-  onGodViewChange: (on: boolean) => void;
+  narratorView: boolean;
+  onNarratorViewChange: (on: boolean) => void;
   /** Called when the dialog closes (Esc, backdrop or the Close button). */
   onClose: () => void;
 }
 
-export function MatchModal({ matchId, godView, onGodViewChange, onClose }: MatchModalProps) {
+export function MatchModal({ matchId, narratorView, onNarratorViewChange, onClose }: MatchModalProps) {
   const ref = useRef<HTMLDialogElement>(null);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
@@ -42,7 +42,7 @@ export function MatchModal({ matchId, godView, onGodViewChange, onClose }: Match
 
   return (
     <dialog ref={ref} className="lg-dialog" aria-labelledby={TITLE_ID} data-testid="match-modal" {...({ closedby: "any" } as object)}>
-      <MatchView matchId={matchId} godView={godView} onGodViewChange={onGodViewChange} onClose={() => ref.current?.close()} titleId={TITLE_ID} />
+      <MatchView matchId={matchId} narratorView={narratorView} onNarratorViewChange={onNarratorViewChange} onClose={() => ref.current?.close()} titleId={TITLE_ID} />
     </dialog>
   );
 }

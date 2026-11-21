@@ -1,6 +1,6 @@
 // Seam 3: the Narrator. A scripted fake Narrator in whole-system tests (real
 // League/Match/Player DOs and alarms): results become Match events and reach
-// tile summaries, God View tagging hides secret flags, a failing or slow
+// tile summaries, Narrator's View tagging hides secret flags, a failing or slow
 // Narrator never holds up a Match, and at most one call per Match is in flight.
 
 import { exports } from "cloudflare:workers";
@@ -79,24 +79,24 @@ describe("the Narrator", () => {
     expect(secret.data.flags).toContainEqual({ id: "wolf_fooling_table", value: 0.95, visibility: "secret", active: true });
   });
 
-  it("hides secret Drama Flags with God View off and shows public-safe ones", async () => {
+  it("hides secret Drama Flags with Narrator's View off and shows public-safe ones", async () => {
     const narrator = { id: "fake", options: { flags: { claim_war: 0.9, wolves_split: 0.9 } } };
-    const matchId = await startMatch({ seed: "narrator-godview", agents: table("n2"), narrator });
+    const matchId = await startMatch({ seed: "narrator-view-flags", agents: table("n2"), narrator });
     await finished(matchId);
     const events = await waitFor(async () => {
       const ev = (await snapshot(matchId)).events;
       return narration(ev).length ? ev : null;
     });
 
-    const off = werewolf.view(events, { spectator: true, godView: false });
+    const off = werewolf.view(events, { spectator: true, narratorView: false });
     expect(off.some((e) => e.kind === "drama_secret")).toBe(false);
     const pub = off.find((e) => e.kind === "drama")!;
     expect(JSON.stringify(pub.data)).not.toContain("wolves_split");
     expect(pub.data.flags).toContainEqual({ id: "claim_war", value: 0.9, visibility: "public-safe", active: true });
-    // The bare Drama Score is shown even with God View off.
+    // The bare Drama Score is shown even with Narrator's View off.
     expect(pub.data.dramaScore).toBe(0.5);
 
-    const on = werewolf.view(events, { spectator: true, godView: true });
+    const on = werewolf.view(events, { spectator: true, narratorView: true });
     expect(on.some((e) => e.kind === "drama_secret")).toBe(true);
 
     // Tile flags carry their visibility so the grid filters them the same way.

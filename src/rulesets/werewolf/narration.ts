@@ -1,4 +1,4 @@
-// What the Narrator asks about a Werewolf Match, and the God View log it reads.
+// What the Narrator asks about a Werewolf Match, and the Narrator's View log it reads.
 // The log includes roles, Wolf Chat and Seer results: drama depends on what the
 // wolves are doing. Nothing here is ever shown to Players.
 
@@ -52,8 +52,8 @@ export const NARRATION_QUESTIONS: NarrationQuestions = {
   ],
 };
 
-/** God View lines for private events whose Player-facing text is written to that Player. */
-const GOD_VIEW_TEXT: Record<string, (d: Record<string, unknown>) => string> = {
+/** Narrator's View lines for private events whose Player-facing text is written to that Player. */
+const NARRATOR_VIEW_TEXT: Record<string, (d: Record<string, unknown>) => string> = {
   seer_result: (d) => `Night ${d.cycle}: the Seer (seat ${d.seat}) inspected seat ${d.target} and learned they are on the ${d.side} side.`,
   protect_chosen: (d) => `Night ${d.cycle}: the Doctor (seat ${d.seat}) protected seat ${d.target}.`,
   doctor_saved: (d) => `Night ${d.cycle}: the Doctor's protection saved seat ${d.target} from the Werewolves.`,
@@ -62,10 +62,10 @@ const GOD_VIEW_TEXT: Record<string, (d: Record<string, unknown>) => string> = {
 export function narrationLog(s: WerewolfState, events: RulesetEvent[]): string {
   const roles = s.players.map((p) => `- Seat ${p.seat} (${p.label}): ${ROLE_NAMES[p.role]}${p.alive ? "" : ", dead"}`);
   const lines = events
-    .map((e) => (GOD_VIEW_TEXT[e.kind] ? GOD_VIEW_TEXT[e.kind]!(e.data) : describeEvent(e, s)))
+    .map((e) => (NARRATOR_VIEW_TEXT[e.kind] ? NARRATOR_VIEW_TEXT[e.kind]!(e.data) : describeEvent(e, s)))
     .filter((t): t is string => !!t);
   return [
-    "A Werewolf game seen with God View (every secret visible). Two Werewolves hide among the players; the rest are the Village.",
+    "A Werewolf game seen with Narrator's View (every secret visible). Two Werewolves hide among the players; the rest are the Village.",
     "Secret roles:",
     ...roles,
     "",

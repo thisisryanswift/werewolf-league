@@ -1,5 +1,5 @@
 // The dense live grid (after prototype variant E): a header with live counts,
-// the leaderboard strip and the God View toggle; sort and filter chips; then the
+// the leaderboard strip and the Narrator's View toggle; sort and filter chips; then the
 // three promoted large tiles and the rest. Each tile links to #match=<id>.
 import { memo, useMemo, useRef, useState } from "react";
 import type { LeagueSnapshot, MatchTile } from "../../src/shared/protocol";
@@ -18,7 +18,7 @@ const SORTS: { key: GridSort; label: string }[] = [
 ];
 const FILTER_LABELS: Record<GridFilter, string> = { all: "All", flagged: "⚑ Flagged", voting: "Voting", night: "Night" };
 const STRIP_AGENTS = 5;
-/** God View pip letters for living seats; Villagers stay blank. */
+/** Narrator's View pip letters for living seats; Villagers stay blank. */
 const ROLE_MARK: Record<string, string> = { werewolf: "W", seer: "S", doctor: "D" };
 
 export const matchLabel = (matchId: string) => `Match ${matchId.slice(0, 8)}`;
@@ -27,20 +27,20 @@ export interface LeagueGridProps {
   league: LeagueSnapshot;
   status: FeedStatus;
   activity: Record<string, number>;
-  godView: boolean;
-  onGodViewChange: (on: boolean) => void;
+  narratorView: boolean;
+  onNarratorViewChange: (on: boolean) => void;
 }
 
-export function LeagueGrid({ league, status, activity, godView, onGodViewChange }: LeagueGridProps) {
+export function LeagueGrid({ league, status, activity, narratorView, onNarratorViewChange }: LeagueGridProps) {
   const [sort, setSort] = useState<GridSort>("drama");
   const [filter, setFilter] = useState<GridFilter>("all");
   // Promotion holds without Drama Scores carry over from one arrangement to the next.
   const held = useRef<PromotionHold[]>([]);
   const grid = useMemo(() => {
-    const g = arrangeGrid(league.tiles, { sort, filter, godView, activity, now: Date.now(), held: held.current });
+    const g = arrangeGrid(league.tiles, { sort, filter, narratorView, activity, now: Date.now(), held: held.current });
     held.current = g.held;
     return g;
-  }, [league.tiles, sort, filter, godView, activity]);
+  }, [league.tiles, sort, filter, narratorView, activity]);
   // Keyed by content so the help dialogs re-render only when a feature lands.
   const landedKey = [...landedFeatures(league.tiles)].join(",");
   const landed = useMemo(() => new Set(landedKey.split(",").filter(Boolean)), [landedKey]);
@@ -68,8 +68,8 @@ export function LeagueGrid({ league, status, activity, godView, onGodViewChange 
             {status === "live" ? "● live" : status}
           </span>
           <HelpButtons landed={landed} />
-          <button type="button" className={`lg-god${godView ? " on" : ""}`} aria-pressed={godView} data-testid="grid-god-view" onClick={() => onGodViewChange(!godView)}>
-            {godView ? "◉ God View on" : "○ God View off"}
+          <button type="button" className={`lg-narrator${narratorView ? " on" : ""}`} aria-pressed={narratorView} data-testid="grid-narrator-view" onClick={() => onNarratorViewChange(!narratorView)}>
+            {narratorView ? "◉ Narrator's View on" : "○ Narrator's View off"}
           </button>
         </div>
         <div className="lg-row lg-ctrls">
@@ -103,10 +103,10 @@ export function LeagueGrid({ league, status, activity, godView, onGodViewChange 
       {league.blocked && <p className="lg-blocked">League can't start Matches: {league.blocked}</p>}
       <section className="lg-grid" aria-label="Live Matches" data-testid="match-grid">
         {grid.promoted.map((t) => (
-          <Tile key={t.matchId} tile={t} godView={godView} big />
+          <Tile key={t.matchId} tile={t} narratorView={narratorView} big />
         ))}
         {grid.rest.map((t) => (
-          <Tile key={t.matchId} tile={t} godView={godView} big={false} />
+          <Tile key={t.matchId} tile={t} narratorView={narratorView} big={false} />
         ))}
         {grid.promoted.length + grid.rest.length === 0 && (
           <p className="lg-empty">{league.tiles.length === 0 ? "No live Matches." : "No Matches match this filter."}</p>
@@ -117,8 +117,8 @@ export function LeagueGrid({ league, status, activity, godView, onGodViewChange 
 }
 
 // Unchanged tiles keep their object identity through applyLeagueDiff, so memo skips them.
-const Tile = memo(function Tile({ tile, godView, big }: { tile: MatchTile; godView: boolean; big: boolean }) {
-  const v = tileView(tile, godView);
+const Tile = memo(function Tile({ tile, narratorView, big }: { tile: MatchTile; narratorView: boolean; big: boolean }) {
+  const v = tileView(tile, narratorView);
   const cls = ["lg-tile", big && "big", big && !v.night && "hot", v.night && "night", v.flags.length > 0 && "flagged", !tile.summary && "starting"]
     .filter(Boolean)
     .join(" ");

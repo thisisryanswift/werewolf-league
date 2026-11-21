@@ -86,7 +86,7 @@ describe("Seer", () => {
 });
 
 describe("Doctor", () => {
-  it("saves the wolves' target: nobody dies, and only God View sees the save", () => {
+  it("saves the wolves' target: nobody dies, and only Narrator's View sees the save", () => {
     const { state, plain, doctor } = table();
     const r = nightActions(state, plain[0]!, { [doctor]: protect(plain[0]!) });
     expect(died(r.events)).toBeNull();
@@ -98,7 +98,7 @@ describe("Doctor", () => {
     });
     const save = r.events.find((e) => e.kind === "doctor_saved")!;
     expect(save.data).toEqual({ cycle: 1, seat: doctor, target: plain[0] });
-    expect(werewolf.view([save], { spectator: true, godView: true })).toHaveLength(1);
+    expect(werewolf.view([save], { spectator: true, narratorView: true })).toHaveLength(1);
     for (let seat = 1; seat <= 7; seat++) expect(werewolf.view([save], { seat })).toHaveLength(0);
   });
 
