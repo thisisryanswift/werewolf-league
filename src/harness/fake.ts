@@ -9,6 +9,7 @@
 //   delayPolls: number  — report "pending" this many polls before answering
 //   silentTurns: number[] — never finish these turns (1-based count of turns started on this seat)
 //   requireText: string[] — end the turn with no call unless the observation contains every string
+//   say: string         — for actions without legal targets (e.g. a chat), call the tool with { text: say }
 
 import type { Harness, PollResult, TurnInput } from "../core/harness";
 import type { ToolCall } from "../core/ruleset";
@@ -20,6 +21,7 @@ interface FakeOptions {
   delayPolls?: number;
   silentTurns?: number[];
   requireText?: string[];
+  say?: string;
 }
 
 function decide(opts: FakeOptions, input: TurnInput, turnNo: number): ToolCall | null | "never" {
@@ -28,6 +30,7 @@ function decide(opts: FakeOptions, input: TurnInput, turnNo: number): ToolCall |
   if (opts.requireText?.some((t) => !input.text.includes(t))) return null;
   if (opts.script === "no-call") return null;
   if (opts.invalidFirst && !input.error) return { name: turn.actionKind, args: { target: "not-a-seat" } };
+  if (opts.say !== undefined && turn.legalTargets.length === 0) return { name: turn.actionKind, args: { text: opts.say } };
   const preferred = opts.prefer?.find((s) => turn.legalTargets.includes(s));
   const extra = turn.actionKind === "vote" ? { beliefs: {}, reason: "scripted" } : {};
   if (preferred !== undefined) return { name: turn.actionKind, args: { target: preferred, ...extra } };

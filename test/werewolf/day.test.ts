@@ -10,15 +10,16 @@ function day1() {
 
 describe("Werewolf Day vote (minimal)", () => {
   it("eliminates the plurality target, reveals its role and starts the next Night", () => {
-    const { state, wolves, villagers } = day1();
+    const { state, wolves, villagers, seer, doctor } = day1();
     const [a, b, c, d] = villagers;
     const { state: next, events } = voteAll(state, { [a!]: wolves[0]!, [b!]: wolves[0]!, [c!]: wolves[0]!, [d!]: a! });
+    // With one Werewolf left there is no Wolf Chat: the Night goes straight to its actions.
     expect(events.find((e) => e.kind === "player_died")).toMatchObject({
       audience: "all",
       data: { seat: wolves[0], role: "werewolf", cause: "vote", cycle: 1 },
     });
     expect(events.find((e) => e.kind === "phase_started")?.data).toEqual({ phase: "night", cycle: 2 });
-    expect(actors(next)).toEqual([wolves[1]]);
+    expect(actors(next)).toEqual([wolves[1]!, seer, doctor].sort((x, y) => x - y));
   });
 
   it("publishes every ballot, with timeouts shown as Abstain", () => {

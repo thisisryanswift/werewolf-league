@@ -4,7 +4,7 @@
 import type { Seat, TurnRequest } from "../../core/ruleset";
 import type { RulesetEvent } from "../../shared/protocol";
 import { dayText } from "./day";
-import { nightText } from "./night";
+import { NIGHT_RULES, ROLE_NAMES, nightText } from "./night";
 import { player, wolfSeats } from "./players";
 import type { WerewolfState } from "./types";
 
@@ -35,7 +35,7 @@ export function describeEvent(e: RulesetEvent, s: WerewolfState): string | null 
 
 export const RULES = `You are playing Werewolf.
 - Two Werewolves hide among the players; everyone else is on the Village side.
-- Each Night the Werewolves choose one player to kill.
+${NIGHT_RULES}
 - Each Day all living players vote at the same time; the player with the most votes is eliminated. A tie, or everyone abstaining, eliminates nobody.
 - A dead player's role is revealed. Dead players no longer act.
 - The Village wins when every Werewolf is dead. The Werewolves win when they equal or outnumber the Village, or if any survive after the 6th Day/Night cycle.
@@ -44,7 +44,7 @@ export const RULES = `You are playing Werewolf.
 export function briefing(s: WerewolfState, seat: Seat): string {
   const me = player(s, seat)!;
   const lines = [RULES, "", "Seats:", ...s.players.map((p) => `- Seat ${p.seat}: ${p.label}`), ""];
-  lines.push(`You are seat ${seat}. Your secret role: ${me.role === "werewolf" ? "Werewolf" : "Villager"}.`);
+  lines.push(`You are seat ${seat}. Your secret role: ${ROLE_NAMES[me.role]}.`);
   if (me.role === "werewolf") {
     const partner = wolfSeats(s).filter((w) => w !== seat);
     lines.push(`Your Werewolf partner is seat ${partner.join(", ")}.`);

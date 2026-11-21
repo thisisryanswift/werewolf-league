@@ -101,9 +101,10 @@ describe("a response that arrives after the deadline", () => {
     );
     // A long grace: the backstop must not be what rejects the late call.
     const matchId = await startMatch({ seed, agents, deadlines: { ...deadlines, graceMs: 5_000 } });
+    // Its earlier Wolf Chat turns time out normally; the kill turn is the one answered late.
     const started = await waitFor(async () => {
       const s = await snapshot(matchId);
-      return s.events.find((e) => e.kind === "turn_started" && e.data.seat === late);
+      return s.events.find((e) => e.kind === "turn_started" && e.data.seat === late && e.data.actionKind === "choose_kill");
     });
     // The seat's Player DO goes quiet, so only the late call below reaches the Match.
     await runInDurableObject(env.PLAYER.getByName(`${matchId}:${late}`), async (_instance, state) => {
@@ -125,7 +126,8 @@ describe("a response that arrives after the deadline", () => {
       return s.events.some((e) => e.kind === "night_passed") ? s : null;
     });
     expect(night1.events.find((e) => e.kind === "night_passed")?.data.killed).toBeNull();
-    expect(night1.events.filter((e) => e.kind === "turn_timed_out").map((e) => [e.data.seat, e.data.by])).toEqual([
+    const killTimeouts = night1.events.filter((e) => e.kind === "turn_timed_out" && e.data.actionKind === "choose_kill");
+    expect(killTimeouts.map((e) => [e.data.seat, e.data.by])).toEqual([
       [late, "late"],
     ]);
   });
