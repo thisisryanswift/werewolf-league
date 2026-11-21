@@ -29,3 +29,9 @@ Real roster in config (Hydrogen, 3.6 Flash, 3.5 Flash-Lite, plus 3.8 Flash if M1
 - [ ] Time to first public speech and time to first result are recorded in a note on this ticket, along with the chosen N and roster
 - [ ] Ramp test recorded in a note on this ticket: N steps, 429 count, turn latency p50/p90 and timeouts per step, plus the chosen demo N and fallback N
 - [ ] Set-N and pause/resume verified on the deployed app
+
+## Notes
+
+**2026-11-21T16:43:58Z**
+
+Human decision 2026-11-21: cap ramp-test Gemini spend at $50 total. Step N up (4 → 8 → 12 → 16 → 24 → 36 if healthy) only while the estimated cumulative spend stays under $50, using the spec's $1–1.5/Match fast-roster estimate and measured Match completions; stop the ramp and pause the League when the cap is reached.
