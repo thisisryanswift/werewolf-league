@@ -24,3 +24,47 @@ body {
   font-style: italic;
   opacity: 0.8;
 }
+.seats {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  gap: 0.4rem;
+}
+.seats li {
+  padding: 0.3rem 0.5rem;
+  border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
+  border-radius: 0.3rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: baseline;
+}
+.seats .dead {
+  opacity: 0.45;
+  text-decoration: line-through;
+}
+.thinking {
+  font-size: 0.85em;
+  opacity: 0.75;
+  animation: pulse 1.2s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .thinking {
+    animation: none;
+  }
+}
+@keyframes pulse {
+  50% {
+    opacity: 0.3;
+  }
+}
+.timeout-badge {
+  font-size: 0.8em;
+  padding: 0 0.35rem;
+  border-radius: 0.3rem;
+  background: color-mix(in srgb, orange 30%, transparent);
+}
+.event-log .timeout {
+  color: color-mix(in srgb, orange 70%, currentColor);
+}

@@ -2,6 +2,7 @@
 // now and by the League DO later.
 
 import { DEFAULT_RULESET_ID } from "../rulesets";
+import type { DeadlineConfig } from "./deadlines";
 import type { AgentConfig } from "./harness";
 import type { MatchInit } from "./match";
 import type { SeatAgent } from "./ruleset";
@@ -20,7 +21,14 @@ export function labelSeats(agents: AgentConfig[]): SeatAgent[] {
 
 export async function startMatch(
   env: Env,
-  opts: { matchId?: string; rulesetId?: string; seed?: string; config?: Record<string, unknown>; agents: AgentConfig[] },
+  opts: {
+    matchId?: string;
+    rulesetId?: string;
+    seed?: string;
+    config?: Record<string, unknown>;
+    deadlines?: Partial<DeadlineConfig>;
+    agents: AgentConfig[];
+  },
 ): Promise<MatchInit> {
   const matchId = opts.matchId ?? crypto.randomUUID();
   const seats = labelSeats(opts.agents);
@@ -29,6 +37,7 @@ export async function startMatch(
     rulesetId: opts.rulesetId ?? DEFAULT_RULESET_ID,
     seed: opts.seed ?? crypto.randomUUID(),
     config: opts.config ?? {},
+    ...(opts.deadlines ? { deadlines: opts.deadlines } : {}),
     seats,
     agents: Object.fromEntries(opts.agents.map((a, i) => [i + 1, a])),
   };

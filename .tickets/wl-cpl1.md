@@ -1,6 +1,6 @@
 ---
 id: wl-cpl1
-status: in_progress
+status: closed
 deps: [wl-b8rj]
 links: []
 created: 2026-11-21T15:06:09Z
@@ -28,3 +28,9 @@ Every turn has a deadline: 60 s, first turn 90 s, both configurable. The Player 
 - [ ] Whole-system test: an Agent that times out once has its default recorded exactly once, its late response is ignored, and it acts normally on its next eligible turn
 - [ ] Whole-system test: a Player DO that never reports back is expired by the Match backstop and the Match continues
 - [ ] The Match result includes timeout counts per Player and per Agent
+
+## Notes
+
+**2026-11-21T16:21:39Z**
+
+Merged into integration/wl-xgp7 (c0f3864; impl/wl-cpl1 b320a21). Verification on integration: pnpm test 59/59, typecheck clean. AC evidence in test/system/deadlines.test.ts: an Agent that never answers gets defaults and the Match finishes; stats.timeouts {bySeat, byAgent} are exact; a seat that misses one turn has its default recorded exactly once, a late submit/report is stale, and it acts on Day 2 with the missed events; a wiped Player DO is expired by the Match backstop (by: backstop); the Match result sent to the League carries the timeout counts. A wrangler dev headless run showed thinking… and 'timed out ×1' markers (screenshot /tmp/wl-cpl1-verify/match.png). codex review P2 fixes, both tested: answers past deadlineAt are rejected (by: late); the first-turn deadline applies only to a seat's first assignment. Gaps: the Player DO turn-ID guard and partial-dispatch resend have no direct tests. One headless run went blank once and was not reproduced.
