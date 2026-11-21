@@ -188,6 +188,27 @@ describe("League at scale", () => {
     return { time, before, matchId: held.tiles[0]!.matchId };
   }
 
+  it("Matches held through a backoff use up the start window when it ends", { timeout: 90_000 }, async () => {
+    const time = await fakeClock();
+    const roster = [fakeAgent("hw-429", { rateLimitProvision: true }), ...slowRoster("hw")];
+    await admin("config", { ...SHORT, n: 4, startsPerWindow: 4, startWindowMs: 30_000, backoffMs: 60_000, roster });
+    await admin("resume");
+    const held = await waitFor(async () => {
+      const s = await league();
+      return s.rateLimit.backoffUntil !== null && s.tiles.length === 4 && s.tiles.some((t) => t.status === "starting") ? s : null;
+    });
+    await admin("config", { n: 8 });
+    // The backoff outlasts the window the four were reserved in.
+    await time.advance(60_001);
+    await waitFor(async () => (await league()).tiles.every((t) => t.status === "running"));
+    // The held Matches were this window's starts: nothing new joins them.
+    expect((await league()).stats.started).toBe(held.stats.started);
+    // The next window starts the rest.
+    await time.advance(30_001);
+    await waitFor(async () => (await league()).stats.started === held.stats.started + 4);
+    await drain();
+  });
+
   const matchExists = async (matchId: string) => (await exports.default.fetch(`http://test/api/matches/${matchId}`)).status !== 404;
 
   for (const [how, change] of [

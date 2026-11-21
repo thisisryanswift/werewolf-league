@@ -476,6 +476,21 @@ export class LeagueDO extends DurableObject<Env> {
   /** Matches whose `start` call is in flight; they may already exist, so they are never released. */
   private launching = new Set<string>();
 
+  /**
+   * The backoff is over: held Matches start now. Their reservations' start times
+   * may have left the window during the backoff, so each counts as a start now,
+   * and they are no longer held (a new 429 holds them again).
+   */
+  private launchHeld(): void {
+    const live = this.live;
+    const held = Object.values(live).filter((m) => m.status === "starting" && m.held);
+    if (!held.length) return;
+    for (const m of held) live[m.matchId] = { ...m, held: false };
+    this.live = live;
+    const now = this.now();
+    this.starts = [...recentStarts(this.starts, now, this.config), ...Array<number>(held.length).fill(now)];
+  }
+
   /** Mark every reserved, not-yet-started Match as held back by the backoff. */
   private holdStarting(): void {
     const live = this.live;
@@ -515,13 +530,14 @@ export class LeagueDO extends DurableObject<Env> {
   /** Start reserved Matches. A start that fails is retried; after repeated failures its slot is freed. */
   async alarm(): Promise<void> {
     this.releaseUnwanted(); // paused or N lowered since they were reserved
-    this.reserve(); // refill freed slots as pacing allows
     if (this.now() < this.rateLimit.until) {
       // Backing off after a 429: hold reserved Matches until it ends.
       this.holdStarting();
       this.broadcast();
       return this.armWake();
     }
+    this.launchHeld(); // held Matches start now, so they use up this window first
+    this.reserve(); // refill freed slots as pacing allows
     const starting = Object.values(this.live).filter((m) => m.status === "starting");
     for (const m of starting) this.launching.add(m.matchId);
     const outcomes = await Promise.all(
