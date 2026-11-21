@@ -46,3 +46,7 @@ Merged into integration/wl-xgp7 (impl/wl-rhpr eb1b7e5). Typecheck clean; notes, 
 **2026-11-21T20:26:58Z**
 
 AC4 now MET (impl/wl-rhpr-notes 10a58b5, merged). The harness PREAMBLE allows one short /notes.md write before exactly one game tool call. Real local Match 9899c442 (Hydrogen + 3.5 Flash-Lite): 31 notes_updated events from 45 turns, written by 6 of 7 seats (the 7th died on N1) and both models; the Seer kept its inspections ('N1: Tobin (4) = WOLF'). Step p50 ~9 s (was ~12 s), no timeouts, $0.35. Screenshots in /tmp/wl-rhpr-notes-verify/. Worker log showed 8 GET poll timeouts (5 s) and 12 '400 Precondition check failed'; neither caused a timed-out turn, and neither is investigated yet (watch on deploy).
+
+**2026-11-21T20:29:20Z**
+
+Human check 2026-11-21 ~15:30: notes ARE written in real Matches. Deployed Match db4957b4 has 12 notes_updated events with real content (e.g. Otto's Day 1 wolf strategy). No preamble change needed; AC4 is satisfied by that Match. Follow-up UI: wl-jz95 (expandable notes in the feed).
