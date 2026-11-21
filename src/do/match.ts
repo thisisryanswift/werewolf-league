@@ -322,6 +322,20 @@ export class MatchDO extends DurableObject<Env> {
     return { status: "accepted" };
   }
 
+  /**
+   * Validate only: is `call` legal for this seat's open turn `turnId`? Records nothing (the
+   * Player's submitAction does). Used by harnesses that check calls mid-run (pi).
+   */
+  async validateAction(turnId: string, seat: Seat, call: ToolCall): Promise<{ ok: true } | { ok: false; error: string }> {
+    const meta = this.meta;
+    const turn = this.step?.turns.find((t) => t.turnId === turnId && t.seat === seat);
+    if (!meta || !turn || turn.action !== undefined || Date.now() >= turn.deadlineAt) {
+      return { ok: false, error: "This turn is over; your call was not used." };
+    }
+    const v = this.ruleset(meta).validate(this.rulesetState, seat, call);
+    return v.ok ? { ok: true } : { ok: false, error: v.error };
+  }
+
   /** A Player reports that its turn missed the deadline; the Ruleset's default applies. */
   async reportTimeout(turnId: string, seat: Seat, usage?: ModelUsage): Promise<SubmitResult> {
     if (this.recordSeatUsage(seat, usage)) this.lateCost();
