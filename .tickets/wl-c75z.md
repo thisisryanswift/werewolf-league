@@ -1,6 +1,6 @@
 ---
 id: wl-c75z
-status: open
+status: in_progress
 deps: [wl-gtil]
 links: []
 created: 2026-11-21T18:04:53Z

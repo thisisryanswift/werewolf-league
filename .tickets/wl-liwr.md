@@ -1,6 +1,6 @@
 ---
 id: wl-liwr
-status: open
+status: in_progress
 deps: [wl-gtil, wl-hozk]
 links: []
 created: 2026-11-21T18:04:53Z
