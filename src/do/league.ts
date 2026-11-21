@@ -62,6 +62,8 @@ export interface Settlement {
   matchId: string;
   /** The Match's result as reported, including timeout counts. */
   result: MatchReport;
+  /** Match Number of a League-scheduled Match that had one. */
+  matchNumber?: number;
   /** Seats of a League-scheduled Match; null for a Match the League did not start. */
   seats: TileSeat[] | null;
   settledAt: number;
@@ -78,6 +80,9 @@ export interface SettleAck {
 
 const MAX_START_FAILURES = 3;
 const SPEND_CAP_BLOCKED = "League spend has reached the spend cap; raise or clear spendCap to resume";
+
+/** `{ matchNumber }` if there is one, else nothing (older Matches have none). */
+const numbered = (n: number | undefined) => (n === undefined ? {} : { matchNumber: n });
 const RECENT = 12;
 /** 429 reports kept on the League snapshot. */
 const RATE_LIMIT_EVENTS = 10;
@@ -245,7 +250,15 @@ export class LeagueDO extends DurableObject<Env> {
       },
       tiles: Object.values(this.live)
         .sort((a, b) => a.startedAt - b.startedAt)
-        .map(({ matchId, seed, status, seats, summary, startedAt }) => ({ matchId, seed, status, seats, summary, startedAt })),
+        .map(({ matchId, init, seed, status, seats, summary, startedAt }) => ({
+          matchId,
+          ...(init.matchNumber !== undefined ? { matchNumber: init.matchNumber } : {}),
+          seed,
+          status,
+          seats,
+          summary,
+          startedAt,
+        })),
       recent: this.recent,
       featured: this.featured,
       stats: this.stats,
@@ -367,7 +380,7 @@ export class LeagueDO extends DurableObject<Env> {
     } else {
       const s = this.ctx.storage.kv.get<Settlement>(`settled:${matchId}`);
       if (!s) return { ok: false, error: `Match ${matchId} has not finished` };
-      const pinned: SettledMatch = { matchId, winner: s.result.winner, settledAt: s.settledAt };
+      const pinned: SettledMatch = { matchId, ...numbered(s.matchNumber), winner: s.result.winner, settledAt: s.settledAt };
       this.ctx.storage.kv.put("featured", pinned);
     }
     this.broadcast();
@@ -416,7 +429,8 @@ export class LeagueDO extends DurableObject<Env> {
 
     const live = this.live;
     const entry = live[matchId];
-    const settlement = this.settle({ matchId, result, seats: entry?.seats ?? null, settledAt: Date.now(), ratings: null }, entry);
+    const matchNumber = numbered(entry?.init.matchNumber);
+    const settlement = this.settle({ matchId, ...matchNumber, result, seats: entry?.seats ?? null, settledAt: Date.now(), ratings: null }, entry);
     this.ctx.storage.kv.put(`settled:${matchId}`, settlement);
     this.addSpend(undefined, result.cost, !!entry);
     if (settlement.ratings) this.broadcastLeaderboard(matchId);
@@ -424,7 +438,7 @@ export class LeagueDO extends DurableObject<Env> {
       delete live[matchId];
       this.live = live;
       this.stats = { ...this.stats, settled: this.stats.settled + 1 };
-      const recent = [{ matchId, winner: result.winner, settledAt: settlement.settledAt }, ...this.recent].slice(0, RECENT);
+      const recent = [{ matchId, ...matchNumber, winner: result.winner, settledAt: settlement.settledAt }, ...this.recent].slice(0, RECENT);
       this.ctx.storage.kv.put("recent", recent);
     }
     this.enforceSpendCap();
@@ -645,6 +659,24 @@ export class LeagueDO extends DurableObject<Env> {
     this.stats = { ...this.stats, started: this.stats.started - releasable.length };
   }
 
+  /**
+   * Give each Match about to start its first time the League's next Match Number,
+   * in reservation order. Numbering at the first start, not at reservation, means
+   * a reservation released before it starts uses no number; a retried start
+   * keeps its number. The counter is this League's own.
+   */
+  private number(): void {
+    const live = this.live;
+    const unnumbered = Object.values(live)
+      .filter((m) => m.status === "starting" && m.init.matchNumber === undefined)
+      .sort((a, b) => a.startedAt - b.startedAt);
+    if (!unnumbered.length) return;
+    let last = this.ctx.storage.kv.get<number>("matchNumber") ?? 0;
+    for (const m of unnumbered) live[m.matchId] = { ...m, init: { ...m.init, matchNumber: ++last } };
+    this.ctx.storage.kv.put("matchNumber", last);
+    this.live = live;
+  }
+
   /** Start reserved Matches. A start that fails is retried; after repeated failures its slot is freed. */
   async alarm(): Promise<void> {
     this.releaseUnwanted(); // paused or N lowered since they were reserved
@@ -656,6 +688,7 @@ export class LeagueDO extends DurableObject<Env> {
     }
     this.launchHeld(); // held Matches start now, so they use up this window first
     this.reserve(); // refill freed slots as pacing allows
+    this.number();
     const starting = Object.values(this.live).filter((m) => m.status === "starting");
     for (const m of starting) this.launching.add(m.matchId);
     const outcomes = await Promise.all(

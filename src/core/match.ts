@@ -25,12 +25,15 @@ export interface MatchInit {
   analyst?: AnalystConfig | null;
   /** The League DO (by name) the Match reports to; absent means LEAGUE_NAME. */
   league?: string;
+  /** Match Number given by the League that started it; absent for a one-off Match. */
+  matchNumber?: number;
 }
 
 export type MatchStatus = "running" | "finished";
 
 export interface MatchSnapshot {
   matchId: string;
+  matchNumber?: number;
   rulesetId: string;
   status: MatchStatus;
   seats: SeatAgent[];

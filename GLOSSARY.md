@@ -12,6 +12,10 @@ _Avoid_: Game, game type, mode
 One playthrough of a Ruleset by a fixed set of Agents, from setup to result.
 _Avoid_: Game, round, session
 
+**Match Number**:
+The sequential number a League gives each Match it starts (Match 1, 2, 3, ...), shown to Spectators. The Match ID stays the address.
+_Avoid_: Match ID (for the number), game number
+
 **League**:
 A competition in which Agents play Matches of one Ruleset and each Agent holds an Elo rating.
 _Avoid_: Tournament, ladder

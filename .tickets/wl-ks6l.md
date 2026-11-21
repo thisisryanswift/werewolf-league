@@ -1,6 +1,6 @@
 ---
 id: wl-ks6l
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-11-21T19:07:49Z
@@ -29,3 +29,13 @@ Spectators see 'Match 127' instead of a truncated UUID ('Match 492BEB1A').
 - [ ] Tiles, the modal title, the finished list and the end screen show 'Match N'; '#' sort orders by N
 - [ ] Matches without a number fall back to the short ID
 
+
+## Notes
+
+**2026-11-21T19:28:10Z**
+
+Merged into integration/wl-xgp7 (impl/wl-ks6l 5437106). Verification on integration: full suite 250/250 on a re-run. test/system/match-numbers.test.ts failed once under full-suite load, then passed 2/2 alone and in the next full run, so it is flaky and a hardening follow-up has been asked for. AC1: consecutive numbers from 1 through replacements and pause/resume, carried in the snapshot, WS log, tiles, recent and featured. AC2: matchLabel() is used for tiles, the finished list, the featured link, the MatchView/modal title and the end screen; '#' sorts by number (test/web/grid.test.ts). AC3: short-ID fallback (test/shared/match-label.test.ts). Contract: matchNumber? on MatchInit, MatchSnapshot, the WS log, MatchTile (top level), SettledMatch and Settlement. codex P2 open: a start that fails 3 times uses up its number, leaving a gap. Gaps: a tile shows its short ID until numbered (lasts through a 429 hold); no render test, because the root tsconfig has no jsx. GLOSSARY: added Match Number.
+
+**2026-11-21T19:40:37Z**
+
+The flaky test was hardened (impl/wl-ks6l-flake f69e422, test-only): longer waits, one-cycle Matches, and numbers read from settled records in storage rather than the capped recent list. Implementer ran the full suite 3/3 green; orchestrator merged it and re-ran on integration.

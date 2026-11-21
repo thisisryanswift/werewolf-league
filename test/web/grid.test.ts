@@ -99,6 +99,14 @@ describe("sorting", () => {
   });
 });
 
+describe("'#' sort", () => {
+  it("orders by Match Number, with older unnumbered Matches first in start order", () => {
+    const numbered = (matchId: string, matchNumber?: number) => ({ ...tile(matchId), ...(matchNumber ? { matchNumber } : {}) });
+    const tiles = [numbered("m-a", 3), numbered("m-b", 1), numbered("m-c"), numbered("m-d", 2), numbered("m-e", 5), numbered("m-f")];
+    expect(order(tiles, { sort: "number" })).toEqual(["m-c", "m-f", "m-b", "m-d", "m-a", "m-e"]);
+  });
+});
+
 describe("promoted tiles", () => {
   it("promotes the top 3 by Drama Score whatever the sort, and the rest follow the sort", () => {
     const tiles = [
