@@ -161,12 +161,13 @@ describe("Managed Agent harness: timeout recovery", () => {
     await s.cancel(timedOut); // deadline passed
     expect(s.api.interactions.get(String(timedOut.interactionId))!.status).toBe("cancelled");
 
-    const h = await s.start(input("NEW: Seat 1 spoke. Call vote."));
+    // The Match repeats every event since the seat's last answered turn.
+    const h = await s.start(input("MISSED: Seat 2 spoke.\nNEW: Seat 1 spoke. Call vote."));
     const body = s.api.creates().at(-1);
     expect(body.previous_interaction_id).toBe(parent);
     expect(body.input[0]).toMatchObject({ type: "function_result", call_id: parentCallId });
     const result = JSON.stringify(body.input[0].result);
-    expect(result).toContain("MISSED: Seat 2 spoke.");
+    expect(result.split("MISSED: Seat 2 spoke.").length - 1).toBe(1);
     expect(result).toContain("NEW: Seat 1 spoke.");
     expect(result).toContain("deadline");
     s.api.callTool(s.api.latest().id, "vote", { target: 1 });
@@ -178,13 +179,18 @@ describe("Managed Agent harness: timeout recovery", () => {
     const first = await s.start(input("BRIEFING-1: rules, role, seats. Night 1 events.", "vote", { firstTurn: true }));
     await s.cancel(first);
 
-    const h = await s.start(input("NEW: Day 1 events. Call speak.", "speak"));
+    // The Match sends the briefing again with a catch-up of everything so far.
+    const h = await s.start(
+      input("BRIEFING-1: rules, role, seats. Night 1 events.\nNEW: Day 1 events. Call speak.", "speak", { firstTurn: true }),
+    );
     const body = s.api.creates().at(-1);
     expect(body.previous_interaction_id).toBeUndefined();
     expect(body.environment).toBe("env-1");
     expect(body.input).toContain("Play to win. Trust nobody.");
     expect(body.input).toContain("BRIEFING-1: rules, role, seats. Night 1 events.");
     expect(body.input).toContain("NEW: Day 1 events.");
+    expect(body.input.split("BRIEFING-1").length - 1).toBe(1);
+    expect(body.input).toContain("deadline");
     s.api.callTool(s.api.latest().id, "speak", { text: "hi" });
     expect(await s.poll(h)).toEqual({ status: "done", call: { name: "speak", args: { text: "hi" } } });
 
@@ -197,7 +203,7 @@ describe("Managed Agent harness: timeout recovery", () => {
     const s = await seat();
     const parent = await s.act(input("BRIEFING-1", "vote", { firstTurn: true }), "vote", { target: 2 });
     const stale = await s.start(input("MISSED-A", "speak"));
-    await s.start(input("NEW-B"));
+    await s.start(input("MISSED-A\nNEW-B"));
     expect(s.api.interactions.get(String(stale.interactionId))!.status).toBe("cancelled");
     const body = s.api.creates().at(-1);
     expect(body.previous_interaction_id).toBe(parent);

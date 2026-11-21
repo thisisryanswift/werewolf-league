@@ -3,15 +3,18 @@
 // - provision(): creates the seat's environment at Match start (a setup interaction on
 //   "remote", cancelled at once; M1 showed environment_id is on the create() response and
 //   survives the cancel).
-// - startTurn(): first turn (or a fresh chain) sends the Agent Instructions plus everything
-//   the seat has been shown; later turns chain with previous_interaction_id + environment and
-//   put the new observation inside the previous call's function_result. Tools are the seat's
-//   fixed list, resent identically every turn (ADR-0002).
-// - Recovery (wl-nos5, both paths confirmed in M1): a turn that timed out is cancelled. If it
-//   had a parent, the next turn answers the parent's still-pending call; if it was a first
-//   turn, the next turn starts a fresh chain on the same environment with a full catch-up.
-//   Either way the result carries every observation the seat missed. A cancelled
-//   interaction's call is never returned by poll().
+// - startTurn(): a first turn (`input.firstTurn`) starts a chain on the seat's environment
+//   with the Agent Instructions and the Match's text (briefing + observation); later turns
+//   chain with previous_interaction_id + environment and put the observation inside the
+//   previous call's function_result. Tools are the seat's fixed list, resent identically
+//   every turn (ADR-0002).
+// - Recovery (wl-nos5, both paths confirmed in M1): a turn that timed out is cancelled. The
+//   Match repeats every event since the seat's last answered turn (and after a missed first
+//   turn sends `firstTurn: true` with the briefing again). After a timed-out continuation,
+//   the next turn answers the parent's still-pending call; after a timed-out first turn it
+//   starts a fresh chain on the same environment. A cancelled interaction's call is never
+//   returned by poll(). If a chain can't be continued at all (rejected continuation, or the
+//   Agent ended a turn without a call), the harness restarts it from its own transcript.
 //
 // All state lives in the JSON `chain` the Player DO persists. startTurn reconciles the
 // previous in-flight interaction itself, so it works whether or not cancel() was called.
@@ -140,21 +143,31 @@ export function managedAgentHarness(opts: ManagedAgentOptions): Harness {
       return { ...chain, inFlight: null, parent: null, delivered: f.upTo, note: undefined };
     }
     // Cancelled, failed or incomplete: the Agent never saw this observation. Keep the
-    // parent and its still-pending call, and resend what was missed.
-    return { ...chain, inFlight: null, parent: f.parent, note: NOTE_TIMED_OUT };
+    // parent and its still-pending call. The Match repeats the missed events in the next
+    // observation, so drop the unseen entries from the transcript.
+    return {
+      ...chain,
+      inFlight: null,
+      parent: f.parent,
+      transcript: chain.transcript.slice(0, chain.delivered),
+      note: NOTE_TIMED_OUT,
+    };
   }
 
   function freshInput(ctx: PlayerContext, chain: Chain, error: string | undefined): string {
     const parts = [PREAMBLE];
     if (ctx.agent.instructions) parts.push(`Agent Instructions:\n${ctx.agent.instructions}`);
-    if (chain.transcript.length > 1 || chain.note) parts.push([chain.note, NOTE_RESTART].filter(Boolean).join(" "));
+    const restart = chain.transcript.length > 1;
+    if (restart || chain.note) parts.push([chain.note, restart ? NOTE_RESTART : null].filter(Boolean).join(" "));
     parts.push(markEarlier(chain.transcript));
     if (error) parts.push(`Your last call was rejected: ${error}`);
     return parts.join("\n\n");
   }
 
-  function continuationInput(chain: Chain, parent: Parent, error: string | undefined) {
-    const observation = markEarlier(chain.transcript.slice(chain.delivered));
+  function continuationInput(chain: Chain, parent: Parent, input: TurnInput) {
+    const { error } = input;
+    // An invalid-call retry repeats the frozen observation the Agent has already seen.
+    const observation = error ? "" : input.text;
     const main: Record<string, unknown> = { accepted: !error && chain.note !== NOTE_TOO_LATE };
     if (error) main.error = error;
     if (chain.note) main.note = chain.note;
@@ -185,7 +198,13 @@ export function managedAgentHarness(opts: ManagedAgentOptions): Harness {
     async startTurn(ctx, input: TurnInput) {
       let chain = await reconcile(ctx, ctx.chain as unknown as Chain);
       // An invalid-call retry repeats the same frozen observation, which the Agent has seen.
-      if (!input.error) chain = { ...chain, transcript: [...chain.transcript, input.text] };
+      if (input.firstTurn && !input.error) {
+        // The Match's first-turn text holds the briefing and everything seen so far:
+        // start the chain (again, after a missed first turn) from it alone.
+        chain = { ...chain, parent: null, transcript: [input.text], delivered: 0 };
+      } else if (!input.error) {
+        chain = { ...chain, transcript: [...chain.transcript, input.text] };
+      }
       const upTo = chain.transcript.length;
 
       let created: Interaction | null = null;
@@ -196,7 +215,7 @@ export function managedAgentHarness(opts: ManagedAgentOptions): Harness {
             ...base(ctx),
             previous_interaction_id: parent.id,
             environment: chain.environment,
-            input: continuationInput(chain, parent, input.error),
+            input: continuationInput(chain, parent, input),
           });
         } catch (err) {
           // The chain can't be continued (e.g. 4xx); restart it on the same environment.
