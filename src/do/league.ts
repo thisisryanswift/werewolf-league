@@ -13,7 +13,7 @@ import { leagueIdOf } from "../core/leagues";
 import { defaultLeagueConfig, patchConfig, type LeagueConfig } from "../core/roster";
 import { findLeague } from "../shared/leagues";
 import { ratingsHistory, type RatingsHistory } from "../core/ratings-history";
-import { applyMatch, calibrationByAgent, rankStandings, ratePlayers, snapshotOf, standing, type AgentRecord, type RatingSnapshot } from "../core/ratings";
+import { applyMatch, backfillPlayed, calibrationByAgent, needsPlayedBackfill, rankStandings, ratePlayers, snapshotOf, standing, type AgentRecord, type RatingSnapshot } from "../core/ratings";
 import { buildMatchInit } from "../core/start-match";
 import { backoffUntil, recentStarts, startBudget } from "../core/start-pacer";
 import { getRuleset } from "../rulesets";
@@ -148,7 +148,13 @@ export class LeagueDO extends DurableObject<Env> {
   }
   /** Per-Agent ratings and counts, keyed by Agent ID. */
   private get agents(): Record<string, AgentRecord> {
-    return this.ctx.storage.kv.get<Record<string, AgentRecord>>("agents") ?? {};
+    const records = this.ctx.storage.kv.get<Record<string, AgentRecord>>("agents") ?? {};
+    if (!needsPlayedBackfill(records)) return records;
+    // Records from before per-Side `played` counts: recount once from the stored settlements.
+    const settlements = [...this.ctx.storage.kv.list<Settlement>({ prefix: "settled:" })].map(([, s]) => s);
+    const backfilled = backfillPlayed(records, settlements);
+    this.agents = backfilled;
+    return backfilled;
   }
   private set agents(a: Record<string, AgentRecord>) {
     this.ctx.storage.kv.put("agents", a);

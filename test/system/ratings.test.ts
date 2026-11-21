@@ -7,6 +7,7 @@ import { exports } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 import { drawTable } from "../../src/core/draw";
 import type { MatchReport } from "../../src/core/match";
+import type { AgentRecord } from "../../src/core/ratings";
 import type { LeagueDO } from "../../src/do/league";
 import { werewolf } from "../../src/rulesets/werewolf";
 import type { AgentStanding, LeagueMessage, LeagueSnapshot, MatchEvent, RatingChanges } from "../../src/shared/protocol";
@@ -249,6 +250,44 @@ describe("Side Ratings", () => {
     expect(again.duplicate).toBe(true);
     expect(again.settlement.ratings).toEqual(changes);
     expect(standing(await league(), "dup-d").ratings.village).toBe(1248);
+  });
+
+  it("counts Matches played per Side once per Match, backfilling records stored before the count existed", async () => {
+    // F has one wolf seat and three village copies; G one wolf and two village. Village wins.
+    const m1 = seedWith("pf-m1", ["pf-f", "pf-g"], { wolves: ["pf-f", "pf-g"], village: ["pf-f", "pf-f", "pf-f", "pf-g", "pf-g"] });
+    await playOne(m1.seed, [villageWins("pf-f", m1.wolfSeats), villageWins("pf-g", m1.wolfSeats)]);
+    expect(standing(await league(), "pf-f")).toMatchObject({ matches: 1, wins: { wolf: 0, village: 1 }, played: { wolf: 1, village: 1 } });
+
+    // Simulate records stored before `played` existed.
+    const stub = env.LEAGUE.getByName("default");
+    await runInDurableObject(stub, (instance: LeagueDO) => {
+      const kv = (instance as unknown as { ctx: DurableObjectState }).ctx.storage.kv;
+      const records = kv.get<Record<string, AgentRecord>>("agents")!;
+      kv.put("agents", Object.fromEntries(Object.entries(records).map(([id, { played: _, ...r }]) => [id, r])));
+    });
+
+    const after1 = await league();
+    expect(standing(after1, "pf-f").played).toEqual({ wolf: 1, village: 1 });
+    expect(standing(after1, "pf-g").played).toEqual({ wolf: 1, village: 1 });
+    // Persisted once: every stored record now carries its count.
+    await runInDurableObject(stub, (instance: LeagueDO) => {
+      const kv = (instance as unknown as { ctx: DurableObjectState }).ctx.storage.kv;
+      const records = kv.get<Record<string, AgentRecord>>("agents")!;
+      expect(Object.values(records).every((r) => r.played)).toBe(true);
+      expect(records["pf-f"]!.played).toEqual({ wolf: 1, village: 1 });
+    });
+
+    // Later settlements increment: F is village only this time, H wolf only. Wolves win.
+    const ids = ["pf-f", "pf-h", "pf-i"];
+    const seed2 = Array.from({ length: 2000 }, (_, i) => `pf-m2-${i}`).find((seed) => {
+      const d = dealFor(seed, ids);
+      return !d.wolves.includes("pf-f") && d.wolves.includes("pf-h") && !d.village.includes("pf-h");
+    })!;
+    await playOne(seed2, ids.map(wolvesWin));
+    const after2 = await league();
+    expect(standing(after2, "pf-f")).toMatchObject({ matches: 2, wins: { wolf: 0, village: 1 }, played: { wolf: 1, village: 2 } });
+    expect(standing(after2, "pf-h")).toMatchObject({ matches: 1, wins: { wolf: 1, village: 0 }, played: { wolf: 1, village: 0 } });
+    expect(standing(after2, "pf-g").played).toEqual({ wolf: 1, village: 1 });
   });
 
   it("leaves Matches the League did not start unrated", async () => {
