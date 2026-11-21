@@ -4,11 +4,12 @@
 // against the last one sent, so it carries only what changed, however many
 // events caused it.
 //
-// The baseline lives in memory. After an eviction it is empty, so the next
-// message carries every tile whole, which clients fold in like any diff.
+// The baseline lives in memory. After an eviction it is empty, and clients may
+// still show tiles that settled meanwhile, so the next message is the whole
+// snapshot ({type: "league"}), which clients take in place of what they had.
 
 import { diffTile } from "../shared/league-feed";
-import type { LeagueSnapshot, LeagueTilesMessage, MatchTile, TileDiff } from "../shared/protocol";
+import type { LeagueMessage, LeagueSnapshot, LeagueTilesMessage, MatchTile, TileDiff } from "../shared/protocol";
 
 export interface FeedDeps {
   /** Minimum time between messages. */
@@ -17,7 +18,7 @@ export interface FeedDeps {
   setTimer(fn: () => void, ms: number): void;
   /** The current League snapshot. */
   snapshot(): LeagueSnapshot;
-  send(msg: LeagueTilesMessage): void;
+  send(msg: Extract<LeagueMessage, { type: "league" | "tiles" }>): void;
   /** The next message revision (persisted by the caller, so it survives hibernation). */
   nextRev(): number;
 }
@@ -60,13 +61,16 @@ export class FeedCoalescer {
   private flush(): void {
     this.lastFlush = this.deps.now();
     const current = this.deps.snapshot();
-    const msg = this.diff(this.sent, current);
+    const prev = this.sent;
     this.sent = structuredClone(current);
+    // No baseline: what clients hold is unknown, so resync them whole.
+    if (!prev) return this.deps.send({ type: "league", league: current });
+    const msg = this.diff(prev, current);
     if (msg) this.deps.send({ type: "tiles", rev: this.deps.nextRev(), ...msg });
   }
 
-  private diff(prev: LeagueSnapshot | null, next: LeagueSnapshot): Omit<LeagueTilesMessage, "type" | "rev"> | null {
-    const before = new Map<string, MatchTile>((prev?.tiles ?? []).map((t) => [t.matchId, t]));
+  private diff(prev: LeagueSnapshot, next: LeagueSnapshot): Omit<LeagueTilesMessage, "type" | "rev"> | null {
+    const before = new Map<string, MatchTile>(prev.tiles.map((t) => [t.matchId, t]));
     const tiles: TileDiff[] = [];
     for (const t of next.tiles) {
       const d = diffTile(before.get(t.matchId), t);
@@ -77,7 +81,7 @@ export class FeedCoalescer {
     const league: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(next)) {
       if (key === "tiles") continue;
-      if (!prev || !same(prev[key as keyof LeagueSnapshot], value)) league[key] = value;
+      if (!same(prev[key as keyof LeagueSnapshot], value)) league[key] = value;
     }
     const changed = Object.keys(league).length > 0;
     if (!tiles.length && !removed.length && !changed) return null;
