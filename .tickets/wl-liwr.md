@@ -30,3 +30,7 @@ The spectator toggle and every user-facing label say Narrator's View (GLOSSARY.m
 **2026-11-21T18:53:02Z**
 
 Merged into integration/wl-xgp7 (impl/wl-liwr 3c157b5). Verification on integration: pnpm test 218/218, typecheck clean. AC evidence: test/vocabulary.test.ts fails on any 'god view', 'god mode' or bare 'god' in src/ and web/; the UI reads Narrator's View; the rename was mechanical (protocol godView → narratorView, test ids, data attributes and CSS classes renamed; the full map is in the implementer report). codex P2 (a ?god= alias) is not applicable, because no such param ever existed, so there is nothing to alias. Cosmetic follow-up: the runner line now reads 'Narrator (Narrator's View): …', which is redundant.
+
+**2026-11-21T20:12:54Z**
+
+Orchestrator: this ticket was already merged and closed at ~14:00 (Narrator's View throughout src/ and web/, enforced by test/vocabulary.test.ts), before the new deps on wl-fuy2/wl-lx3p were added. Those tickets build on the renamed code instead.
