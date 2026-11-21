@@ -8,15 +8,15 @@ description: Use this skill when writing, debugging, or reviewing code that runs
 > [!WARNING]
 > **Public Preview (`v1beta`).** Managed agents and the agent surface of the Interactions API change without notice: several behaviours below changed *during* our test week. Every empirical fact here was **verified 2026-11-18 to 2026-11-20 with `antigravity-preview-09-2026`, `google-genai` 3.3.0**. When the live API or docs disagree with this skill, re-check the docs index at https://aistudio.google.com/llms.txt (append `.md` to any doc URL for raw markdown) and trust a fresh observation over this file.
 >
-> **The hosted docs have known errors** (as of 2026-11-20):
+> **The hosted docs have known errors and gaps** (as of 2026-11-20):
 > 1. The Antigravity guide's function-calling example omits `tools` on the continuation and fails with a 400 in every language tab.
 > 2. The background/streaming guides promise an `event_id` on every stream event for `last_event_id` resume. Agent streams carry none.
 > 3. The webhooks guide says dynamic webhooks are signed as RS256 JWTs looked up by `kid`. Real deliveries are Standard Webhooks `v1a` (Ed25519) and the JWKS keys have no `kid`.
-> 4. The webhooks guide implies agent support. Agents get no webhooks at all (see Gotchas).
+> 4. *(Gap)* The webhooks guide implies agent support, but agents got no webhooks at all (see Gotchas).
 > 5. The webhook event catalog lists `interaction.cancelled`, but subscriptions reject it.
-> 6. `tools: []` reads as "no tools" but means default tools. "May slightly exceed" undersells the `max_total_tokens` overshoot.
+> 6. *(Gaps)* `tools: []` reads as "no tools" but means default tools. "May slightly exceed" undersells the `max_total_tokens` overshoot.
 
-Docs to fetch before writing code: [Antigravity agent](https://aistudio.google.com/docs/antigravity-agent.md), [Background execution](https://aistudio.google.com/docs/background-execution.md), [Streaming](https://aistudio.google.com/docs/streaming.md), [Agent environments](https://aistudio.google.com/docs/agent-environment.md), [Custom agents](https://aistudio.google.com/docs/custom-agents.md), [Agent hooks](https://aistudio.google.com/docs/agent-hooks.md), [Webhooks](https://aistudio.google.com/docs/webhooks.md).
+Docs to fetch before writing code: [Antigravity agent](https://aistudio.google.com/docs/antigravity-agent.md), [Background execution](https://aistudio.google.com/docs/background-execution.md), [Streaming](https://aistudio.google.com/docs/streaming.md), [Agent environments](https://aistudio.google.com/docs/agent-environment.md), [Custom agents](https://aistudio.google.com/docs/custom-agents.md), [Agent hooks](https://aistudio.google.com/docs/agent-hooks.md), [Webhooks](https://aistudio.google.com/docs/webhooks.md). For calibrated yes/no, choice, or score judgments (`gemini-decision-1`), use the [Decisions API](https://aistudio.google.com/docs/decisions-api.md) instead of an agent.
 
 References in this skill:
 - [references/rest-and-streaming.md](references/rest-and-streaming.md): raw REST/`fetch` shapes (Workers/Durable Objects), the reconnecting stream consumer, environment config objects, webhook signature details.
@@ -105,7 +105,7 @@ Cancelling a continuation does **not** consume the pending function call, so you
 ## Gotchas
 
 **Tools**
-- Resend the **identical** `tools` list on every continuation. Omitting it or sending a subset fails fast in sync and background mode: `400 invalid_request: tools must match the interaction referenced by previous_interaction_id.` (Before 2026-11-20 the error was `received tool response but no client tool call is pending`, and background continuations hung in `in_progress` forever. Keep a watchdog in case that regresses.)
+- Resend the **identical** `tools` list on every continuation. Omitting it or sending a subset fails fast in sync and background mode: `400 invalid_request: tools must match the interaction referenced by previous_interaction_id.` (Before 2026-11-20 the error was `received tool response but no client tool call is pending`, and background continuations sat in `in_progress` with zero steps until cancelled (observed for 150 s and >5 min). Keep a watchdog in case that regresses.)
 - `tools: []` and omitting `tools` both mean **default tools** (code execution, Google Search, URL context). To restrict, pass an explicit non-empty list. `tools=[your_fn]` removes code execution, search, and fetching.
 - Filesystem tools (`write_to_file`, `list_dir`, ...) **cannot be disabled**. They come with the sandbox and run automatically.
 - `environment` is required: `Missing required field 'environment'`.
@@ -131,11 +131,11 @@ Cancelling a continuation does **not** consume the pending function call, so you
 
 **Interaction IDs and lifetime**
 - No list endpoint: `GET /v1beta/interactions` returns 404. A lost ID means a run you can't find or cancel, so persist IDs before doing anything else. (Environments *can* be listed: `client.environments.list()`.)
-- `requires_action` survives at least 46 h, so a parked turn can be resumed much later.
+- `requires_action` survived ~46 h in our recheck, so a parked turn can be resumed much later.
 
 **Context growth**
 - Earlier turns' thought tokens are carried forward and re-billed as input on every later turn (mostly cached). Trimming what you send doesn't remove them; only a new chain does.
-- A separate `user_input` step next to a `function_result` doubles model passes. On Hydrogen it cost about 35% more and grew context twice as fast.
+- A separate `user_input` step next to a `function_result` doubles model passes. On Hydrogen the `function_result` shape was ~35% cheaper per turn ($0.021 vs $0.033) and grew context half as fast.
 
 **Environments**
 - The working directory is `/` (files land at `/note.txt`, `/.agents/AGENTS.md`).
