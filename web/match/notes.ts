@@ -24,3 +24,9 @@ export function latestNotes(events: MatchEvent[], narratorView: boolean): Map<nu
   }
   return out;
 }
+
+/** The notes as written at one notes_updated event (wl-jz95); null for any other event. */
+export function notesVersion(e: MatchEvent): { text: string; truncated: boolean } | null {
+  if (e.kind !== "notes_updated" || typeof e.data.text !== "string") return null;
+  return { text: e.data.text, truncated: !!e.data.truncated };
+}
