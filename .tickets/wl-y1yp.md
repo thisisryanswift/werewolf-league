@@ -1,6 +1,6 @@
 ---
 id: wl-y1yp
-status: open
+status: in_progress
 deps: []
 links: []
 created: 2026-11-21T18:45:39Z
