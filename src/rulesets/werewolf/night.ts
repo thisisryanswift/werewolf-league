@@ -4,6 +4,7 @@
 import type { Seat, ToolCall, TurnRequest } from "../../core/ruleset";
 import type { RulesetEvent } from "../../shared/protocol";
 import { alive, aliveWolves, killPlayer, player, wolfSeats } from "./players";
+import { startDay } from "./day";
 import type { PhaseModule, WerewolfState } from "./types";
 import { targetOf, validateTargeted } from "./validation";
 
@@ -41,7 +42,7 @@ function apply(s: WerewolfState, actions: Record<Seat, ToolCall | null>): { stat
     });
   }
   events.push({ kind: "night_passed", audience: "all", data: { cycle: s.cycle, killed } });
-  state = { ...state, phase: "day", day: { step: "vote" } };
+  state = { ...state, phase: "day", day: startDay(s.cycle) };
   events.push({ kind: "phase_started", audience: "all", data: { phase: "day", cycle: s.cycle } });
   return { state, events };
 }

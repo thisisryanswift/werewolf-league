@@ -7,6 +7,8 @@
 //   prefer: seat[]      — for targeted actions, pick the first preferred seat that is legal
 //   invalidFirst: bool  — answer every turn with an illegal call first, then a legal one on retry
 //   delayPolls: number  — report "pending" this many polls before answering
+//   args: { [actionKind]: object } — extra call arguments per action kind, over the defaults below
+//   echo: string        — put a digest of the observation into this argument (tests compare observations)
 
 import type { Harness, PollResult, TurnInput } from "../core/harness";
 import type { ToolCall } from "../core/ruleset";
@@ -16,6 +18,21 @@ interface FakeOptions {
   prefer?: number[];
   invalidFirst?: boolean;
   delayPolls?: number;
+  args?: Record<string, Record<string, unknown>>;
+  echo?: string;
+}
+
+/** Default extra arguments per action kind, so scripted calls are well-formed. */
+const DEFAULT_ARGS: Record<string, Record<string, unknown>> = {
+  vote: { beliefs: {}, reason: "scripted" },
+  speak: { text: "scripted" },
+};
+
+/** Short stable digest of a string (FNV-1a). */
+function digest(text: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 0x01000193);
+  return (h >>> 0).toString(16).padStart(8, "0");
 }
 
 function decide(opts: FakeOptions, input: TurnInput): ToolCall | null | "never" {
@@ -24,7 +41,8 @@ function decide(opts: FakeOptions, input: TurnInput): ToolCall | null | "never" 
   if (opts.script === "no-call") return null;
   if (opts.invalidFirst && !input.error) return { name: turn.actionKind, args: { target: "not-a-seat" } };
   const preferred = opts.prefer?.find((s) => turn.legalTargets.includes(s));
-  const extra = turn.actionKind === "vote" ? { beliefs: {}, reason: "scripted" } : {};
+  const extra: Record<string, unknown> = { ...DEFAULT_ARGS[turn.actionKind], ...opts.args?.[turn.actionKind] };
+  if (opts.echo) extra[opts.echo] = `${String(extra[opts.echo] ?? "")} [obs ${digest(input.text)}]`.trim();
   if (preferred !== undefined) return { name: turn.actionKind, args: { target: preferred, ...extra } };
   if (opts.script === "passive") {
     return turn.actionKind === "vote" && turn.legalTargets.includes("abstain")
@@ -32,7 +50,8 @@ function decide(opts: FakeOptions, input: TurnInput): ToolCall | null | "never" 
       : null;
   }
   const first = turn.legalTargets[0];
-  return first === undefined ? null : { name: turn.actionKind, args: { target: first, ...extra } };
+  if (first === undefined) return DEFAULT_ARGS[turn.actionKind] || opts.args?.[turn.actionKind] ? { name: turn.actionKind, args: extra } : null;
+  return { name: turn.actionKind, args: { target: first, ...extra } };
 }
 
 export const fakeHarness: Harness = {

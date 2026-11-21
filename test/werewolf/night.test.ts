@@ -13,7 +13,7 @@ describe("Werewolf Night (minimal)", () => {
     const death = events.find((e) => e.kind === "player_died")!;
     expect(death).toMatchObject({ audience: "all", data: { seat: target, role: "villager", cause: "night_kill" } });
     expect(events.find((e) => e.kind === "phase_started")?.data).toEqual({ phase: "day", cycle: 1 });
-    expect(actors(next)).toEqual([...wolves, ...villagers].filter((s) => s !== target).sort((a, b) => a - b));
+    expect([...actors(next)].sort((a, b) => a - b)).toEqual([...wolves, ...villagers].filter((s) => s !== target).sort((a, b) => a - b));
   });
 
   it("kills nobody when no wolf chooses (default)", () => {
