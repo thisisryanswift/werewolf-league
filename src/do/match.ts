@@ -26,6 +26,7 @@ import {
   type SubmitResult,
   type TurnAssignment,
 } from "../core/match";
+import { LEAGUE_NAME } from "../core/roster";
 import type { Ruleset, Seat, ToolCall, ToolSpec, TurnRequest } from "../core/ruleset";
 import { getRuleset } from "../rulesets";
 import type { MatchEvent, RulesetEvent, ServerMessage } from "../shared/protocol";
@@ -43,6 +44,8 @@ interface MatchMeta extends Omit<MatchInit, "deadlines"> {
   lastSeen: Record<Seat, number>;
   /** Seats that have been assigned a turn before; only a seat's first assignment gets the first-turn deadline. */
   assigned?: Seat[];
+  /** True once the League has acknowledged the result. */
+  resultAcked?: boolean;
 }
 
 type EventRow = { seq: number; ts: number; kind: string; audience: string; data: string };
@@ -170,6 +173,7 @@ export class MatchDO extends DurableObject<Env> {
     };
     this.rulesetState = setup.state;
     this.commit(setup.events);
+    this.pushSummary(ruleset);
     await this.ctx.storage.setAlarm(Date.now());
   }
 
@@ -235,7 +239,11 @@ export class MatchDO extends DurableObject<Env> {
 
   async alarm(): Promise<void> {
     const meta = this.meta;
-    if (!meta || meta.status === "finished") return;
+    if (!meta) return;
+    if (meta.status === "finished") {
+      if (!meta.resultAcked) await this.deliverResult(meta);
+      return;
+    }
     const ruleset = this.ruleset(meta);
 
     const pending = this.step;
@@ -247,14 +255,16 @@ export class MatchDO extends DurableObject<Env> {
         return;
       }
       this.resolve(meta, ruleset, pending);
+      this.pushSummary(ruleset);
     }
 
     const current = this.meta!;
     const next = ruleset.nextStep(this.rulesetState);
     if (next.type === "finished") {
       const result: MatchReport = { ...next.result, timeouts: countTimeouts(this.events(), current.seats) };
-      this.meta = { ...current, status: "finished", result };
-      await this.env.LEAGUE.getByName("default").reportMatchResult(current.matchId, result);
+      const done: MatchMeta = { ...current, status: "finished", result };
+      this.meta = done;
+      await this.deliverResult(done);
       return;
     }
     await this.dispatch(current, ruleset, next.turns);
@@ -270,6 +280,38 @@ export class MatchDO extends DurableObject<Env> {
     this.rulesetState = r.state;
     this.step = undefined;
     this.commit([...stepResolvedEvents(step), ...r.events]);
+  }
+
+  /**
+   * Deliver the result to the League until it acknowledges it. A retry alarm is
+   * armed before each attempt, so a lost acknowledgement (or an eviction mid-call)
+   * leads to redelivery; the League settles idempotently by Match ID.
+   * Once finished the Match has no pending step, so no deadline or backstop
+   * alarm competes with this one; the retry is the only wake-up it needs.
+   */
+  private async deliverResult(meta: MatchMeta): Promise<void> {
+    if (!meta.result) return;
+    await this.ctx.storage.setAlarm(Date.now() + Number(this.env.LEAGUE_RETRY_MS ?? 2000));
+    try {
+      await this.env.LEAGUE.getByName(LEAGUE_NAME).reportMatchResult(meta.matchId, meta.result);
+    } catch {
+      return; // the armed alarm retries
+    }
+    this.meta = { ...this.meta!, resultAcked: true };
+    await this.ctx.storage.deleteAlarm();
+  }
+
+  /** Push the public tile summary to the League. Best effort: never holds up the Match. */
+  private pushSummary(ruleset: Ruleset<unknown>): void {
+    const meta = this.meta;
+    if (!meta) return;
+    // Runner events (turn markers, step_resolved) are not game events.
+    const publicEvents = this.events().filter((e) => e.audience === "all" && !isRunnerEvent(e));
+    const summary = ruleset.summary(this.rulesetState, publicEvents);
+    const update = this.env.LEAGUE.getByName(LEAGUE_NAME)
+      .updateTile(meta.matchId, summary, this.lastSeq())
+      .catch(() => {});
+    this.ctx.waitUntil(update);
   }
 
   /** Start a step: freeze each Player's observation and hand the turns to the Player DOs. */

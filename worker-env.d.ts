@@ -13,6 +13,8 @@ declare namespace Cloudflare {
     ADMIN_SECRET?: string;
     /** Player DO Harness poll interval in milliseconds. */
     PLAYER_POLL_MS: string;
+    /** Retry interval in milliseconds for League Match starts and Match result delivery. */
+    LEAGUE_RETRY_MS: string;
   }
 }
 type Env = Cloudflare.Env;

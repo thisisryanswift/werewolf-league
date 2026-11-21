@@ -21,7 +21,9 @@
   ],
   "vars": {
     // How often a Player DO polls its Harness for a finished turn.
-    "PLAYER_POLL_MS": "1000"
+    "PLAYER_POLL_MS": "1000",
+    // Retry interval for League Match starts and Match result delivery.
+    "LEAGUE_RETRY_MS": "2000"
   },
   "observability": { "enabled": true }
 }

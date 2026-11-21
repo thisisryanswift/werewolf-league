@@ -2,7 +2,9 @@
 // only on this file (plus the registry); every game rule lives behind it.
 // A Ruleset is pure: all randomness comes from the match seed.
 
-import type { EventAudience, RulesetEvent } from "../shared/protocol";
+import type { EventAudience, MatchSummary, RulesetEvent } from "../shared/protocol";
+
+export type { MatchSummary };
 
 export type Seat = number; // 1-based seat number
 
@@ -86,6 +88,11 @@ export interface Ruleset<S = unknown> {
   /** Render a frozen observation: new events since the Player's last turn plus its turn request. */
   renderObservation(state: S, seat: Seat, newEvents: RulesetEvent[], turn: TurnRequest): string;
   result(state: S): MatchResult | null;
+  /**
+   * Public summary for the League grid tile. `publicEvents` is the committed
+   * log filtered to the "all" audience (for the latest speech line).
+   */
+  summary(state: S, publicEvents: RulesetEvent[]): MatchSummary;
 }
 
 /** Default `view` for rulesets that use the shared audience field. */
