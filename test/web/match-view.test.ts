@@ -1,7 +1,7 @@
 // The Match view's model: what a Spectator sees for a given event log and God View setting.
 import { describe, expect, it } from "vitest";
 import type { MatchEvent, RulesetEvent } from "../../src/shared/protocol";
-import { buildMatchView, panelsFor } from "../../web/match/model";
+import { agentName, buildMatchView, panelsFor, playerLabel } from "../../web/match/model";
 
 /** Number events into a log, as the Match DO would. */
 function logOf(events: RulesetEvent[]): MatchEvent[] {
@@ -215,5 +215,36 @@ describe("Match view", () => {
   it("reports the phase and alive count", () => {
     expect(buildMatchView(logOf([...night1, ...day1]), { godView: false }).status).toEqual({ phase: "night", cycle: 2, alive: 3, total: 5 });
     expect(buildMatchView(logOf([]), { godView: false }).status).toEqual({ phase: null, cycle: 0, alive: 0, total: 0 });
+  });
+});
+
+describe("Match view Claims and labels", () => {
+  const claimLog = (results: { seat: number; side: string }[]) =>
+    logOf([...night1, speech(1, "A", 3, { claim: { role: "seer", results } })]);
+
+  it("marks a true Seer's Claim a lie when a claimed inspection result is false", () => {
+    const view = buildMatchView(claimLog([{ seat: 1, side: "wolf" }, { seat: 4, side: "wolf" }]), { godView: true });
+    expect(view.seats.find((s) => s.seat === 3)!.claim).toMatchObject({ role: "seer", truth: "lie" });
+  });
+
+  it("marks a Claim true only when the role and every claimed result's Side match", () => {
+    const view = buildMatchView(claimLog([{ seat: 1, side: "wolf" }, { seat: 4, side: "village" }]), { godView: true });
+    expect(view.seats.find((s) => s.seat === 3)!.claim).toMatchObject({ truth: "true" });
+  });
+
+  it("does not judge a true role's Claim while a claimed seat's Side is hidden", () => {
+    // God View off: seat 3's role is hidden anyway; once seat 3 dies its role is public but seat 4's is not.
+    const log = logOf([
+      ...night1,
+      speech(1, "A", 3, { claim: { role: "seer", results: [{ seat: 4, side: "wolf" }] } }),
+      pub("player_died", { seat: 3, role: "seer", cause: "vote", cycle: 1 }),
+    ]);
+    expect(buildMatchView(log, { godView: false }).seats.find((s) => s.seat === 3)!.claim).toMatchObject({ truth: null });
+  });
+
+  it("names seats 'Display Name · Agent #n', and Agents by name alone", () => {
+    expect(playerLabel({ seat: 2, agentId: "h", label: "Hydrogen #2", displayName: "Mara" })).toBe("Mara · Hydrogen #2");
+    expect(playerLabel({ seat: 2, agentId: "h", label: "Hydrogen #2" })).toBe("Hydrogen #2");
+    expect(agentName({ seat: 2, agentId: "h", label: "Hydrogen #2", displayName: "Mara" })).toBe("Hydrogen");
   });
 });
