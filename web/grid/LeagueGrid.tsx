@@ -16,6 +16,8 @@ const SORTS: { key: GridSort; label: string }[] = [
 ];
 const FILTER_LABELS: Record<GridFilter, string> = { all: "All", flagged: "⚑ Flagged", voting: "Voting", night: "Night" };
 const STRIP_AGENTS = 5;
+/** God View pip letters for living seats; Villagers stay blank. */
+const ROLE_MARK: Record<string, string> = { werewolf: "W", seer: "S", doctor: "D" };
 
 export const matchLabel = (matchId: string) => `Match ${matchId.slice(0, 8)}`;
 
@@ -133,10 +135,10 @@ const Tile = memo(function Tile({ tile, godView, big }: { tile: MatchTile; godVi
           {v.pips.map((p) => (
             <span
               key={p.seat}
-              className={["pip", !p.alive && "dead", p.role === "werewolf" && "wolf"].filter(Boolean).join(" ")}
+              className={["pip", !p.alive && "dead", p.role === "werewolf" && "wolf", p.role && `role-${p.role}`].filter(Boolean).join(" ")}
               title={`P${p.seat}${p.role ? ` · ${p.role}` : ""}${p.alive ? "" : " · dead"}`}
             >
-              {!p.alive ? "✕" : p.role === "werewolf" ? "W" : ""}
+              {!p.alive ? "✕" : (p.role && ROLE_MARK[p.role]) || ""}
             </span>
           ))}
         </span>
