@@ -19,7 +19,7 @@ describe("Werewolf narration", () => {
     expect(log).toContain("Secret roles:");
     expect(log).toContain(`Seat ${t.wolves[0]} (Agent ${t.wolves[0]}): Werewolf`);
     expect(log).toContain(`Seat ${t.seer} (Agent ${t.seer}): Seer`);
-    expect(log).toContain(`Wolf Chat (Night 1) — seat ${t.wolves[0]}: seat ${t.wolves[0]} wants a quiet Night`);
+    expect(log).toContain(`Wolf Chat (Night 1) — Name${t.wolves[0]} (seat ${t.wolves[0]}): seat ${t.wolves[0]} wants a quiet Night`);
     expect(log).toContain(`the Seer (seat ${t.seer}) inspected seat ${t.wolves[0]} and learned they are on the wolf side`);
   });
 
