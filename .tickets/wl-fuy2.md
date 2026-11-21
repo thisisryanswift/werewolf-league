@@ -1,6 +1,6 @@
 ---
 id: wl-fuy2
-status: open
+status: in_progress
 deps: [wl-2lfo]
 links: []
 created: 2026-11-21T20:06:38Z
@@ -54,3 +54,9 @@ Rebuild the grid Match tile (web/grid/LeagueGrid.tsx and its CSS) on variant C (
 - [ ] At 1920×1080 the header strip, sort/filter bar, 3 large tiles and at least 3 rows of small tiles are visible without scrolling
 - [ ] Before/after screenshots of the deployed or local grid are attached in a note
 
+
+## Notes
+
+**2026-11-21T20:13:16Z**
+
+Orchestrator: started at 15:13, before wl-2lfo lands, to hit the human's ~15:30 target for core items; merges wl-2lfo (the League switcher in the grid header) when it lands. Core items first, large-tile extras second.
