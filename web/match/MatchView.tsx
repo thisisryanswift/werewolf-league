@@ -79,19 +79,15 @@ function MatchViewForMatch({ matchId, godView: controlled, onGodViewChange, onCl
         <div className="mv-body">
           <section className="mv-left" aria-label="Players">
             <Seats view={view} panelProps={panelProps} />
-            {!godView && <p className="mv-note">God View off: living Players' roles, Wolf Chat, Night choices and turn markers are hidden.</p>}
+            <Panels placement="seats" godView={godView} panelProps={panelProps} />
+            {!godView &&<p className="mv-note">God View off: living Players' roles, Wolf Chat, Night choices and turn markers are hidden.</p>}
           </section>
           <section className="mv-right" aria-label="Match log">
             {view.end && showEnd ? (
               <End end={view.end} onHide={() => setShowEnd(false)} />
             ) : (
               <>
-                {panelsFor(MATCH_PANELS, godView).map((p) => (
-                  <div key={p.id} className="mv-box mv-panel" data-panel={p.id} data-god-view-only={p.godViewOnly || undefined}>
-                    <h3>{p.title}</h3>
-                    <p.Component {...panelProps} />
-                  </div>
-                ))}
+                <Panels placement="feed" godView={godView} panelProps={panelProps} />
                 <LatestTally view={view} />
                 <Feed view={view} log={events} />
               </>
@@ -100,6 +96,21 @@ function MatchViewForMatch({ matchId, godView: controlled, onGodViewChange, onCl
         </div>
       </div>
     </GodViewContext.Provider>
+  );
+}
+
+function Panels({ placement, godView, panelProps }: { placement: "seats" | "feed"; godView: boolean; panelProps: MatchPanelProps }) {
+  return (
+    <>
+      {panelsFor(MATCH_PANELS, godView)
+        .filter((p) => (p.placement ?? "seats") === placement)
+        .map((p) => (
+          <div key={p.id} className={`mv-box mv-panel mv-panel-${placement}`} data-panel={p.id} data-god-view-only={p.godViewOnly || undefined}>
+            {p.title && <h3>{p.title}</h3>}
+            <p.Component {...panelProps} />
+          </div>
+        ))}
+    </>
   );
 }
 

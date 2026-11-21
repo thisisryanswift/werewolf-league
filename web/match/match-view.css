@@ -138,6 +138,15 @@ body:has(.mv-page) {
   font-weight: 900;
   text-transform: uppercase;
 }
+.mv-panel-seats {
+  margin: 16px 0 0 64px;
+}
+.mv-panel h2 {
+  margin: 0 0 6px;
+  font-size: 16px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
 .mv-muted {
   color: #3a3a3a;
   margin: 0;

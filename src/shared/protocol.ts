@@ -156,7 +156,8 @@ export interface AgentStanding {
   wins: Record<string, number>;
   /** Turns that missed their deadline, summed from each Match result's per-Agent counts. */
   timeouts: number;
-  // wl-bfo1: Calibration (Brier) belongs here, e.g. `calibration: number | null`.
+  /** Calibration: Brier score over the Agent's village-side beliefs (lower is better); null before any are scored. */
+  calibration: number | null;
 }
 
 /** The leaderboard: every current roster Agent plus every Agent with a rated Match. */

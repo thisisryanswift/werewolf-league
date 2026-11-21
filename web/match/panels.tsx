@@ -5,11 +5,13 @@
 // panel/seat slot registered below with godViewOnly: true. Panels never decide
 // visibility themselves.
 //
-// To add a panel (e.g. wl-bfo1's Table Suspicion), import its component here and
-// add one entry to MATCH_PANELS (a box above the feed) or SEAT_SLOTS (a line in
-// every seat row). Each receives the full event log and the derived view.
+// To add a panel, import its component here and add one entry to MATCH_PANELS
+// (a box under the seats or above the feed) or SEAT_SLOTS (a line in every seat
+// row). Each receives the full event log (God-View-only events included) and
+// the derived view.
 import { createContext, useContext, type ReactNode } from "react";
 import type { MatchEvent } from "../../src/shared/protocol";
+import { TableSuspicion } from "../components/TableSuspicion";
 import type { MatchView, SeatView } from "./model";
 
 export const GodViewContext = createContext(true);
@@ -30,8 +32,11 @@ export interface MatchPanelProps {
 
 export interface MatchPanel {
   id: string;
-  title: string;
+  /** Box heading; omit if the component has its own. */
+  title?: string;
   godViewOnly: boolean;
+  /** Under the seats (default) or above the feed. */
+  placement?: "seats" | "feed";
   Component: (props: MatchPanelProps) => ReactNode;
 }
 
@@ -41,8 +46,11 @@ export interface SeatSlot {
   Component: (props: MatchPanelProps & { seat: SeatView }) => ReactNode;
 }
 
-/** Boxes shown above the feed. */
-export const MATCH_PANELS: MatchPanel[] = [];
+/** Boxes shown under the seats or above the feed. */
+export const MATCH_PANELS: MatchPanel[] = [
+  // wl-bfo1. It reads ballots and roles, so it gets the full log and is God-View-only.
+  { id: "table-suspicion", godViewOnly: true, placement: "seats", Component: ({ events }) => <TableSuspicion events={events} /> },
+];
 
 /** Extra lines inside each seat row (e.g. a Table Suspicion meter). */
 export const SEAT_SLOTS: SeatSlot[] = [];

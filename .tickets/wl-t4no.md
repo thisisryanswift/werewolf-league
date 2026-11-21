@@ -40,3 +40,14 @@ Human decision 2026-11-21: cap ramp-test Gemini spend at $50 total. Step N up (4
 **2026-11-21T16:56:27Z**
 
 Progress (orchestrator, 11:56): deployed to https://werewolf-league.rswift.workers.dev (version 99a8b20a, built from impl/wl-t4no 0ef0c4e). GEMINI_API_KEY and ADMIN_SECRET are set as Wrangler secrets; ADMIN_SECRET is also in the main checkout's gitignored .dev.vars. The League is paused on the fake roster with 0 Matches started. The real roster (hydrogen, flash-3-8, flash-3-6, flash-lite-3-5) is in src/rulesets/werewolf/roster.ts with scripts/apply-roster.mjs. ON HOLD until wl-cizy and wl-e9tp land. codex review on impl/wl-t4no: P1, every seat gets every role section (resolved by wl-cizy's per-role assembly; re-check after it merges); P2, N=36 is refused by MAX_LIVE_MATCHES=24 (asked wl-d5wn to allow 36); P2, apply-roster.mjs breaks on a base URL with a trailing slash (fix before the rehearsal). Operator caution: never resume on the fake roster, because fake Agents would stay on the leaderboard and there is no reset route.
+
+**2026-11-21T17:03:42Z**
+
+Pre-rehearsal real local Match (orchestrator-run smoke on integration @ d8ac2bf, wrangler dev). Match eaf83678-0ce1-4b94-9481-4ecafd9d6716, seed smoke-hyd-flash-20261121, 7 seats alternating hydrogen (gemini-4-hydrogen; seats 1,3,5,7) and flash-3-6 (gemini-3.6-flash; seats 2,4,6), instructions sent in the first turn.
+- Tool schemas: all six accepted by the real API (wolf_chat x8, inspect x1, choose_kill x4, protect x2, speak x14, vote x6). No 4xx/5xx, no schema rejections, no harness errors. Invalid or out-of-phase calls can't be counted, because the Player DO retries silently with no log line or event (observability gap).
+- Timeouts: none.
+- Timing: first non-skipped speech at 43.1 s; match_over at 123.3 s, wolf win by parity after N1, D1, N2. Step latency (turn_started to step_resolved, i.e. the slowest seat) over 11 steps: p50 9.7 s, p90 16.6 s, max 19.4 s (D1 vote).
+- Speeches: every one was 3 sentences and 240-330 chars, within limits. accuse was used in 5/6 Round B speeches and both replies, defend never, claim once. Round A speeches were near-identical (all about losing the Seer). One vote reason was confused by simultaneous speech ('piggybacking on a simultaneous round').
+- ODD 1: model names leak to Players. Seat labels are '<Agent name> #n' and Agents quote them ('I accuse Hydrogen #3'). wl-e9tp (Display Names) fixes this; the rehearsal must not run before it lands.
+- ODD 2: beliefs_recorded stores only normalized ballots, so raw sums and genuinely uniform vs empty/zero ballots can't be told apart. Two ballots were uniform (seat 7 wolf all 0.2; seat 5 all 0.4). Normalized sums were correct (2.0 village, 1.0 wolf W-1). No self-ratings, no missing seats, nothing over 1. Wolf 4 rated its partner lowest (0.125).
+Artifacts: /tmp/wl-smoke/ (events.json, wrangler.log, analyze.mjs).
