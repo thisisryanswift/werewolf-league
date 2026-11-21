@@ -24,6 +24,8 @@ import { handleGameCall, type PiTurn, type TurnStore } from "./turn";
 
 /** Bash and notes calls use turns too, so leave room beyond the in-run retries. */
 export const PI_MAX_TURNS = 8;
+/** Some OpenRouter endpoints (e.g. Hydrogen) refuse requests with reasoning off (measured: 400). */
+export const PI_THINKING = "low";
 /** The sandbox runs as user `node`, which cannot write /root (measured in the smoke Match). */
 export const NOTES_PATH = "/home/node/notes.md";
 const PLACEHOLDER_MODEL = "anthropic/claude-haiku-5.5";
@@ -95,7 +97,7 @@ export class PiSeatDO extends DurableObject<Env> {
         if (config) registry.install(this.extension(config) as never);
         return Harness.open(storage, { models, registry, onWake } as never, context);
       },
-      defaults: { model: { provider: "openrouter", id: stored?.model ?? PLACEHOLDER_MODEL }, maxTurns: PI_MAX_TURNS },
+      defaults: { model: { provider: "openrouter", id: stored?.model ?? PLACEHOLDER_MODEL }, maxTurns: PI_MAX_TURNS, thinkingLevel: PI_THINKING },
     } as ConstructorParameters<typeof PiHarness>[0]);
     this.lifecycle = Lifecycle.install(this).use(this.harness);
   }

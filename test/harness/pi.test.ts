@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Harness, PlayerContext } from "../../src/core/harness";
 import type { ToolCall } from "../../src/core/ruleset";
 import { PI_HARNESS_ID, piHarness, SWEEP_AGE_MS, sweepSandboxes, type PiSeatClient } from "../../src/harness/pi";
+import { INSTANCE_PREFIX, instanceName } from "../../src/harness/pi/seat-name";
 import type { PiPoll, PiSeatConfig } from "../../src/harness/pi/seat";
 import { ACCEPTED, handleGameCall, IGNORED, type CheckCall, type PiTurn, type TurnStore } from "../../src/harness/pi/turn";
 import { piRoster } from "../../src/rulesets/werewolf/roster";
@@ -157,6 +158,16 @@ describe("pi roster", () => {
     expect(roster.every((a) => a.harness === PI_HARNESS_ID)).toBe(true);
     expect(roster.map((a) => a.model)).toContain("google/gemini-4-hydrogen");
     for (const a of roster) expect(PRICES[a.model!], a.model).toBeDefined();
+  });
+});
+
+describe("pi sandbox names", () => {
+  it("are deterministic and unique per seat, even for Match IDs that normalise alike", () => {
+    expect(instanceName("m-1", 2)).toBe(instanceName("m-1", 2));
+    expect(instanceName("a_b", 1)).not.toBe(instanceName("a-b", 1));
+    const long = "x".repeat(64);
+    expect(instanceName(long, 1)).not.toBe(instanceName(long, 2));
+    expect(instanceName(long, 1).startsWith(INSTANCE_PREFIX)).toBe(true);
   });
 });
 
