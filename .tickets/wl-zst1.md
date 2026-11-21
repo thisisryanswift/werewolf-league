@@ -72,3 +72,7 @@ Findings:
 (8) The architecture test bans harness code from naming the Ruleset, and the spike validated against a local state copy. Decision needed on validation ownership (resolved below).
 (9) Gemini models via OpenRouter bill the Google key stored on the OpenRouter account.
 Not yet done: an Agent37 bash/notes tool wired into Pi; extra calls after a valid one; Pi schema-failure calls; eviction mid-run. Spend: ~5 short OpenRouter turns.
+
+**2026-11-21T18:28:43Z**
+
+Verified 2026-11-21 13:30 via OpenRouter's public model list: google/gemini-4-hydrogen is available, priced like the direct API ($1.50/$7.50 per 1M). So are google/gemini-3.8-flash, google/gemini-3.6-flash and google/gemini-3.5-flash-lite, which makes the same-model comparison possible for the whole Gemini roster. Neon, Carbon and Argon are listed too. Pi's built-in catalog is stale, so use these ids directly.
