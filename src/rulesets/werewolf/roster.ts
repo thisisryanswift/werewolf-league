@@ -16,3 +16,19 @@ export const REAL_MODELS = [
 export function realRoster(): AgentConfig[] {
   return REAL_MODELS.map(({ id, name, model }) => ({ id, name, harness: "managed-agent", model }));
 }
+
+/**
+ * The pi-open League's roster: OpenRouter models on the pi harness (wl-zst1), each with its own
+ * Agent37 sandbox. Hydrogen through OpenRouter is the controlled comparison with the Managed
+ * Agent Hydrogen ('Hydrogen · Pi' vs 'Hydrogen · Managed'); it bills the Google key stored on
+ * OpenRouter. Ids verified on OpenRouter's public model list on 2026-11-21 (Pi's catalog is stale).
+ */
+export const PI_MODELS = [
+  { id: "hydrogen-pi", name: "Hydrogen · Pi", model: "google/gemini-4-hydrogen" },
+  { id: "claude-haiku-5-5-pi", name: "Claude Haiku 5.5 · Pi", model: "anthropic/claude-haiku-5.5" },
+  { id: "deepseek-v4-1-flash-pi", name: "DeepSeek V4.1 Flash · Pi", model: "deepseek/deepseek-v4.1-flash" },
+] as const;
+
+export function piRoster(): AgentConfig[] {
+  return PI_MODELS.map(({ id, name, model }) => ({ id, name, harness: "pi", model }));
+}
