@@ -363,7 +363,8 @@ export class LeagueDO extends DurableObject<Env> {
     const r = patchConfig(this.config, patch);
     if (!r.ok) return r;
     this.config = r.config;
-    this.blocked = null;
+    // A config change may resolve any other block; a spend-cap block stays until the cap is lifted.
+    if (this.blocked !== SPEND_CAP_BLOCKED || !this.capReached) this.blocked = null;
     this.enforceSpendCap(); // a new cap at or below current spend pauses before anything is scheduled
     this.releaseUnwanted();
     await this.schedule();

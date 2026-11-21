@@ -204,7 +204,13 @@ describe("League spend", () => {
     expect(refused.config.paused).toBe(true);
     expect(refused.blocked).toMatch(/spend cap/i);
     expect(refused.tiles).toHaveLength(0);
+    // A config change that does not lift the cap keeps the spend-cap banner while the League stays paused.
+    await admin("config", { n: 1 });
+    expect((await league()).blocked).toMatch(/spend cap/i);
+    await admin("config", { spendCap: start + 0.005 });
+    expect((await league()).blocked).toMatch(/spend cap/i);
     await admin("config", { spendCap: null, n: 0 });
+    expect((await league()).blocked).toBeNull();
     expect(((await admin("resume")) as LeagueSnapshot).config.paused).toBe(false);
     await admin("pause");
   });
