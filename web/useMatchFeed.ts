@@ -13,12 +13,16 @@ export function useMatchFeed(matchId: string): { events: MatchEvent[]; status: F
     let ws: WebSocket | null = null;
     let retry: ReturnType<typeof setTimeout> | undefined;
     let stopped = false;
+    // A new Match (or a remount) starts from its own full log, never a previous one's.
+    setEvents([]);
+    setStatus("connecting");
 
     const open = () => {
       const proto = location.protocol === "https:" ? "wss:" : "ws:";
       ws = new WebSocket(`${proto}//${location.host}/api/matches/${matchId}/ws`);
-      ws.onopen = () => setStatus("live");
+      ws.onopen = () => !stopped && setStatus("live");
       ws.onmessage = (m) => {
+        if (stopped) return;
         const msg = JSON.parse(m.data as string) as ServerMessage;
         const incoming = msg.type === "log" ? msg.events : [msg.event];
         setEvents((prev) => mergeEvents(prev, incoming));
