@@ -45,3 +45,7 @@ Two header buttons on the grid, each opening its own modal: a native <dialog>, c
 **2026-11-21T19:03:49Z**
 
 Code merged into integration/wl-xgp7 (impl/wl-c75z 8def297). Verification on integration: pnpm test 224/224, typecheck clean. AC1 met: headless 28/28 checks (both buttons in the header; Esc, backdrop and close button all work; focus returns; the closedby fallback works). AC2 met: Narrator's View wording, no scrolling at 1080p. AC3: copy renders from docs/help/{how-to-play,about}.md at build time; awaiting the human's review. AC4 NOT YET: ungated lines in docs/help/about.md mention unlanded features (the Neon Analyst bullet and 'the Analyst explains where Agents fail' for wl-ofdn; 'illegal moves and cost per Match', where the illegal-move metric is dropped and cost is wl-64dn). Gate syntax: '<!-- Show only if wl-xxxx has landed -->' before a paragraph, or inline before a single line; the wl-64dn gate turns on when tiles carry cost. Kept open for the human's copy pass.
+
+**2026-11-21T19:42:18Z**
+
+Human copy pass done (84ac683). Orchestrator removed 'illegal moves' from about.md line 25 (that metric was dropped). Remaining for AC4: the Neon Analyst bullet (line 11) and 'the Analyst explains where Agents fail' (line 25) describe wl-ofdn, which is in progress. The human will revisit line 11 once wl-ofdn lands; close this ticket then.
