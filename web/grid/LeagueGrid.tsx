@@ -1,11 +1,11 @@
 // The dense live grid (after prototype variant E): a header with live counts,
 // the leaderboard strip and the God View toggle; sort and filter chips; then the
 // three promoted large tiles and the rest. Each tile links to #match=<id>.
-import { memo, useMemo, useState } from "react";
+import { memo, useMemo, useRef, useState } from "react";
 import type { LeagueSnapshot, MatchTile } from "../../src/shared/protocol";
 import { FeaturedMatchLink } from "../components/FinishedMatches";
 import type { FeedStatus } from "../useMatchFeed";
-import { arrangeGrid, tileView, topAgents, type GridFilter, type GridSort } from "./model";
+import { arrangeGrid, tileView, topAgents, type GridFilter, type GridSort, type PromotionHold } from "./model";
 import { matchHash } from "./route";
 import "./grid.css";
 
@@ -30,7 +30,13 @@ export interface LeagueGridProps {
 export function LeagueGrid({ league, status, activity, godView, onGodViewChange }: LeagueGridProps) {
   const [sort, setSort] = useState<GridSort>("drama");
   const [filter, setFilter] = useState<GridFilter>("all");
-  const grid = useMemo(() => arrangeGrid(league.tiles, { sort, filter, godView, activity }), [league.tiles, sort, filter, godView, activity]);
+  // Promotion holds without Drama Scores carry over from one arrangement to the next.
+  const held = useRef<PromotionHold[]>([]);
+  const grid = useMemo(() => {
+    const g = arrangeGrid(league.tiles, { sort, filter, godView, activity, now: Date.now(), held: held.current });
+    held.current = g.held;
+    return g;
+  }, [league.tiles, sort, filter, godView, activity]);
 
   return (
     <div className="lg">

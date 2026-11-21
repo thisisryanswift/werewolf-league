@@ -2,7 +2,8 @@
 // are promoted to large tiles, and what each tile shows for a God View setting.
 // Before the Narrator has scored any Match, the grid degrades: drama sorting
 // falls back to Match number, the flagged filter is hidden, and promotion goes
-// by most recent activity.
+// by most recent activity, holding each promoted Match for a while so the
+// large tiles don't swap faster than a line can be read.
 import { visibleDramaFlags, type Leaderboard, type LeagueTilesMessage, type MatchTile } from "../../src/shared/protocol";
 import { spectatorLabel } from "../../src/shared/seat-label";
 
@@ -15,6 +16,16 @@ export interface GridOptions {
   godView: boolean;
   /** When each Match last had activity (any increasing number), for promotion without Drama Scores. */
   activity?: Record<string, number>;
+  /** Clock time (ms) for holding promoted Matches without Drama Scores; omit for no hold. */
+  now?: number;
+  /** The previous arrangement's `held`. */
+  held?: PromotionHold[];
+}
+
+/** A Match promoted (without Drama Scores) at `since`. */
+export interface PromotionHold {
+  matchId: string;
+  since: number;
 }
 
 export interface GridArrangement {
@@ -30,9 +41,13 @@ export interface GridArrangement {
   promoted: MatchTile[];
   /** The other shown tiles, in the sort's order. */
   rest: MatchTile[];
+  /** Promotion holds to pass back in next time (empty with Drama Scores). */
+  held: PromotionHold[];
 }
 
 const PROMOTED = 3;
+/** How long a Match stays promoted by activity before a more active one may replace it. */
+export const PROMOTION_HOLD_MS = 10_000;
 
 /** The Drama Flags a Spectator may see on a tile (secret ones only in God View). */
 export const tileFlags = (tile: MatchTile, godView: boolean) => visibleDramaFlags(tile.summary?.dramaFlags ?? [], godView);
@@ -61,9 +76,25 @@ export function arrangeGrid(tiles: MatchTile[], options: GridOptions): GridArran
   const activity = (t: MatchTile) => options.activity?.[t.matchId] ?? -Infinity;
   const byActivity = (a: MatchTile, b: MatchTile) => activity(b) - activity(a) || byNumber(a, b);
   const sorted = [...shown].sort(sort === "drama" ? byDrama : sort === "alive" ? byAlive : byNumber);
-  const promoted = [...shown].sort(hasDrama ? byDrama : byActivity).slice(0, PROMOTED);
+  let promoted: MatchTile[];
+  let held: PromotionHold[] = [];
+  if (hasDrama) promoted = [...shown].sort(byDrama).slice(0, PROMOTED);
+  else {
+    const ranked = [...shown].sort(byActivity);
+    if (options.now === undefined) promoted = ranked.slice(0, PROMOTED);
+    else {
+      const now = options.now;
+      const byId = new Map(shown.map((t) => [t.matchId, t]));
+      held = (options.held ?? []).filter((h) => byId.has(h.matchId) && now - h.since < PROMOTION_HOLD_MS).slice(0, PROMOTED);
+      for (const t of ranked) {
+        if (held.length >= PROMOTED) break;
+        if (!held.some((h) => h.matchId === t.matchId)) held.push({ matchId: t.matchId, since: now });
+      }
+      promoted = held.map((h) => byId.get(h.matchId)!);
+    }
+  }
   const big = new Set(promoted.map((t) => t.matchId));
-  return { hasDrama, sort, filters, filter, promoted, rest: sorted.filter((t) => !big.has(t.matchId)) };
+  return { hasDrama, sort, filters, filter, promoted, rest: sorted.filter((t) => !big.has(t.matchId)), held };
 }
 
 /**

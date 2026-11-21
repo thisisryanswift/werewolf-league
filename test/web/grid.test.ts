@@ -121,6 +121,22 @@ describe("promoted tiles", () => {
     expect(ids(g.promoted)).toEqual(["m5", "m4", "m2"]);
     expect(ids(g.rest)).toEqual(["m1", "m3"]);
   });
+
+  it("without Drama Scores, holds each promoted Match for a while so the large tiles stay readable", () => {
+    const tiles = [tile("m1"), tile("m2"), tile("m3"), tile("m4"), tile("m5")];
+    const first = arrangeGrid(tiles, opts({ activity: { m1: 3, m2: 2, m3: 1 }, now: 0 }));
+    expect(ids(first.promoted)).toEqual(["m1", "m2", "m3"]);
+    // m4 and m5 become more active, but the held Matches stay until their hold ends.
+    const held = arrangeGrid(tiles, opts({ activity: { m1: 3, m2: 2, m3: 1, m4: 9, m5: 8 }, now: 5_000, held: first.held }));
+    expect(ids(held.promoted)).toEqual(["m1", "m2", "m3"]);
+    expect(ids(held.rest)).toEqual(["m4", "m5"]);
+    // After the hold, the most active Matches take over; m1 was re-promoted at once if still top-ranked.
+    const later = arrangeGrid(tiles, opts({ activity: { m1: 3, m2: 2, m3: 1, m4: 9, m5: 8 }, now: 20_000, held: held.held }));
+    expect(ids(later.promoted)).toEqual(["m4", "m5", "m1"]);
+    // A held Match that leaves the filter frees its slot.
+    const filtered = arrangeGrid(tiles.map((t) => (t.matchId === "m4" ? { ...t, summary: { ...t.summary!, step: "Vote" } } : t)), opts({ filter: "voting", now: 21_000, held: later.held }));
+    expect(ids(filtered.promoted)).toEqual(["m4"]);
+  });
 });
 
 const pub = (id: string): TileDramaFlag => ({ id, visibility: "public-safe" });
