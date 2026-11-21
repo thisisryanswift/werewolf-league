@@ -31,5 +31,9 @@ export function settle(s: WerewolfState, events: RulesetEvent[]): { state: Werew
 
 export function resultOf(s: WerewolfState): MatchResult | null {
   if (!s.winner) return null;
-  return { winner: s.winner, sides: Object.fromEntries(s.players.map((p) => [p.seat, SIDE_OF[p.role]])) };
+  return {
+    winner: s.winner,
+    sides: Object.fromEntries(s.players.map((p) => [p.seat, SIDE_OF[p.role]])),
+    ballots: s.ballots,
+  };
 }

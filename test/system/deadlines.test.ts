@@ -137,9 +137,9 @@ describe("an Agent that misses exactly one turn", () => {
   it("has its default recorded once, its late response ignored, and acts normally next turn with what it missed", async () => {
     const seed = "miss-once";
     const wolves = dealtWolves(seed);
-    const seat = [1, 2, 3, 4, 5, 6, 7].find((s) => !wolves.includes(s))!; // a villager: its first turn is the Day 1 vote
-    // Everyone else passes (no kill, Abstain). The villager misses its first turn,
-    // then votes for a Werewolf, but only if its next observation repeats what it
+    const seat = [1, 2, 3, 4, 5, 6, 7].find((s) => !wolves.includes(s))!; // a villager: its first turn is Day 1 Speech Round A
+    // Everyone else passes (no kill, silence, Abstain). The villager misses its first turn,
+    // then speaks in Round B, but only if its next observation repeats what it
     // missed: the briefing and Night 1.
     const agents = Array.from({ length: 7 }, (_, i) =>
       i + 1 === seat
@@ -152,17 +152,17 @@ describe("an Agent that misses exactly one turn", () => {
     );
     const matchId = await startMatch({ seed, agents, deadlines });
 
-    // Day 1 resolves with the villager timed out.
+    // Day 1 Speech Round A resolves with the villager timed out.
     const day1 = await waitFor(async () => {
       const s = await snapshot(matchId);
-      return s.events.some((e) => e.kind === "votes_revealed") ? s : null;
+      return s.events.some((e) => e.kind === "speech" && e.data.seat === seat) ? s : null;
     });
     const missed = day1.events.find((e) => e.kind === "turn_started" && e.data.seat === seat)!;
     // The late answer to that turn arrives after the Match moved on: it is dropped.
     const turnId = `${matchId}:${missed.data.step}:${seat}`; // the Match's turn ID format
     const match = env.MATCH.getByName(matchId);
-    const lateVote = { name: "vote", args: { target: wolves[1], beliefs: {}, reason: "late" } };
-    expect(await match.submitAction(turnId, seat, lateVote)).toEqual({ status: "stale" });
+    const lateSpeech = { name: "speak", args: { text: "late" } };
+    expect(await match.submitAction(turnId, seat, lateSpeech)).toEqual({ status: "stale" });
     expect(await match.reportTimeout(turnId, seat)).toEqual({ status: "stale" });
 
     const done = await finished(matchId);
@@ -171,18 +171,15 @@ describe("an Agent that misses exactly one turn", () => {
     const turnsOfSeat = done.events.filter((e) => e.kind === "turn_started" && e.data.seat === seat);
     expect(turnsOfSeat.slice(0, 2).map((e) => e.data.deadlineMs)).toEqual([deadlines.firstTurnMs, deadlines.turnMs]);
     const timeouts = done.events.filter((e) => e.kind === "turn_timed_out");
-    expect(timeouts.map((e) => e.data)).toEqual([{ step: missed.data.step, seat, actionKind: "vote", by: "player" }]);
+    expect(timeouts.map((e) => e.data)).toEqual([{ step: missed.data.step, seat, actionKind: "speak", by: "player" }]);
     expect(done.stats.timeouts.bySeat[seat]).toBe(1);
     expect(done.result?.timeouts.byAgent.flaky).toBe(1);
 
-    const votes = done.events.filter((e) => e.kind === "votes_revealed").map((e) => e.data.votes as Record<string, unknown>[]);
-    expect(votes[0]!.find((v) => v.seat === seat)).toMatchObject({ target: "abstain", timedOut: true });
-    expect(votes[1]!.find((v) => v.seat === seat)).toMatchObject({ target: wolves[0], timedOut: false });
-    expect(done.events.find((e) => e.kind === "player_died")?.data).toEqual({
-      seat: wolves[0],
-      role: "werewolf",
-      cause: "vote",
-      cycle: 2,
-    });
+    // Round A defaulted to silence; Round B was spoken with what the seat had missed.
+    const spoken = done.events.filter((e) => e.kind === "speech" && e.data.seat === seat && e.data.cycle === 1);
+    expect(spoken.map((e) => [e.data.round, e.data.skipped])).toEqual([
+      ["A", true],
+      ["B", false],
+    ]);
   });
 });

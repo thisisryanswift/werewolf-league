@@ -1,4 +1,4 @@
-import type { Seat, ToolCall, TurnRequest, Validation } from "../../core/ruleset";
+import type { BeliefBallot, Seat, ToolCall, TurnRequest, Validation } from "../../core/ruleset";
 import type { RulesetEvent } from "../../shared/protocol";
 
 export type Role = "werewolf" | "seer" | "doctor" | "villager";
@@ -6,14 +6,14 @@ export type Side = "wolf" | "village";
 
 export const SIDE_OF: Record<Role, Side> = { werewolf: "wolf", seer: "village", doctor: "village", villager: "village" };
 
-export interface WerewolfConfig {
+export interface WerewolfConfig extends DayConfig {
   seats: number; // 7 or 8
   allowAbstain: boolean;
   /** After this many Day/Night cycles, Werewolves win if any survive. */
   maxCycles: number;
 }
 
-export const DEFAULT_CONFIG: WerewolfConfig = { seats: 7, allowAbstain: true, maxCycles: 6 };
+export const DEFAULT_CONFIG: WerewolfConfig = { seats: 7, allowAbstain: true, maxCycles: 6, speechRounds: 2, replySlots: 2 };
 
 export interface PlayerState {
   seat: Seat;
@@ -36,10 +36,31 @@ export interface NightState {
   lastProtected: Seat | null;
 }
 
-/** Day sub-state, owned by day.ts. */
-export interface DayState {
-  step: "vote";
+// ---- Day (owned by day.ts) -------------------------------------------
+
+export interface DayConfig {
+  /** Speech Rounds per Day (A, B, ...). */
+  speechRounds: number;
+  /** Right of Reply slots per Day. */
+  replySlots: number;
 }
+
+/** Day sub-state. Start each Day with `startDay` from day.ts. */
+export interface DayState {
+  /** The Day this state belongs to. */
+  cycle: number;
+  step: "speech" | "reply" | "vote";
+  /** The seat that speaks first in this Day's presentation order. */
+  starter: Seat;
+  /** 1-based Speech Round while `step` is "speech". */
+  round: number;
+  /** Accusations from this Day's Speech Rounds, for Right of Reply scoring. */
+  accusations: { round: number; seat: Seat; targets: Seat[] }[];
+  /** Repliers chosen so far this Day; while `step` is "reply" the last one is speaking. */
+  replied: Seat[];
+}
+
+// ---- end Day ----------------------------------------------------------
 
 export interface WerewolfState {
   config: WerewolfConfig;
@@ -50,6 +71,8 @@ export interface WerewolfState {
   phase: "night" | "day" | "over";
   night: NightState;
   day: DayState;
+  /** Every normalized vote-time belief ballot so far (Day section). */
+  ballots: BeliefBallot[];
   winner: Side | null;
 }
 

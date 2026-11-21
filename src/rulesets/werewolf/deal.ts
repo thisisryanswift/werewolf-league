@@ -3,6 +3,7 @@
 import type { Seat, SeatAgent, SetupResult } from "../../core/ruleset";
 import { rngFrom } from "../../core/rng";
 import type { RulesetEvent } from "../../shared/protocol";
+import { startDay, voteTool } from "./day";
 import { startNight } from "./night";
 import { TOOLS_BY_ROLE } from "./tools";
 import { DEFAULT_CONFIG, type Role, type WerewolfConfig, type WerewolfState } from "./types";
@@ -47,7 +48,8 @@ export function setup(rawConfig: Record<string, unknown>, seed: string, seats: S
     cycle: 1,
     phase: "night",
     night: startNight(players, null),
-    day: { step: "vote" },
+    day: startDay({ seed, players }, 1, null),
+    ballots: [],
     winner: null,
   };
   const wolves = players.filter((p) => p.role === "werewolf").map((p) => p.seat);
@@ -61,6 +63,9 @@ export function setup(rawConfig: Record<string, unknown>, seed: string, seats: S
     { kind: "wolf_team", audience: wolves, data: { wolves } },
     { kind: "phase_started", audience: "all", data: { phase: "night", cycle: 1 } },
   ];
-  const tools = Object.fromEntries(players.map((p) => [p.seat, TOOLS_BY_ROLE[p.role]]));
+  const vote = voteTool(config.allowAbstain);
+  const tools = Object.fromEntries(
+    players.map((p) => [p.seat, TOOLS_BY_ROLE[p.role].map((t) => (t.name === vote.name ? vote : t))]),
+  );
   return { ok: true, state, events, tools };
 }

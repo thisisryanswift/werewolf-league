@@ -4,6 +4,7 @@ import type { Seat, ToolCall, TurnRequest, Validation } from "../../core/ruleset
 import { rngFrom } from "../../core/rng";
 import type { RulesetEvent } from "../../shared/protocol";
 import { alive, aliveWolves, killPlayer, player, wolfSeats } from "./players";
+import { startDay } from "./day";
 import { SIDE_OF, type NightState, type PhaseModule, type PlayerState, type Role, type WerewolfState } from "./types";
 import { targetOf, validateTargeted } from "./validation";
 
@@ -180,7 +181,7 @@ function applyAct(s: WerewolfState, actions: Record<Seat, ToolCall | null>): { s
     });
   }
   events.push({ kind: "night_passed", audience: "all", data: { cycle: s.cycle, killed } });
-  state = { ...state, phase: "day", day: { step: "vote" } };
+  state = { ...state, phase: "day", day: startDay(state, s.cycle, s.day) };
   events.push({ kind: "phase_started", audience: "all", data: { phase: "day", cycle: s.cycle } });
   return { state, events };
 }

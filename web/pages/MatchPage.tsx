@@ -4,6 +4,7 @@ import type { MatchEvent } from "../../src/shared/protocol";
 import { countTimeouts, thinkingSeats } from "../../src/shared/turn-events";
 import { describeEvent } from "../events";
 import { HIDDEN_KINDS } from "../events/runner";
+import { Speech } from "../events/Speech";
 import { useMatchFeed } from "../useMatchFeed";
 
 type SeatInfo = { seat: number; label: string; agentId: string };
@@ -68,7 +69,8 @@ export function MatchPage({ matchId }: { matchId: string }) {
               key={e.seq}
               className={[e.audience === "all" ? "" : "private", e.kind === "turn_timed_out" ? "timeout" : ""].join(" ").trim()}
             >
-              <span className="seq">{e.seq}</span> {describeEvent(e, events)}
+              <span className="seq">{e.seq}</span>{" "}
+              {e.kind === "speech" ? <Speech event={e} log={events} /> : describeEvent(e, events)}
             </li>
           ))}
       </ol>

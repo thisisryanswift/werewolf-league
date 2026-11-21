@@ -3,7 +3,7 @@
 
 import type { Seat, TurnRequest } from "../../core/ruleset";
 import type { RulesetEvent } from "../../shared/protocol";
-import { dayText } from "./day";
+import { DAY_RULES, dayText } from "./day";
 import { NIGHT_RULES, ROLE_NAMES, nightText } from "./night";
 import { player, wolfSeats } from "./players";
 import type { WerewolfState } from "./types";
@@ -36,10 +36,10 @@ export function describeEvent(e: RulesetEvent, s: WerewolfState): string | null 
 export const RULES = `You are playing Werewolf.
 - Two Werewolves hide among the players; everyone else is on the Village side.
 ${NIGHT_RULES}
-- Each Day all living players vote at the same time; the player with the most votes is eliminated. A tie, or everyone abstaining, eliminates nobody.
+${DAY_RULES}
 - A dead player's role is revealed. Dead players no longer act.
 - The Village wins when every Werewolf is dead. The Werewolves win when they equal or outnumber the Village, or if any survive after the 6th Day/Night cycle.
-- On each turn you are told the required action. Call exactly that tool with a legal target.`;
+- On each turn you are told the required action. Call exactly that tool with legal arguments.`;
 
 export function briefing(s: WerewolfState, seat: Seat): string {
   const me = player(s, seat)!;

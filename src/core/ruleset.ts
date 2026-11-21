@@ -49,6 +49,20 @@ export interface MatchResult {
   winner: string; // winning Side
   /** Side of every Player, by seat. */
   sides: Record<Seat, string>;
+  /** Normalized belief ballots, for Rulesets that collect them (Calibration, Table Suspicion). */
+  ballots?: BeliefBallot[];
+}
+
+/**
+ * One Player's stated, normalized beliefs at one decision point: for each other
+ * seat, the probability that it belongs to the Side being guessed at.
+ */
+export interface BeliefBallot {
+  /** The voter. */
+  seat: Seat;
+  /** Ruleset-defined round number (e.g. the Day). */
+  round: number;
+  beliefs: Record<Seat, number>;
 }
 
 export type SetupResult<S> =

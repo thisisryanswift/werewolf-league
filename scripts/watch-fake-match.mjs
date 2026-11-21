@@ -20,10 +20,28 @@ const secret = process.env.ADMIN_SECRET ?? devVarsSecret();
 if (!secret) throw new Error("set ADMIN_SECRET (see .dev.vars)");
 const UA = "werewolf-league-smoke/1.0";
 
+/** 7 Fake Harness Agents whose speeches carry Accusations, defences and Claims. */
+function talkativeAgents() {
+  const names = ["Ada", "Bo", "Cy", "Di", "Ed", "Flo", "Gus"];
+  return names.map((name, i) => {
+    const seat = i + 1;
+    const next = (seat % 7) + 1;
+    const speak = { text: `${name} here. I don't trust seat ${next}.`, accuse: [next], defend: [((seat + 1) % 7) + 1] };
+    if (seat === 1) speak.claim = { role: "seer", results: [{ seat: next, side: "wolf" }] };
+    if (seat === 4) speak.claim = { role: "villager" };
+    return {
+      id: `fake-${name.toLowerCase()}`,
+      name,
+      harness: "fake",
+      options: { script: "first-legal", delayPolls: 1, args: { speak, vote: { reason: `${name} follows the accusations` } } },
+    };
+  });
+}
+
 const res = await fetch(`${base}/api/admin/matches`, {
   method: "POST",
   headers: { "x-admin-secret": secret, "content-type": "application/json", "user-agent": UA },
-  body: JSON.stringify({ seed: process.env.SEED ?? `smoke-${Date.now()}` }),
+  body: JSON.stringify({ seed: process.env.SEED ?? `smoke-${Date.now()}`, agents: talkativeAgents() }),
 });
 if (res.status !== 201) throw new Error(`start failed: ${res.status} ${await res.text()}`);
 const { matchId } = await res.json();
