@@ -3,12 +3,14 @@
 // the Ruleset's Agent Instructions for its role) to a League. It only changes the roster
 // (plus N and the Narrator if set); it never resumes the League.
 //
-// Usage: [N=1] [NARRATOR=decisions|off] node scripts/apply-roster.mjs <baseUrl>
+// Usage: [LEAGUE=gemini-managed] [N=1] [NARRATOR=decisions|off] node scripts/apply-roster.mjs <baseUrl>
 // ADMIN_SECRET comes from the environment, or else from .dev.vars.
 import { readFileSync } from "node:fs";
 import { realRoster } from "../src/rulesets/werewolf/roster.ts";
 
 const base = process.argv[2]?.replace(/\/+$/, "");
+// LEAGUE=<id> picks a League (e.g. pi-open); unset uses the single-League routes, which are gemini-managed.
+const ADMIN_PATH = process.env.LEAGUE ? `/api/admin/leagues/${process.env.LEAGUE}` : "/api/admin/league";
 if (!base) throw new Error("usage: node scripts/apply-roster.mjs <baseUrl>");
 function devVarsSecret() {
   try {
@@ -23,7 +25,7 @@ if (!secret) throw new Error("set ADMIN_SECRET (see .dev.vars)");
 const body = { roster: realRoster() };
 if (process.env.N !== undefined) body.n = Number(process.env.N);
 if (process.env.NARRATOR) body.narrator = process.env.NARRATOR === "off" ? null : { id: process.env.NARRATOR };
-const res = await fetch(`${base}/api/admin/league/config`, {
+const res = await fetch(`${base}${ADMIN_PATH}/config`, {
   method: "POST",
   headers: { "x-admin-secret": secret, "content-type": "application/json", "user-agent": "werewolf-league-rehearsal/1" },
   body: JSON.stringify(body),

@@ -23,7 +23,7 @@ export interface MatchInit {
   narrator?: NarratorConfig | null;
   /** The post-Match Analyst; absent or null means no analysis. */
   analyst?: AnalystConfig | null;
-  /** The League DO (by name) the Match reports to; absent means LEAGUE_NAME. */
+  /** The League (by id) the Match belongs and reports to; absent means the default League. */
   league?: string;
   /** Match Number given by the League that started it; absent for a one-off Match. */
   matchNumber?: number;
@@ -34,6 +34,8 @@ export type MatchStatus = "running" | "finished";
 export interface MatchSnapshot {
   matchId: string;
   matchNumber?: number;
+  /** The League the Match belongs to (a one-off Match reports to the default League). */
+  league: string;
   rulesetId: string;
   status: MatchStatus;
   seats: SeatAgent[];

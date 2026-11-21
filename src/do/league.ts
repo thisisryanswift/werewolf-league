@@ -1,4 +1,4 @@
-// League DO (one for the demo). Keeps N Matches live, drawing each table from
+// League DO, one per League (src/shared/leagues.ts). Keeps N Matches live, drawing each table from
 // the roster with a recorded match seed; settles each finished Match exactly
 // once (idempotent by Match ID) and starts its replacement; serves the grid
 // feed over a hibernatable WebSocket. Ruleset-agnostic: it only uses the
@@ -9,7 +9,9 @@ import { acquireSlot, DEFAULT_ANALYST_CONCURRENCY, type AnalystSlots } from "../
 import { drawTable } from "../core/draw";
 import type { MatchInit, MatchReport } from "../core/match";
 import { FeedCoalescer } from "../core/league-feed";
-import { defaultLeagueConfig, LEAGUE_NAME, patchConfig, type LeagueConfig } from "../core/roster";
+import { leagueIdOf } from "../core/leagues";
+import { defaultLeagueConfig, patchConfig, type LeagueConfig } from "../core/roster";
+import { findLeague } from "../shared/leagues";
 import { applyMatch, calibrationByAgent, rankStandings, ratePlayers, snapshotOf, standing, type AgentRecord, type RatingSnapshot } from "../core/ratings";
 import { buildMatchInit } from "../core/start-match";
 import { backoffUntil, recentStarts, startBudget } from "../core/start-pacer";
@@ -114,11 +116,16 @@ export class LeagueDO extends DurableObject<Env> {
     },
   });
 
+  /** This League's id (the DO named "default" is gemini-managed). */
+  private get leagueId(): string {
+    return leagueIdOf(this.ctx.id.name);
+  }
+
   // ---- storage ---------------------------------------------------------
 
   private get config(): LeagueConfig {
     // Stored configs from before a key existed get its default.
-    return { ...defaultLeagueConfig(), ...this.ctx.storage.kv.get<LeagueConfig>("config") };
+    return { ...defaultLeagueConfig(this.leagueId), ...this.ctx.storage.kv.get<LeagueConfig>("config") };
   }
   private set config(c: LeagueConfig) {
     this.ctx.storage.kv.put("config", c);
@@ -235,7 +242,9 @@ export class LeagueDO extends DurableObject<Env> {
 
   snapshot(): LeagueSnapshot {
     const c = this.config;
+    const id = this.leagueId;
     return {
+      league: { id, name: findLeague(id)?.name ?? id },
       config: {
         n: c.n,
         paused: c.paused,
@@ -582,8 +591,8 @@ export class LeagueDO extends DurableObject<Env> {
         analyst: config.analyst,
         agents: draw.agents,
       });
-      // Report back to this League (there is one in production; tests may run others).
-      init.league = this.ctx.id.name ?? LEAGUE_NAME;
+      // The Match belongs and reports to this League.
+      init.league = this.leagueId;
       live[init.matchId] = {
         matchId: init.matchId,
         seed,
