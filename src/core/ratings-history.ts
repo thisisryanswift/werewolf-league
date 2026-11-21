@@ -1,4 +1,4 @@
-// Overall Rating history for the leaderboard chart. Ruleset-agnostic and pure:
+// Overall and Side Rating history for the leaderboard chart. Ruleset-agnostic and pure:
 // replays the rating deltas stored on each rated settlement, in settlement order.
 // Each Agent starts from the `before` of its first change in the window (1200 for
 // a full history); a Side it has not played reads INITIAL_RATING.
@@ -17,6 +17,8 @@ export interface RatingsHistoryPoint {
   settledAt: number;
   /** Overall Rating of every Agent seen so far, after this settlement; agentId -> rating (0.01 precision, unrounded for display). */
   overall: Record<string, number>;
+  /** Side Rating of every Agent seen so far, per Side, after this settlement; side -> agentId -> rating. A Side not yet played reads INITIAL_RATING. */
+  sides: Record<string, Record<string, number>>;
 }
 
 export interface RatingsHistory {
@@ -25,6 +27,8 @@ export interface RatingsHistory {
 }
 
 export const RATINGS_HISTORY_CAP = 500;
+
+const round2 = (v: number) => Math.round(v * 100) / 100;
 
 export function ratingsHistory(opts: {
   settlements: Iterable<RatedSettlement>;
@@ -53,8 +57,12 @@ export function ratingsHistory(opts: {
   const points = rated.map((s, i) => {
     for (const c of s.ratings!.agents) ratings.get(c.agentId)![c.side]! += c.delta;
     const overall: Record<string, number> = {};
-    for (const [id, r] of ratings) overall[id] = Math.round(overallOf(r) * 100) / 100;
-    return { matchNumber: s.matchNumber ?? i + 1, settledAt: s.settledAt, overall };
+    const sides: Record<string, Record<string, number>> = Object.fromEntries(opts.sides.map((side) => [side, {}]));
+    for (const [id, r] of ratings) {
+      overall[id] = round2(overallOf(r));
+      for (const side of opts.sides) sides[side]![id] = round2(r[side] ?? INITIAL_RATING);
+    }
+    return { matchNumber: s.matchNumber ?? i + 1, settledAt: s.settledAt, overall, sides };
   });
 
   return {
