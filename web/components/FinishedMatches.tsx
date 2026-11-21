@@ -20,12 +20,12 @@ export function FeaturedMatchLink({ featured }: { featured: FeaturedMatch | null
 export function FinishedMatchList({ recent }: { recent: SettledMatch[] }) {
   if (recent.length === 0) return null;
   return (
-    <section data-testid="finished-matches">
+    <section className="lg-card lg-finished" data-testid="finished-matches">
       <h2>Finished Matches</h2>
       <ul className="recent">
         {recent.map((r) => (
           <li key={r.matchId}>
-            <a href={matchHash(r.matchId)}>{matchLabel(r)}</a>: {r.winner} won
+            <a href={matchHash(r.matchId)}>{matchLabel(r)}</a> — {r.winner.toLowerCase()} won
           </li>
         ))}
       </ul>

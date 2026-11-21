@@ -83,7 +83,6 @@ body:has(.lg-page) {
   text-transform: uppercase;
 }
 .lg-count,
-.lg-board li,
 .lg-chip,
 .lg-narrator,
 .lg-feed,
@@ -93,37 +92,19 @@ body:has(.lg-page) {
   box-shadow: 3px 3px 0 var(--lg-ink);
   padding: 3px 10px;
 }
+/* The live and finished counters sit at the start of the chips row, at chip size. */
 .lg-count {
-  font-size: 15px;
+  font: 700 13px/1 var(--lg-font);
+  padding: 5px 10px;
 }
 .lg-count b {
-  font-size: 20px;
+  font-weight: 900;
 }
-.lg-board {
-  display: flex;
-  gap: 8px;
-  list-style: none;
-  margin: 0 0 0 10px;
-  padding: 0;
-}
-.lg-board li {
-  font-size: 14px;
-  font-weight: 700;
-  padding: 3px 8px;
-  animation: lg-flash 1.2s ease-out;
-}
-.lg-board li.first {
-  background: var(--lg-yellow);
-}
-@keyframes lg-flash {
-  from {
-    background: var(--lg-teal);
-    color: #fff;
-  }
+.lg-spacer {
+  margin-left: auto;
 }
 .lg-feed {
   font: 700 13px/1.4 var(--lg-mono);
-  margin-left: auto;
 }
 .lg-feed-reconnecting,
 .lg-feed-connecting {
@@ -236,6 +217,15 @@ body:has(.lg-page) {
 }
 .lg-tile.starting {
   background: var(--lg-starting);
+}
+/* A recently finished Match filling an empty slot: muted "Over" style. */
+.lg-tile.finished {
+  background: var(--lg-starting);
+  color: var(--lg-muted);
+  box-shadow: none;
+}
+.lg-tile.finished:hover {
+  box-shadow: var(--lg-shadow);
 }
 .t-head {
   display: flex;
@@ -443,9 +433,6 @@ body:has(.lg-page) {
   .spin {
     animation-duration: 4s;
   }
-  .lg-board li {
-    animation: none;
-  }
 }
 .lg-empty {
   grid-column: 1 / -1;
@@ -460,7 +447,8 @@ body:has(.lg-page) {
   align-items: flex-start;
   padding: 0 22px 40px;
 }
-.lg-below .leaderboard {
+.lg-below .leaderboard,
+.lg-below .lg-card {
   float: none;
   margin: 0;
   flex: 1 1 39rem;
@@ -468,8 +456,45 @@ body:has(.lg-page) {
   border: 3px solid var(--lg-ink);
   padding: 10px 14px;
 }
-.lg-below [data-testid="finished-matches"] {
+.lg-below .lg-card h2 {
+  margin: 0 0 6px;
+  font-size: 16px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.lg-below .lg-spend {
+  flex: 0 1 16rem;
+}
+.lg-spend-total {
+  margin: 0;
+  font-size: 34px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+.lg-spend-sub {
+  margin: 2px 0 0;
+  font-size: 14px;
+  color: var(--lg-muted);
+}
+.lg-below .lg-finished {
   flex: 1 1 20rem;
+}
+.lg-finished .recent {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 14px;
+}
+.lg-finished .recent li {
+  padding: 3px 0;
+  border-top: 1px solid var(--lg-starting);
+}
+.lg-finished .recent li:first-child {
+  border-top: none;
+}
+.lg-finished .recent a {
+  font-weight: 700;
+  color: var(--lg-ink);
 }
 
 /* ---- Match modal ---- */

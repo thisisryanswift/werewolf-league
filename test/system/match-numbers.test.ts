@@ -22,7 +22,7 @@ async function drain(): Promise<LeagueSnapshot> {
   }, LOADED_MS);
 }
 
-/** Every settlement this League has recorded (the snapshot's `recent` keeps only the latest 12). */
+/** Every settlement this League has recorded (the snapshot's `recent` keeps only the latest 24). */
 const settlements = () =>
   runInDurableObject(stub(), async (_instance: LeagueDO, state) => [...state.storage.kv.list<Settlement>({ prefix: "settled:" })].map(([, s]) => s));
 

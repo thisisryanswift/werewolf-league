@@ -1,8 +1,8 @@
 // The League grid's model: which tiles show, in what order, which are promoted,
 // and what each tile shows for a Narrator's View setting.
 import { describe, expect, it } from "vitest";
-import type { MatchTile, TileDramaFlag, TileSummary } from "../../src/shared/protocol";
-import { arrangeGrid, noteActivity, tileView, topAgents, type GridOptions } from "../../web/grid/model";
+import type { MatchTile, SettledMatch, TileDramaFlag, TileSummary } from "../../src/shared/protocol";
+import { arrangeGrid, fillGrid, finishedView, noteActivity, tileView, topAgents, type GridCard, type GridOptions } from "../../web/grid/model";
 import { matchHash, matchIdFromHash } from "../../web/grid/route";
 
 describe("Match links", () => {
@@ -347,5 +347,34 @@ describe("tile face", () => {
     expect(tileView(nightStart(), false).thinking).toBeNull();
     expect(tileView(nightStart(), true).thinking).toBe(4);
     expect(JSON.stringify(tileView(nightStart(), false))).not.toMatch(/werewolf|seer|Wolf Chat/i);
+  });
+});
+
+describe("filling the grid with finished Matches", () => {
+  const settled = (n: number): SettledMatch => ({ matchId: `f${n}`, matchNumber: n, winner: n % 2 ? "Village" : "Werewolves", settledAt: n });
+  const cardIds = (cards: GridCard[]) => cards.map((c) => (c.kind === "live" ? `live:${c.tile.matchId}` : `done:${c.match.matchId}`));
+
+  it("puts live Matches first, then finished ones newest first, 21 cards in all", () => {
+    const g = arrangeGrid([tile("m1", { dramaScore: 0.5 })], opts());
+    const recent = Array.from({ length: 24 }, (_, i) => settled(i + 1)).reverse();
+    const shuffled = [...recent.slice(12), ...recent.slice(0, 12)];
+    const f = fillGrid(g, shuffled);
+    expect(cardIds(f.large)).toEqual(["live:m1", "done:f24", "done:f23"]);
+    expect(f.small).toHaveLength(18);
+    expect(cardIds(f.small).slice(0, 2)).toEqual(["done:f22", "done:f21"]);
+    expect(cardIds(f.small).at(-1)).toBe("done:f5");
+    expect(finishedView(settled(7))).toEqual({ match: "Match 7", headline: "Village wins" });
+    expect(finishedView(settled(8)).headline).toBe("Werewolves win");
+  });
+
+  it("never drops live Matches, skips Matches still on a tile, and fills only under All", () => {
+    const tiles = Array.from({ length: 22 }, (_, i) => tile(`m${i + 1}`, { dramaScore: i / 100 }));
+    const f = fillGrid(arrangeGrid(tiles, opts()), [settled(1)]);
+    expect(f.large.length + f.small.length).toBe(22);
+    expect(f.small.every((c) => c.kind === "live")).toBe(true);
+    const one = arrangeGrid([tile("f1")], opts());
+    expect(cardIds(fillGrid(one, [settled(1), settled(2)]).large)).toEqual(["live:f1", "done:f2"]);
+    const night = arrangeGrid([tile("m1")], opts({ filter: "night" }));
+    expect(fillGrid(night, [settled(1)]).large).toHaveLength(0);
   });
 });

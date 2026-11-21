@@ -4,7 +4,7 @@
 // falls back to Match number, the flagged filter is hidden, and promotion goes
 // by most recent activity, holding each promoted Match for a while so the
 // large tiles don't swap faster than a line can be read.
-import { visibleDramaFlags, type Leaderboard, type LeagueTilesMessage, type MatchTile } from "../../src/shared/protocol";
+import { visibleDramaFlags, type Leaderboard, type LeagueTilesMessage, type MatchTile, type SettledMatch } from "../../src/shared/protocol";
 import { matchLabel } from "../../src/shared/match-label";
 import { spectatorLabel } from "../../src/shared/seat-label";
 import { formatUsd } from "../cost";
@@ -97,6 +97,48 @@ export function arrangeGrid(tiles: MatchTile[], options: GridOptions): GridArran
   }
   const big = new Set(promoted.map((t) => t.matchId));
   return { hasDrama, sort, filters, filter, promoted, rest: sorted.filter((t) => !big.has(t.matchId)), held };
+}
+
+/** How many cards the grid always shows: a row of 3 large, then 3 rows of 6 small. */
+export const GRID_CARDS = 21;
+
+/** A grid card: a live Match's tile, or a recently finished Match filling an empty slot. */
+export type GridCard = { kind: "live"; tile: MatchTile } | { kind: "finished"; match: SettledMatch };
+
+export interface FilledGrid {
+  /** The top row: promoted live Matches, then finished ones if fewer than 3 are live. */
+  large: GridCard[];
+  small: GridCard[];
+}
+
+const cardId = (c: GridCard) => (c.kind === "live" ? c.tile.matchId : c.match.matchId);
+
+/**
+ * Fill the grid to `total` cards: live Matches first (promoted ones in the large
+ * slots), then the most recently finished Matches, newest first. Finished cards
+ * fill in only under the "all" filter, and never repeat a Match still on a tile.
+ * Live Matches are never dropped, even past `total`.
+ */
+export function fillGrid(grid: Pick<GridArrangement, "promoted" | "rest" | "filter">, recent: SettledMatch[], total = GRID_CARDS): FilledGrid {
+  const onTile = new Set([...grid.promoted, ...grid.rest].map((t) => t.matchId));
+  const finished: GridCard[] =
+    grid.filter === "all"
+      ? recent
+          .filter((m) => !onTile.has(m.matchId))
+          .sort((a, b) => b.settledAt - a.settledAt)
+          .map((match) => ({ kind: "finished", match }))
+      : [];
+  const promoted: GridCard[] = grid.promoted.map((tile) => ({ kind: "live", tile }));
+  const rest: GridCard[] = grid.rest.map((tile) => ({ kind: "live", tile }));
+  const large = [...promoted, ...finished.slice(0, Math.max(0, PROMOTED - promoted.length))];
+  const used = new Set(large.map(cardId));
+  const small = [...rest, ...finished.filter((c) => !used.has(cardId(c)))];
+  return { large, small: small.slice(0, Math.max(total - large.length, rest.length)) };
+}
+
+/** A finished card's view: "Match N" and the result headline. */
+export function finishedView(match: SettledMatch): { match: string; headline: string } {
+  return { match: matchLabel(match), headline: match.winner ? resultLine(match.winner) : "Over" };
 }
 
 /**

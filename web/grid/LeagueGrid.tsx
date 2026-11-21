@@ -1,15 +1,16 @@
-// The dense live grid (after prototype variant E): a header with live counts,
-// the leaderboard strip and the Narrator's View toggle; sort and filter chips; then the
-// three promoted large tiles and the rest. Each tile links to #match=<id>.
+// The dense live grid (after prototype variant E): a header with the help and
+// Narrator's View buttons; live counts, sort and filter chips; then the three promoted
+// large tiles and the rest, filled to 21 cards with recently finished Matches.
+// Each card links to #match=<id>.
 import { memo, useMemo, useRef, useState } from "react";
 import { matchLabel } from "../../src/shared/match-label";
-import type { LeagueSnapshot, MatchTile } from "../../src/shared/protocol";
+import type { LeagueSnapshot, MatchTile, SettledMatch } from "../../src/shared/protocol";
 import { FeaturedMatchLink } from "../components/FinishedMatches";
 import { landedFeatures } from "../help/features";
 import { HelpButtons } from "../help/HelpButtons";
 import type { FeedStatus } from "../useMatchFeed";
 import { LeagueSwitcher } from "./LeagueSwitcher";
-import { arrangeGrid, tileView, topAgents, type GridFilter, type GridSort, type PromotionHold } from "./model";
+import { arrangeGrid, fillGrid, finishedView, tileView, type GridCard, type GridFilter, type GridSort, type PromotionHold } from "./model";
 import { matchHash } from "./route";
 import "./grid.css";
 
@@ -19,7 +20,6 @@ const SORTS: { key: GridSort; label: string }[] = [
   { key: "number", label: "#" },
 ];
 const FILTER_LABELS: Record<GridFilter, string> = { all: "All", flagged: "⚑ Flagged", voting: "Voting", night: "Night" };
-const STRIP_AGENTS = 5;
 
 export interface LeagueGridProps {
   league: LeagueSnapshot;
@@ -39,6 +39,8 @@ export function LeagueGrid({ league, status, activity, narratorView, onNarratorV
     held.current = g.held;
     return g;
   }, [league.tiles, sort, filter, narratorView, activity]);
+  // Recently finished Matches fill the slots live Matches leave empty.
+  const cards = useMemo(() => fillGrid(grid, league.recent ?? []), [grid, league.recent]);
   // Keyed by content so the help dialogs re-render only when a feature lands.
   const landedKey = [...landedFeatures(league.tiles)].join(",");
   const landed = useMemo(() => new Set(landedKey.split(",").filter(Boolean)), [landedKey]);
@@ -49,29 +51,25 @@ export function LeagueGrid({ league, status, activity, narratorView, onNarratorV
         <div className="lg-row">
           <h1>Werewolf League</h1>
           <LeagueSwitcher current={league.league.id} />
-          <span className="lg-count" data-testid="live-count">
-            <b>{league.tiles.length}</b> {league.config.paused ? "live · paused" : `of ${league.config.n} live`}
-          </span>
-          <span className="lg-count">
-            <b>{league.stats.settled.toLocaleString()}</b> finished
-          </span>
-          <ol className="lg-board" aria-label="Top Agents by Overall Rating" data-testid="leaderboard-strip">
-            {topAgents(league.leaderboard, STRIP_AGENTS).map((a) => (
-              // Keyed by rating, so an entry re-mounts (and flashes) when a settlement changes it.
-              <li key={`${a.agentId}:${a.rating}`} className={a.rank === 1 ? "first" : undefined} data-agent-id={a.agentId}>
-                {a.rank} {a.name} <b>{a.rating}</b>
-              </li>
-            ))}
-          </ol>
-          <span className={`lg-feed lg-feed-${status}`} data-testid="feed-status" title="Live connection to the League">
-            {status === "live" ? "● live" : status}
-          </span>
+          <span className="lg-spacer" />
+          {/* Shown only while the feed is down, so a stalled grid explains itself. */}
+          {status !== "live" && (
+            <span className={`lg-feed lg-feed-${status}`} data-testid="feed-status" title="Live connection to the League">
+              {status}
+            </span>
+          )}
           <HelpButtons landed={landed} />
           <button type="button" className={`lg-narrator${narratorView ? " on" : ""}`} aria-pressed={narratorView} data-testid="grid-narrator-view" onClick={() => onNarratorViewChange(!narratorView)}>
             {narratorView ? "◉ Narrator's View on" : "○ Narrator's View off"}
           </button>
         </div>
         <div className="lg-row lg-ctrls">
+          <span className="lg-count" data-testid="live-count">
+            <b>{league.tiles.length}</b> {league.config.paused ? "live · paused" : `of ${league.config.n} live`}
+          </span>
+          <span className="lg-count">
+            <b>{league.stats.settled.toLocaleString()}</b> finished
+          </span>
           <span className="lg-lbl">Sort</span>
           {SORTS.map((s) => {
             const unavailable = s.key === "drama" && !grid.hasDrama;
@@ -101,19 +99,50 @@ export function LeagueGrid({ league, status, activity, narratorView, onNarratorV
       </header>
       {league.blocked && <p className="lg-blocked">League can't start Matches: {league.blocked}</p>}
       <section className="lg-grid" aria-label="Live Matches" data-testid="match-grid">
-        {grid.promoted.map((t) => (
-          <Tile key={t.matchId} tile={t} narratorView={narratorView} big />
+        {cards.large.map((c) => (
+          <Card key={c.kind === "live" ? c.tile.matchId : c.match.matchId} card={c} narratorView={narratorView} big />
         ))}
-        {grid.rest.map((t) => (
-          <Tile key={t.matchId} tile={t} narratorView={narratorView} big={false} />
+        {cards.small.map((c) => (
+          <Card key={c.kind === "live" ? c.tile.matchId : c.match.matchId} card={c} narratorView={narratorView} big={false} />
         ))}
-        {grid.promoted.length + grid.rest.length === 0 && (
+        {cards.large.length + cards.small.length === 0 && (
           <p className="lg-empty">{league.tiles.length === 0 ? "No live Matches." : "No Matches match this filter."}</p>
         )}
       </section>
     </div>
   );
 }
+
+function Card({ card, narratorView, big }: { card: GridCard; narratorView: boolean; big: boolean }) {
+  return card.kind === "live" ? <Tile tile={card.tile} narratorView={narratorView} big={big} /> : <FinishedTile match={card.match} big={big} />;
+}
+
+// A recently finished Match filling an empty slot: muted, "Match N" and the result.
+const FinishedTile = memo(function FinishedTile({ match, big }: { match: SettledMatch; big: boolean }) {
+  const v = finishedView(match);
+  return (
+    <a
+      className={`lg-tile finished${big ? " big" : ""}`}
+      href={matchHash(match.matchId)}
+      data-testid="finished-tile"
+      data-match-id={match.matchId}
+      aria-label={`Open ${v.match}`}
+    >
+      <span className="t-head">
+        <span className="t-main">
+          <span className="t-kick">
+            <span className="t-id">{v.match}</span>
+            <span aria-hidden="true">·</span>
+            <span className="t-chip">Over</span>
+          </span>
+          <span className="t-headline" title={v.headline}>
+            {v.headline}
+          </span>
+        </span>
+      </span>
+    </a>
+  );
+});
 
 // Unchanged tiles keep their object identity through applyLeagueDiff, so memo skips them.
 // The tile (wl-fuy2): a top line, a headline, a fixed Drama Score slot and the pips;
