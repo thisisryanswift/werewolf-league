@@ -32,3 +32,9 @@ Each Player keeps a private /notes.md scratchpad in its sandbox (docs/agent-inst
 - [ ] A capture failure doesn't delay or fail the turn
 - [ ] Real Match: at least one Agent's notes show up in the Match view
 
+
+## Notes
+
+**2026-11-21T18:26:47Z**
+
+Human decision: start when unblocked (after wl-t4no and wl-hozk); the stretch tag is not a gate.
