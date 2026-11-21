@@ -176,6 +176,11 @@ const Tile = memo(function Tile({ tile, godView, big }: { tile: MatchTile; godVi
       )}
       <span className="t-foot">
         <span className={`tag${v.voting ? " vote" : ""}`}>{v.step ?? (tile.summary ? v.phase : "Starting")}</span>
+        {v.cost !== null && (
+          <span className="t-cost" title="Model cost so far">
+            {v.cost}
+          </span>
+        )}
         {v.thinking !== null && v.thinking > 0 && (
           <span className="think" title="Players thinking">
             <span className="spin" aria-hidden="true" />×{v.thinking}

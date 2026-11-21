@@ -141,6 +141,8 @@ export interface TileView {
   thinking: number | null;
   timeouts: number;
   speech: { seat: number; speaker: string; text: string } | null;
+  /** The Match's model cost so far, e.g. "$0.43", or null when the summary has none. */
+  cost: string | null;
 }
 
 /** "claim_war" -> "Claim war". */
@@ -168,5 +170,12 @@ export function tileView(tile: MatchTile, godView: boolean): TileView {
     thinking: s === null || (night && !godView) ? null : s.thinking,
     timeouts: s?.timeouts ?? 0,
     speech: said ? { ...said, speaker: speaker ? spectatorLabel(speaker) : `Seat ${said.seat}` } : null,
+    cost: costText(s),
   };
+}
+
+/** Cost so far, once wl-64dn adds it to the tile summary (field name to confirm when it merges). */
+function costText(s: MatchTile["summary"]): string | null {
+  const cost = (s as { cost?: unknown } | null)?.cost;
+  return typeof cost === "number" ? "$" + cost.toFixed(2) : null;
 }

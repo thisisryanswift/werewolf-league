@@ -400,6 +400,11 @@ body:has(.lg-page) {
     animation: none;
   }
 }
+/* Model cost so far (wl-64dn); only rendered when the summary has it. */
+.t-cost {
+  margin-left: auto;
+  font: 700 12px/1 var(--lg-mono);
+}
 .lg-empty {
   grid-column: 1 / -1;
   font-size: 20px;

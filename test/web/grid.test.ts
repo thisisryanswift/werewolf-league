@@ -229,4 +229,9 @@ describe("a tile", () => {
     expect(v.pips).toHaveLength(7);
     expect(v.speech).toBeNull();
   });
+
+  it("shows the Match's cost so far only when the summary carries one", () => {
+    expect(tileView(tile("c", { cost: 0.4271 } as Partial<TileSummary>), false).cost).toBe("$0.43");
+    expect(tileView(tile("c"), false).cost).toBeNull();
+  });
 });
