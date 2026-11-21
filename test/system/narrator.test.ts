@@ -152,7 +152,7 @@ describe("the Narrator", () => {
   });
 
   it("has at most one Narrator call in flight per Match, and a newer step supersedes queued ones", async () => {
-    const narrator = { id: "fake", options: { delayMs: 40, reportInFlight: true } };
+    const narrator = { id: "fake", options: { delayMs: 150, reportInFlight: true } };
     const matchId = await startMatch({ seed: "narrator-throttle", agents: table("n5"), narrator });
     const done = await finished(matchId);
     const steps = done.events.filter((e) => e.kind === "step_resolved").length;

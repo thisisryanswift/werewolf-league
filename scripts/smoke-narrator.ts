@@ -4,7 +4,7 @@
 // printing latency, Drama Score and flag values.
 //
 //   GEMINI_API_KEY=... (from .dev.vars) then:
-//   pnpm exec esbuild scripts/smoke-narrator.ts --bundle --platform=node --format=esm --outfile=/tmp/smoke-narrator.mjs
+//   node_modules/.pnpm/esbuild@*/node_modules/esbuild/bin/esbuild scripts/smoke-narrator.ts --bundle --platform=node --format=esm --outfile=/tmp/smoke-narrator.mjs
 //   node /tmp/smoke-narrator.mjs
 
 import { DEFAULT_DRAMA_THRESHOLD, type NarrationInput } from "../src/core/narrator";
