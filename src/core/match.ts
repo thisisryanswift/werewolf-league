@@ -3,6 +3,7 @@
 
 import type { DeadlineConfig, TimeoutCounts, TimeoutSource } from "./deadlines";
 import type { AgentConfig, TurnInput } from "./harness";
+import type { NarratorConfig } from "./narrator";
 import type { MatchResult, Seat, SeatAgent, ToolCall, TurnRequest } from "./ruleset";
 
 /** Everything needed to start a Match. */
@@ -16,6 +17,8 @@ export interface MatchInit {
   agents: Record<Seat, AgentConfig>;
   /** Turn deadlines; missing values use DEFAULT_DEADLINES (60 s, first turn 90 s). */
   deadlines?: Partial<DeadlineConfig>;
+  /** The Narrator for this Match; absent or null means no narration. */
+  narrator?: NarratorConfig | null;
 }
 
 export type MatchStatus = "running" | "finished";

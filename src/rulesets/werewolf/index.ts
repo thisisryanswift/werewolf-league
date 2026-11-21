@@ -8,6 +8,7 @@ import { night } from "./night";
 import { briefing, renderObservation } from "./text";
 import type { PhaseModule, WerewolfState } from "./types";
 import { summary } from "./summary";
+import { NARRATION_QUESTIONS, narrationLog } from "./narration";
 import { resultOf, settle } from "./win";
 
 const PHASES: Record<"night" | "day", PhaseModule> = { night, day };
@@ -40,4 +41,5 @@ export const werewolf: Ruleset<WerewolfState> = {
   renderObservation,
   result: resultOf,
   summary,
+  narration: { questions: NARRATION_QUESTIONS, log: narrationLog },
 };

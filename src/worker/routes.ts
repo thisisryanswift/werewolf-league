@@ -10,6 +10,7 @@
 
 import type { DeadlineConfig } from "../core/deadlines";
 import type { AgentConfig } from "../core/harness";
+import type { NarratorConfig } from "../core/narrator";
 import { fakeRoster, LEAGUE_NAME } from "../core/roster";
 import { startMatch } from "../core/start-match";
 import { isAdmin } from "./auth";
@@ -54,6 +55,8 @@ export async function handleApi(request: Request, env: Env, url: URL): Promise<R
       /** Turn deadlines in ms: { turnMs, firstTurnMs, graceMs }. Defaults 60 s / 90 s / 15 s. */
       deadlines?: Partial<DeadlineConfig>;
       agents?: AgentConfig[];
+      /** Narrator for this Match, e.g. { id: "fake", options } or { id: "decisions" }; default none. */
+      narrator?: NarratorConfig | null;
     };
     const agents = body.agents?.length ? body.agents : fakeRoster();
     if (body.matchId !== undefined && !/^[\w-]{1,64}$/.test(body.matchId)) {
@@ -62,6 +65,7 @@ export async function handleApi(request: Request, env: Env, url: URL): Promise<R
     try {
       const init = await startMatch(env, { matchId: body.matchId, seed: body.seed, config: body.config,
         deadlines: body.deadlines,
+        narrator: body.narrator,
         agents,
       });
       return Response.json({ matchId: init.matchId, seed: init.seed }, { status: 201 });

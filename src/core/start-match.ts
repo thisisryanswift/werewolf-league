@@ -5,6 +5,7 @@ import { DEFAULT_RULESET_ID } from "../rulesets";
 import type { DeadlineConfig } from "./deadlines";
 import type { AgentConfig } from "./harness";
 import type { MatchInit } from "./match";
+import type { NarratorConfig } from "./narrator";
 import type { SeatAgent } from "./ruleset";
 
 /** Seat labels, numbering copies when an Agent fills several seats ("Hydrogen #2"). */
@@ -26,6 +27,8 @@ export interface MatchOptions {
   config?: Record<string, unknown>;
   /** Turn deadlines; missing values use the defaults. */
   deadlines?: Partial<DeadlineConfig>;
+  /** The Narrator for the Match; absent or null means none. */
+  narrator?: NarratorConfig | null;
   agents: AgentConfig[];
 }
 
@@ -39,6 +42,7 @@ export function buildMatchInit(opts: MatchOptions): MatchInit {
     seed: opts.seed ?? crypto.randomUUID(),
     config: opts.config ?? {},
     ...(opts.deadlines ? { deadlines: opts.deadlines } : {}),
+    ...(opts.narrator ? { narrator: opts.narrator } : {}),
     seats,
     agents: Object.fromEntries(opts.agents.map((a, i) => [i + 1, a])),
   };
