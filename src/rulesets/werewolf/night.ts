@@ -3,7 +3,7 @@
 import type { Seat, ToolCall, TurnRequest, Validation } from "../../core/ruleset";
 import { rngFrom } from "../../core/rng";
 import type { RulesetEvent } from "../../shared/protocol";
-import { alive, aliveWolves, killPlayer, player, wolfSeats } from "./players";
+import { alive, aliveWolves, killPlayer, player, who, wolfSeats } from "./players";
 import { startDay } from "./day";
 import { SIDE_OF, type NightState, type PhaseModule, type PlayerState, type Role, type WerewolfState } from "./types";
 import { targetOf, validateTargeted } from "./validation";
@@ -39,8 +39,8 @@ export function packLeader(s: WerewolfState): Seat | null {
 const leaderLine = (s: WerewolfState, seat: Seat) => {
   const leader = packLeader(s);
   return leader === seat
-    ? `Tonight's Pack Leader is seat ${leader} (you): if the two of you choose different kills, your choice decides.`
-    : `Tonight's Pack Leader is seat ${leader} (your partner): if the two of you choose different kills, their choice decides.`;
+    ? `Tonight's Pack Leader is you, ${who(s, leader)}: if the two of you choose different kills, your choice decides.`
+    : `Tonight's Pack Leader is your partner, ${who(s, leader)}: if the two of you choose different kills, their choice decides.`;
 };
 
 function chatTurns(s: WerewolfState): TurnRequest[] {
@@ -87,7 +87,7 @@ function actTurns(s: WerewolfState): TurnRequest[] {
       legalTargets: targets,
       prompt:
         `Night ${s.cycle}: protect a player from tonight's kill with protect (yourself allowed). Legal targets: ${targets.join(", ")}.` +
-        (last !== null ? ` You protected seat ${last} last Night, so you cannot protect them again tonight.` : ""),
+        (last !== null ? ` You protected ${who(s, last)} last Night, so you cannot protect them again tonight.` : ""),
     });
   }
   return out.sort((a, b) => a.seat - b.seat);
@@ -109,7 +109,7 @@ function validate(s: WerewolfState, seat: Seat, call: ToolCall): Validation {
     return {
       ok: false,
       error:
-        `The Doctor cannot protect the same player on consecutive Nights: you protected seat ${last} last Night. ` +
+        `The Doctor cannot protect the same player on consecutive Nights: you protected ${who(s, last)} last Night. ` +
         `Required action: protect with target one of ${turn.legalTargets.join(", ")}.`,
     };
   }
@@ -195,12 +195,12 @@ export const NIGHT_RULES = `- The Village side has one Seer and one Doctor; ever
 export const ROLE_NAMES: Record<Role, string> = { werewolf: "Werewolf", seer: "Seer", doctor: "Doctor", villager: "Villager" };
 
 /** Observation text for Night events (see text.ts). */
-export const nightText: Record<string, (d: Record<string, unknown>) => string | null> = {
-  wolf_chat: (d) => `Wolf Chat (Night ${d.cycle}) — seat ${d.seat}: ${String(d.text)}`,
-  kill_chosen: (d) => `Werewolf seat ${d.seat} chose to kill seat ${d.target}.`,
-  kill_decided: (d) => `Night ${d.cycle}: the Werewolves' kill is seat ${d.target} (Pack Leader: seat ${d.packLeader}).`,
-  seer_result: (d) => `Your Night ${d.cycle} inspection: Seat ${d.target} is on the ${d.side} side.`,
-  protect_chosen: (d) => `Night ${d.cycle}: you protected seat ${d.target}.`,
+export const nightText: Record<string, (d: Record<string, unknown>, s: WerewolfState) => string | null> = {
+  wolf_chat: (d, s) => `Wolf Chat (Night ${d.cycle}) — ${who(s, d.seat)}: ${String(d.text)}`,
+  kill_chosen: (d, s) => `Werewolf ${who(s, d.seat)} chose to kill ${who(s, d.target)}.`,
+  kill_decided: (d, s) => `Night ${d.cycle}: the Werewolves' kill is ${who(s, d.target)} (Pack Leader: ${who(s, d.packLeader)}).`,
+  seer_result: (d, s) => `Your Night ${d.cycle} inspection: ${who(s, d.target)} is on the ${d.side} side.`,
+  protect_chosen: (d, s) => `Night ${d.cycle}: you protected ${who(s, d.target)}.`,
   doctor_saved: () => null,
   night_passed: (d) => (d.killed === null ? `Night ${d.cycle} passed and nobody died.` : null),
 };

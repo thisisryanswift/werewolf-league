@@ -114,8 +114,9 @@ describe("Werewolf Day: Speech Rounds", () => {
     const turn = turnsOf(a.state).find((t) => t.seat === 5)!;
     const text = werewolf.renderObservation(a.state, 5, werewolf.view(a.events, { seat: 5 }), turn);
     expect(text).toContain('"Seat 3 is lying"');
-    expect(text).toContain("accuses seat 3");
-    expect(text).toContain("claims to be seer (seat 3 is wolf)");
+    expect(text).toContain('Name2 (seat 2) [Round A]: "Seat 3 is lying"');
+    expect(text).toContain("accuses Name3 (seat 3)");
+    expect(text).toContain("claims to be seer (Name3 (seat 3) is wolf)");
     expect(text).toContain("Speech Round B");
   });
 

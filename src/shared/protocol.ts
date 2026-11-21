@@ -74,7 +74,10 @@ export function visibleDramaFlags<F extends { visibility: DramaFlagVisibility }>
 export interface TileSeat {
   seat: number;
   agentId: string;
+  /** Agent and copy label, e.g. "Hydrogen #2". */
   label: string;
+  /** The seat's Display Name, e.g. "Mara". */
+  displayName: string;
 }
 
 /** A live Match on the League grid. */

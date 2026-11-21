@@ -13,8 +13,10 @@ export type Seat = number; // 1-based seat number
 export interface SeatAgent {
   seat: Seat;
   agentId: string;
-  /** Display label, e.g. "Hydrogen #2". */
+  /** The Agent and copy label, e.g. "Hydrogen #2". For Spectators only: never show it to a Player. */
   label: string;
+  /** The Display Name this seat goes by inside the Match, e.g. "Mara". All a Player ever sees of another seat. */
+  displayName: string;
 }
 
 /** A tool the Agent can call (ADR-0002: fixed per seat for the whole Match). */
