@@ -195,7 +195,7 @@ describe("League feed", () => {
     expect(night.summary).toMatchObject({ round: 1, alive: [1, 2, 3, 4, 5, 6, 7], latestSpeech: null });
     expect(day.seats).toHaveLength(7);
     // After the join snapshot, updates arrive as coalesced tile diffs.
-    expect(feed.messages.slice(1).every((m) => m.type === "tiles")).toBe(true);
+    expect(feed.messages.slice(1).every((m) => m.type === "tiles" || m.type === "leaderboard")).toBe(true);
     // When the Match ends its tile gives way to a new Match.
     await waitFor(async () => feed.states.some((s) => s.tiles[0] && s.tiles[0].matchId !== day.matchId));
     await drain();

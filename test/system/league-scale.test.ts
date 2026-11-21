@@ -208,10 +208,8 @@ describe("League feed at scale", () => {
     expect(s.alive.length).toBeLessThanOrEqual(7);
     expect(typeof s.thinking).toBe("number");
     expect(s.latestSpeech).toMatchObject({ text: expect.any(String) });
-    // God View roles for the pips; Drama fields stay empty until the Narrator lands.
+    // God View roles for the pips. (Drama fields are the Narrator's, wl-pbkx.)
     expect(Object.keys(s.godView!.roles)).toHaveLength(7);
-    expect(s.dramaScore).toBeUndefined();
-    expect(s.dramaFlags).toBeUndefined();
     feed.close();
     await drain();
   });

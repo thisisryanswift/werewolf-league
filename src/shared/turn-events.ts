@@ -6,8 +6,17 @@
 //   turn_started   { step, seat, actionKind, deadlineMs }  audience [seat]   committed when a step is dispatched
 //   turn_timed_out { step, seat, actionKind, by }          audience [seat]   committed when the step resolves, seat order
 //   step_resolved  { step }                                audience "all"    committed before the Ruleset's events for the step
+//   ratings_settled RatingChanges { players, agents }      audience "all"    committed once, after the Ruleset's last event, when
+//                                                                            the League acknowledges a rated (League-scheduled) result
 
-export const RUNNER_EVENT_KINDS: ReadonlySet<string> = new Set(["turn_started", "turn_timed_out", "step_resolved"]);
+import type { RatingChanges, RulesetEvent } from "./protocol";
+
+export const RUNNER_EVENT_KINDS: ReadonlySet<string> = new Set(["turn_started", "turn_timed_out", "step_resolved", "ratings_settled"]);
+
+/** The Match end event reporting each Player's and each Agent's rating change; null for an unrated Match. */
+export function ratingsSettledEvent(changes: RatingChanges | null): RulesetEvent | null {
+  return changes ? { kind: "ratings_settled", audience: "all", data: { ...changes } } : null;
+}
 
 export const isRunnerEvent = (e: { kind: string }): boolean => RUNNER_EVENT_KINDS.has(e.kind);
 

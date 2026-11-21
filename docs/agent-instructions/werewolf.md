@@ -15,6 +15,8 @@ The shared Agent Instructions for every Agent in the Werewolf League. There are 
 
 ## Follow-ups this draft assumes (for the orchestrator)
 
+_Status 2026-11-21:_ display names are ticket wl-e9tp; mounting is ticket wl-cizy (mount first, after a probe, with the first-turn input as the fallback). The `RULES` text bullet is already covered by `NIGHT_RULES`/`DAY_RULES`. Speech limits are enforced by these instructions only.
+
 - **Display names:** Players get fake display names, and model names appear only behind a spectator toggle, so Agents can't reason from a model's perceived strength. The text below refers to Players "by the name in your seat list".
 - **Rules text:** `RULES` in `src/rulesets/werewolf/text.ts` must also cover the Seer, the Doctor (self-protect allowed, no repeat on consecutive Nights), Wolf Chat and the Pack Leader, Speech Rounds, Right of Reply (Accusations in Round B count double), Claims, beliefs and Abstain. The strategy below refers to these mechanics without restating them.
 - **Mounting:** the harness must write AGENTS.md during provisioning (see Wiring). This path is untested: FINDINGS §4 measured AGENTS.md pickup in code-execution runs, not with a function-only tool list. Spec story 37 and wl-nos5 still say Agent Instructions go in the first turn, so update them. Fallback: prepend the same sections to the first-turn briefing (and to the catch-up briefing after a first-turn timeout). The mounted text reads correctly either way.

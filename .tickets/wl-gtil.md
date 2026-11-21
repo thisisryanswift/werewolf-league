@@ -44,3 +44,7 @@ Replace the basic grid with a dense grid built and tested for up to 36 live Matc
 **2026-11-21T16:37:12Z**
 
 Design verdict (2026-11-21): build from variant E on prototype/spectator-ui (commit 03cd205, prototype/spectator-ui/variant-e.js, ?variant=E) as the starting design. The human will tweak the visuals during implementation and integration, so treat E as the baseline layout and behaviour, not pixel-final.
+
+**2026-11-21T16:43:58Z**
+
+Human decision 2026-11-21: the human wants to be involved in the final design pass. The implementer builds from variant E, then stops and reports with a runnable local build (wrangler dev plus fake League) for the human's review. The orchestrator does not merge wl-gtil until the human has done the design pass.

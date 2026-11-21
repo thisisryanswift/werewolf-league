@@ -30,7 +30,8 @@ import { LEAGUE_NAME } from "../core/roster";
 import type { Ruleset, Seat, ToolCall, ToolSpec, TurnRequest } from "../core/ruleset";
 import { getRuleset } from "../rulesets";
 import type { MatchEvent, RulesetEvent, ServerMessage, TileSummary } from "../shared/protocol";
-import { thinkingSeats } from "../shared/turn-events";
+import { ratingsSettledEvent, thinkingSeats } from "../shared/turn-events";
+import type { SettleAck } from "./league";
 
 /** How soon the Match retries sending a turn to a Player DO that failed to accept it. */
 const DISPATCH_RETRY_MS = 1000;
@@ -293,12 +294,20 @@ export class MatchDO extends DurableObject<Env> {
   private async deliverResult(meta: MatchMeta): Promise<void> {
     if (!meta.result) return;
     await this.ctx.storage.setAlarm(Date.now() + Number(this.env.LEAGUE_RETRY_MS ?? 2000));
+    let ack: SettleAck;
     try {
-      await this.env.LEAGUE.getByName(LEAGUE_NAME).reportMatchResult(meta.matchId, meta.result);
+      ack = await this.env.LEAGUE.getByName(LEAGUE_NAME).reportMatchResult(meta.matchId, meta.result);
     } catch {
       return; // the armed alarm retries
     }
-    this.meta = { ...this.meta!, resultAcked: true };
+    const current = this.meta!;
+    if (current.resultAcked) return; // a concurrent delivery already recorded the ack
+    // The settlement's rating changes go into the log in the same synchronous step
+    // as the ack, so the event is committed exactly once, with the League's deltas
+    // (a redelivered result gets the original deltas back).
+    const settled = ratingsSettledEvent(ack.settlement.ratings);
+    if (settled) this.commit([settled]);
+    this.meta = { ...current, resultAcked: true };
     await this.ctx.storage.deleteAlarm();
   }
 

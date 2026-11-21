@@ -9,15 +9,18 @@ import { drawTable } from "../core/draw";
 import type { MatchInit, MatchReport } from "../core/match";
 import { FeedCoalescer } from "../core/league-feed";
 import { defaultLeagueConfig, patchConfig, type LeagueConfig } from "../core/roster";
+import { applyMatch, rankStandings, ratePlayers, snapshotOf, standing, type AgentRecord, type RatingSnapshot } from "../core/ratings";
 import { buildMatchInit } from "../core/start-match";
 import { backoffUntil, recentStarts, startBudget } from "../core/start-pacer";
 import { getRuleset } from "../rulesets";
 import type {
   FeaturedMatch,
+  Leaderboard,
   LeagueMessage,
   LeagueSnapshot,
   MatchTile,
   RateLimitEvent,
+  RatingChanges,
   SettledMatch,
   TileSeat,
   TileSummary,
@@ -29,6 +32,8 @@ interface LiveMatch extends MatchTile {
   /** Seq of the event the current summary reflects; older summaries are ignored. */
   summarySeq: number;
   startFailures: number;
+  /** The seated Agents' Side Ratings when the table was drawn: every Player is rated from this. */
+  ratingsBefore?: RatingSnapshot;
 }
 
 /**
@@ -43,6 +48,8 @@ export interface Settlement {
   /** Seats of a League-scheduled Match; null for a Match the League did not start. */
   seats: TileSeat[] | null;
   settledAt: number;
+  /** Rating changes applied by this settlement; null for a Match the League did not start (unrated). */
+  ratings: RatingChanges | null;
 }
 
 export interface SettleAck {
@@ -108,6 +115,13 @@ export class LeagueDO extends DurableObject<Env> {
   private get recent(): SettledMatch[] {
     return this.ctx.storage.kv.get<SettledMatch[]>("recent") ?? [];
   }
+  /** Per-Agent ratings and counts, keyed by Agent ID. */
+  private get agents(): Record<string, AgentRecord> {
+    return this.ctx.storage.kv.get<Record<string, AgentRecord>>("agents") ?? {};
+  }
+  private set agents(a: Record<string, AgentRecord>) {
+    this.ctx.storage.kv.put("agents", a);
+  }
   /** The operator-pinned featured Match, if any. */
   private get pinned(): SettledMatch | null {
     return this.ctx.storage.kv.get<SettledMatch>("featured") ?? null;
@@ -168,12 +182,28 @@ export class LeagueDO extends DurableObject<Env> {
       stats: this.stats,
       blocked: this.blocked,
       rateLimit: this.rateLimitView(),
+      leaderboard: this.leaderboard(),
     };
   }
 
   private rateLimitView(): LeagueSnapshot["rateLimit"] {
     const r = this.rateLimit;
     return { backoffUntil: r.until > this.now() ? r.until : null, count: r.count, recent: r.recent };
+  }
+
+  /** Every current roster Agent plus every Agent with a rated Match, ranked by Overall Rating. */
+  private leaderboard(): Leaderboard {
+    const c = this.config;
+    const sides = [...getRuleset(c.rulesetId).sides];
+    const records = this.agents;
+    const names = new Map<string, string>(Object.entries(records).map(([id, r]) => [id, r.name]));
+    for (const a of c.roster) names.set(a.id, a.name);
+    return { sides, rows: rankStandings([...names].map(([id, name]) => standing(id, name, records[id], sides))) };
+  }
+
+  /** Push the leaderboard after a rated Match settles, as its own feed message. */
+  private broadcastLeaderboard(matchId: string): void {
+    this.send({ type: "leaderboard", matchId, leaderboard: this.leaderboard() });
   }
 
   /** Something on the snapshot changed: grid clients get it in the next coalesced feed message. */
@@ -296,8 +326,9 @@ export class LeagueDO extends DurableObject<Env> {
 
     const live = this.live;
     const entry = live[matchId];
-    const settlement = this.settle({ matchId, result, seats: entry?.seats ?? null, settledAt: Date.now() });
+    const settlement = this.settle({ matchId, result, seats: entry?.seats ?? null, settledAt: Date.now(), ratings: null }, entry);
     this.ctx.storage.kv.put(`settled:${matchId}`, settlement);
+    if (settlement.ratings) this.broadcastLeaderboard(matchId);
     if (entry) {
       delete live[matchId];
       this.live = live;
@@ -311,11 +342,27 @@ export class LeagueDO extends DurableObject<Env> {
 
   /**
    * Settlement hook: runs exactly once per Match ID, synchronously, before the
-   * settlement record is stored. wl-lvtw applies rating updates here and
-   * returns them on the record.
+   * settlement record is stored. Applies the Match's rating changes, computed
+   * from the pre-Match snapshot, to the current ratings and returns them on the
+   * record. Only League-scheduled Matches are rated.
    */
-  private settle(s: Settlement): Settlement {
-    return s;
+  private settle(s: Settlement, entry: LiveMatch | undefined): Settlement {
+    if (!entry) return s;
+    const records = this.agents;
+    const seats = entry.seats;
+    const snapshot = entry.ratingsBefore ?? snapshotOf(records, seats.map((x) => x.agentId));
+    const players = ratePlayers({ seats, sides: s.result.sides, winner: s.result.winner, snapshot });
+    const names = Object.fromEntries(Object.values(entry.init.agents).map((a) => [a.id, a.name]));
+    const applied = applyMatch({
+      records,
+      players,
+      winner: s.result.winner,
+      sideOrder: getRuleset(entry.init.rulesetId).sides,
+      names,
+      timeoutsByAgent: s.result.timeouts?.byAgent ?? {},
+    });
+    this.agents = applied.records;
+    return { ...s, ratings: applied.changes };
   }
 
   // ---- scheduling ----------------------------------------------------------
@@ -361,12 +408,14 @@ export class LeagueDO extends DurableObject<Env> {
     if (config.paused) return;
     const live = this.live;
     const ruleset = getRuleset(config.rulesetId);
+    const records = this.agents;
+    const seeds = [...(config.seeds ?? [])];
     const now = this.now();
     const starts = recentStarts(this.starts, now, config);
     const { allowed } = startBudget(starts, now, config, this.rateLimit.until);
     let started = 0;
     while (Object.keys(live).length < config.n && started < allowed) {
-      const seed = crypto.randomUUID();
+      const seed = seeds.shift() ?? crypto.randomUUID();
       const draw = drawTable({
         roster: config.roster,
         seats: config.seats,
@@ -397,9 +446,11 @@ export class LeagueDO extends DurableObject<Env> {
         startedAt: Date.now(),
         init,
         startFailures: 0,
+        ratingsBefore: snapshotOf(records, init.seats.map((x) => x.agentId)),
       };
       started++;
     }
+    if (seeds.length !== (config.seeds ?? []).length) this.config = { ...config, seeds };
     if (started) {
       this.live = live;
       this.stats = { ...this.stats, started: this.stats.started + started };

@@ -1,6 +1,6 @@
 ---
 id: wl-bfo1
-status: open
+status: in_progress
 deps: [wl-jb4x, wl-lvtw]
 links: []
 created: 2026-11-21T15:06:09Z

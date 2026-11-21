@@ -23,6 +23,7 @@ export function useLeagueFeed(): { league: LeagueSnapshot | null; status: FeedSt
         const msg = JSON.parse(m.data as string) as LeagueMessage;
         if (msg.type === "league") setLeague(msg.league);
         else if (msg.type === "tiles") setLeague((prev) => (prev ? applyLeagueDiff(prev, msg) : prev));
+        else if (msg.type === "leaderboard") setLeague((l) => (l ? { ...l, leaderboard: msg.leaderboard } : l));
       };
       ws.onclose = () => {
         if (stopped) return;

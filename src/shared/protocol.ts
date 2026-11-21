@@ -57,25 +57,16 @@ export interface MatchSummary {
   godView?: { roles: Record<number, string>; step?: string | null };
 }
 
-/** A Drama Flag on a tile (set by the Narrator, wl-pbkx). Secret flags are God View only. */
-export interface TileDramaFlag {
-  id: string;
-  visibility: "public" | "secret";
-}
-
 /**
  * Everything a grid tile shows: the Ruleset's summary plus counts the Match
- * runner derives from its own events.
+ * runner derives from its own events. (Drama Score and Drama Flags are the
+ * Narrator's optional MatchSummary fields, wl-pbkx.)
  */
 export interface TileSummary extends MatchSummary {
   /** Players whose turn is in flight (a count only, so it never says who). */
   thinking: number;
   /** Turns timed out so far in this Match, all seats. */
   timeouts: number;
-  /** Narrator Drama Score from 0 to 1; absent until the Narrator lands. */
-  dramaScore?: number;
-  /** Active Drama Flags; absent until the Narrator lands. */
-  dramaFlags?: TileDramaFlag[];
 }
 
 /** One seat of a Match as shown on a tile. */
@@ -158,6 +149,71 @@ export interface LeagueSnapshot {
   blocked: string | null;
   /** 429 backoff: when new starts resume (null if not backing off), and the reports so far, newest first. */
   rateLimit: { backoffUntil: number | null; count: number; recent: RateLimitEvent[] };
+  leaderboard: Leaderboard;
+}
+
+// ---- Ratings ------------------------------------------------------------
+
+/** Every Side Rating starts here. */
+export const INITIAL_RATING = 1200;
+
+/**
+ * One Agent's League standing. Ratings and win counts are keyed by Side (the
+ * Ruleset's Side names, e.g. "wolf" and "village"); a Side never played reads
+ * INITIAL_RATING / 0. Ratings are unrounded; round for display.
+ */
+export interface AgentStanding {
+  agentId: string;
+  name: string;
+  /** Side Rating per Side. */
+  ratings: Record<string, number>;
+  /** Overall Rating: the mean of the Agent's Side Ratings. */
+  overall: number;
+  /** Rated Matches played (an Agent with several seats in one Match counts it once). */
+  matches: number;
+  /** Rated Matches won per Side (once per Match, on the Side that won). */
+  wins: Record<string, number>;
+  /** Turns that missed their deadline, summed from each Match result's per-Agent counts. */
+  timeouts: number;
+  // wl-bfo1: Calibration (Brier) belongs here, e.g. `calibration: number | null`.
+}
+
+/** The leaderboard: every current roster Agent plus every Agent with a rated Match. */
+export interface Leaderboard {
+  /** The Ruleset's Sides, in its order: the rating and win columns. */
+  sides: string[];
+  /** Ranked by Overall Rating, highest first. */
+  rows: AgentStanding[];
+}
+
+/** One Player's rating update, computed from the pre-Match rating snapshot. */
+export interface PlayerRatingChange {
+  seat: number;
+  agentId: string;
+  side: string;
+  won: boolean;
+  /** The Agent's Side Rating in the pre-Match snapshot. */
+  before: number;
+  delta: number;
+}
+
+/** One Agent's net change on one Side: the sum of its Players' deltas on that Side. */
+export interface AgentRatingChange {
+  agentId: string;
+  side: string;
+  /** Side Rating just before this settlement was applied. */
+  before: number;
+  delta: number;
+  after: number;
+}
+
+/**
+ * A Match's rating changes, stored with its settlement and returned unchanged
+ * on any redelivery. Also the data of the Match's `ratings_settled` event.
+ */
+export interface RatingChanges {
+  players: PlayerRatingChange[];
+  agents: AgentRatingChange[];
 }
 
 /**
@@ -183,7 +239,12 @@ export interface LeagueTilesMessage {
 }
 
 /**
- * Messages sent from the League WebSocket: the full snapshot on join, then
- * coalesced "tiles" diffs. Consumers switch on `type`.
+ * Messages sent from the League WebSocket: the full snapshot on join, coalesced
+ * "tiles" diffs after it, and a leaderboard message per rated settlement.
+ * Consumers switch on `type`.
  */
-export type LeagueMessage = { type: "league"; league: LeagueSnapshot } | LeagueTilesMessage;
+export type LeagueMessage =
+  | { type: "league"; league: LeagueSnapshot }
+  | LeagueTilesMessage
+  /** Sent once when a rated Match settles: the whole leaderboard after its rating changes. */
+  | { type: "leaderboard"; matchId: string; leaderboard: Leaderboard };

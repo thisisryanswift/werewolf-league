@@ -81,6 +81,7 @@ export async function connectLeague() {
     const last = states.at(-1);
     if (msg.type === "league") states.push(msg.league);
     else if (msg.type === "tiles" && last) states.push(applyLeagueDiff(last, msg));
+    else if (msg.type === "leaderboard" && last) states.push({ ...last, leaderboard: msg.leaderboard });
   });
   ws.accept();
   await waitFor(async () => states.length > 0);

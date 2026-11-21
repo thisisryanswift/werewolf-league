@@ -1,6 +1,6 @@
 ---
 id: wl-hozk
-status: open
+status: in_progress
 deps: [wl-2qjw, wl-jb4x, wl-lvtw]
 links: []
 created: 2026-11-21T15:06:09Z

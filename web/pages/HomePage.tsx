@@ -1,5 +1,6 @@
 // Home page: a live grid of the League's Match tiles. Each tile links to its Match page.
 import type { MatchTile } from "../../src/shared/protocol";
+import { Leaderboard } from "../components/Leaderboard";
 import { FeaturedMatchLink, FinishedMatchList } from "../components/FinishedMatches";
 import { useLeagueFeed } from "../useLeagueFeed";
 
@@ -59,6 +60,7 @@ export function HomePage() {
       </p>
       {league && <FeaturedMatchLink featured={league.featured} />}
       {league?.blocked && <p className="blocked">League can't start Matches: {league.blocked}</p>}
+      {league && <Leaderboard data={league.leaderboard} />}
       {league && league.tiles.length === 0 && <p className="muted">No live Matches.</p>}
       <ul className="match-grid">
         {league?.tiles.map((t) => <Tile key={t.matchId} tile={t} />)}

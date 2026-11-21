@@ -1,7 +1,7 @@
 ---
 id: wl-t4no
-status: open
-deps: [wl-nos5, wl-kh5w, wl-lvtw, wl-jb4x]
+status: in_progress
+deps: [wl-nos5, wl-kh5w, wl-lvtw, wl-jb4x, wl-cizy, wl-e9tp]
 links: []
 created: 2026-11-21T15:06:09Z
 type: task
@@ -29,3 +29,14 @@ Real roster in config (Hydrogen, 3.6 Flash, 3.5 Flash-Lite, plus 3.8 Flash if M1
 - [ ] Time to first public speech and time to first result are recorded in a note on this ticket, along with the chosen N and roster
 - [ ] Ramp test recorded in a note on this ticket: N steps, 429 count, turn latency p50/p90 and timeouts per step, plus the chosen demo N and fallback N
 - [ ] Set-N and pause/resume verified on the deployed app
+
+## Notes
+
+**2026-11-21T16:43:58Z**
+
+Human decision 2026-11-21: cap ramp-test Gemini spend at $50 total. Step N up (4 → 8 → 12 → 16 → 24 → 36 if healthy) only while the estimated cumulative spend stays under $50, using the spec's $1–1.5/Match fast-roster estimate and measured Match completions; stop the ramp and pause the League when the cap is reached.
+- [ ] Agent behaviour checked on real Matches, with findings in a note: Flash speeches within ~350 characters with no markdown; whether /notes.md writes push turns past the deadline (if so, cut Notes from the instructions); Werewolves not putting their partner at 1 in their beliefs; Agents following the mounted AGENTS.md
+
+**2026-11-21T16:56:27Z**
+
+Progress (orchestrator, 11:56): deployed to https://werewolf-league.rswift.workers.dev (version 99a8b20a, built from impl/wl-t4no 0ef0c4e). GEMINI_API_KEY and ADMIN_SECRET are set as Wrangler secrets; ADMIN_SECRET is also in the main checkout's gitignored .dev.vars. The League is paused on the fake roster with 0 Matches started. The real roster (hydrogen, flash-3-8, flash-3-6, flash-lite-3-5) is in src/rulesets/werewolf/roster.ts with scripts/apply-roster.mjs. ON HOLD until wl-cizy and wl-e9tp land. codex review on impl/wl-t4no: P1, every seat gets every role section (resolved by wl-cizy's per-role assembly; re-check after it merges); P2, N=36 is refused by MAX_LIVE_MATCHES=24 (asked wl-d5wn to allow 36); P2, apply-roster.mjs breaks on a base URL with a trailing slash (fix before the rehearsal). Operator caution: never resume on the fake roster, because fake Agents would stay on the leaderboard and there is no reset route.

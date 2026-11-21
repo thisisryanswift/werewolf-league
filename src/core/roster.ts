@@ -29,6 +29,11 @@ export interface LeagueConfig {
   backoffMs: number;
   /** Minimum time between League feed messages. */
   feedIntervalMs: number;
+  /**
+   * Match seeds to use for the next Matches, in order, before random ones.
+   * Lets the operator (or a test) replay or script a specific table.
+   */
+  seeds?: string[];
 }
 
 /** Scheduling and feed defaults (spec wl-xgp7, "Scale and League feed"). */
@@ -110,6 +115,12 @@ export function patchConfig(
       Object.entries(d).every(([k, v]) => keys.includes(k) && typeof v === "number" && Number.isFinite(v) && v > 0);
     if (!valid) return { ok: false, error: "deadlines must be { turnMs?, firstTurnMs?, graceMs? } with positive numbers" };
     next.deadlines = d as Partial<DeadlineConfig>;
+  }
+  if (patch.seeds !== undefined) {
+    if (!Array.isArray(patch.seeds) || !patch.seeds.every((x) => typeof x === "string" && x.length > 0 && x.length <= 128)) {
+      return { ok: false, error: "seeds must be a list of non-empty strings (at most 128 characters)" };
+    }
+    next.seeds = patch.seeds as string[];
   }
   if (patch.roster !== undefined) {
     if (!Array.isArray(patch.roster) || !patch.roster.every(isAgent)) {
