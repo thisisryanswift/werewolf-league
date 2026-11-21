@@ -88,3 +88,7 @@ Pi harness merged into integration/wl-xgp7 (impl/wl-zst1 c35b5b7). Verification 
 **2026-11-21T20:38:10Z**
 
 pi-open is now seeded paused with piRoster() via wl-2lfo (merged). OPENROUTER_API_KEY and AGENT37_API_KEY uploaded as Wrangler secrets (human-approved). All ACs met locally; the deployed Pi League starts at the final deploy.
+
+**2026-11-21T22:19:40Z**
+
+Pi League RESET at 17:19 (human decision): the pi-open id now maps to the fresh League DO 'pi-open-2' (src/core/leagues.ts); the old DO 'pi-open' keeps its ~40 earlier Matches, viewable by Match id but off the leaderboard and chart. New League config uniqueAgents=true (draw one seat per Agent when the roster covers the table), so with 7 Agents and 7 seats every Agent plays every Match and Match counts stay equal. N=1, Narrator on, no spend cap. Deployed version 10c9188b.
