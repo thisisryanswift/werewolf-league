@@ -19,11 +19,11 @@
   --lg-font: "Space Grotesk", "Helvetica Neue", Arial, "Liberation Sans", sans-serif;
   --lg-mono: ui-monospace, "JetBrains Mono", "DejaVu Sans Mono", monospace;
   /* grid */
-  --lg-tile-min: 200px; /* narrowest small tile: 8 columns at 1920px */
-  --lg-tile-height: 158px;
+  --lg-tile-min: 260px; /* narrowest small tile: ~6 columns at 1920px */
+  --lg-tile-height: 190px;
   --lg-gap: 14px;
-  --lg-pip: 14px;
-  --lg-pip-big: 18px;
+  --lg-pip: 16px;
+  --lg-pip-big: 22px;
   /* modal */
   --lg-dialog-width: min(1600px, 96vw);
   --lg-dialog-height: min(1000px, 92vh);
