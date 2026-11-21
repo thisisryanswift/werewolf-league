@@ -67,6 +67,7 @@ body {
 }
 .event-log .timeout {
   color: color-mix(in srgb, orange 70%, currentColor);
+}
 .speech .round {
   font-size: 0.8em;
   opacity: 0.6;
