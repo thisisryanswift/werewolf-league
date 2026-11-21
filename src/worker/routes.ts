@@ -13,6 +13,7 @@ import type { AgentConfig } from "../core/harness";
 import type { NarratorConfig } from "../core/narrator";
 import { fakeRoster, LEAGUE_NAME } from "../core/roster";
 import { startMatch } from "../core/start-match";
+import { narratorConfigError } from "../narrator";
 import { isAdmin } from "./auth";
 
 const unauthorized = () => Response.json({ error: "unauthorized" }, { status: 401 });
@@ -59,6 +60,8 @@ export async function handleApi(request: Request, env: Env, url: URL): Promise<R
       narrator?: NarratorConfig | null;
     };
     const agents = body.agents?.length ? body.agents : fakeRoster();
+    const narratorError = body.narrator == null ? null : narratorConfigError(body.narrator);
+    if (narratorError) return Response.json({ error: narratorError }, { status: 400 });
     if (body.matchId !== undefined && !/^[\w-]{1,64}$/.test(body.matchId)) {
       return Response.json({ error: "matchId must be 1-64 word characters or dashes" }, { status: 400 });
     }
