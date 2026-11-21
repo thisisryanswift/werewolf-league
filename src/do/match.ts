@@ -28,8 +28,10 @@ import {
 } from "../core/match";
 import { assembleInstructions } from "../core/agent-instructions";
 import type { AgentConfig } from "../core/harness";
+import { isNarrationEvent, latestDrama, LatestOnly, narrateMatch } from "../core/narrator";
 import { LEAGUE_NAME } from "../core/roster";
 import type { Ruleset, Seat, ToolCall, ToolSpec, TurnRequest } from "../core/ruleset";
+import { narratorFor } from "../narrator";
 import { getRuleset } from "../rulesets";
 import type { MatchEvent, RulesetEvent, ServerMessage } from "../shared/protocol";
 import { ratingsSettledEvent } from "../shared/turn-events";
@@ -271,6 +273,7 @@ export class MatchDO extends DurableObject<Env> {
       }
       this.resolve(meta, ruleset, pending);
       this.pushSummary(ruleset);
+      this.narrate();
     }
 
     const current = this.meta!;
@@ -328,20 +331,52 @@ export class MatchDO extends DurableObject<Env> {
   private pushSummary(ruleset: Ruleset<unknown>): void {
     const meta = this.meta;
     if (!meta) return;
-    // Runner events (turn markers, step_resolved) are not game events.
-    const publicEvents = this.events().filter((e) => e.audience === "all" && !isRunnerEvent(e));
-    const summary = ruleset.summary(this.rulesetState, publicEvents);
+    // Runner events (turn markers, step_resolved) and narrations are not game events.
+    const events = this.events();
+    const publicEvents = events.filter((e) => e.audience === "all" && !isRunnerEvent(e) && !isNarrationEvent(e));
+    const summary = { ...ruleset.summary(this.rulesetState, publicEvents), ...latestDrama(events) };
     const update = this.env.LEAGUE.getByName(LEAGUE_NAME)
       .updateTile(meta.matchId, summary, this.lastSeq())
       .catch(() => {});
     this.ctx.waitUntil(update);
   }
 
+  // ---- Narrator (never affects play) -------------------------------
+
+  /** At most one narration in flight; a newer step supersedes any queued behind it. In memory only. */
+  private narration: LatestOnly | null = null;
+
+  /** Narrate the Match after a published step. Never awaited: it cannot delay or block a step. */
+  private narrate(): void {
+    const meta = this.meta;
+    if (!meta?.narrator || !this.ruleset(meta).narration) return;
+    this.narration ??= new LatestOnly(() => this.narrateOnce());
+    const run = this.narration.kick();
+    if (run) this.ctx.waitUntil(run);
+  }
+
+  /** One narration of the current log. A failure or timeout is dropped; the tile keeps its last value. */
+  private async narrateOnce(): Promise<void> {
+    const meta = this.meta!;
+    const ruleset = this.ruleset(meta);
+    const events = await narrateMatch({
+      matchId: meta.matchId,
+      config: meta.narrator!,
+      narrator: narratorFor(meta.narrator!, this.env),
+      hook: ruleset.narration!,
+      state: this.rulesetState,
+      events: this.events().filter((e) => !isRunnerEvent(e) && !isNarrationEvent(e)),
+      throughSeq: this.lastSeq(),
+    });
+    this.commit(events);
+    this.pushSummary(ruleset);
+  }
+
   /** Start a step: freeze each Player's observation and hand the turns to the Player DOs. */
   private async dispatch(meta: MatchMeta, ruleset: Ruleset<unknown>, turns: TurnRequest[]) {
     const state = this.rulesetState;
-    // Runner events (turn markers, timeouts) are for Spectators, never for Agents.
-    const all = this.events().filter((e) => !isRunnerEvent(e));
+    // Runner events (turn markers, timeouts) and narrations are for Spectators, never for Agents.
+    const all = this.events().filter((e) => !isRunnerEvent(e) && !isNarrationEvent(e));
     const head = this.lastSeq();
     const stepNo = meta.stepCount + 1;
     const startedAt = Date.now();

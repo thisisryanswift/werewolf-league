@@ -1,6 +1,6 @@
 ---
 id: wl-pbkx
-status: in_progress
+status: closed
 deps: [wl-jb4x, wl-kh5w]
 links: []
 created: 2026-11-21T16:34:58Z
@@ -44,3 +44,7 @@ Add a Narrator behind an interface:
 **2026-11-21T16:43:58Z**
 
 Go decision (human, ~12:10 on 2026-11-21): proceed now; retagged ready-for-agent.
+
+**2026-11-21T17:01:52Z**
+
+Merged into integration/wl-xgp7 (impl/wl-pbkx a8013b2). Verification on integration: pnpm test 134/134, typecheck clean. AC evidence: test/system/narrator.test.ts (fake Narrator results become drama (public) and drama_secret (audience []) events and reach tile dramaScore/dramaFlags; with God View off, drama_secret is dropped and public-safe flags are kept; failing, hanging and absent Narrators give identical game decisions and the tile keeps its last score; peak in-flight is 1, and newer steps supersede queued ones, which fails if the throttle is broken); the Decisions request shape is checked against a stub; the real API was used only by scripts/smoke-narrator.ts (3 calls at 209-287 ms, claim_war detected). The Narrator is OFF by default; enable it with POST /api/admin/league/config {narrator:{id:'decisions'}}. Secret flags travel in the public tile feed tagged visibility:'secret', so wl-gtil must filter them via visibleDramaFlags. codex review P2, not fixed: narrator options:null passes validation and makes the fake fail on every call (admin-only input).
