@@ -85,6 +85,9 @@ _Avoid_: Accused, nominee
 **Accusation**:
 A structured claim within a speech that a named player is a Werewolf.
 
+**Abstain**:
+A Day vote for nobody. A timed-out vote counts as an Abstain.
+
 **Claim**:
 A player's public statement of their own role, and for a Seer their inspection results. A Claim may be a lie.
 
