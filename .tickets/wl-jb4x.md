@@ -1,6 +1,6 @@
 ---
 id: wl-jb4x
-status: in_progress
+status: closed
 deps: [wl-b8rj]
 links: []
 created: 2026-11-21T15:06:09Z
@@ -32,3 +32,9 @@ A timed-out vote is always an Abstain, even when voluntary Abstain is disabled; 
 - [ ] Same Speech Round resolved with opposite arrival orders gives an identical event log; a seat retrying an illegal call sees the same frozen observation
 - [ ] Belief fixtures with exact expected values: a wolf voter (target W-1), a concentrated village ballot [1,0,0,...] with target 2, an all-zero ballot, and a timed-out vote (no ballot)
 - [ ] Ruleset tests: no accusations means no Right of Reply; a timed-out vote with voluntary Abstain disabled counts as an Abstain
+
+## Notes
+
+**2026-11-21T16:28:23Z**
+
+Merged into integration/wl-xgp7 (impl/wl-jb4x plus the codex P2 CSS brace fix; merged cleanly after wl-kh5w and wl-nos5). Verification on integration: pnpm test 116/116, typecheck clean. AC evidence: test/werewolf/day.test.ts (reply scoring A x1 / B x2, seeded tie-break, repeat-reply skip, presentation rotation, plurality/tie/all-Abstain, exact belief-normalization fixtures for a wolf voter (W-1), a concentrated [1,0,...] ballot, an all-zero ballot and a timed-out vote with no ballot, no-Accusations meaning no Right of Reply, a timed-out vote with Abstain disabled counting as Abstain, and the same seed giving an identical log); test/system/day.test.ts (opposite arrival orders give identical decisions; a retry after an illegal call sees the same frozen observation, checked with a mutation test). A wrangler dev headless run showed speeches in presentation order with Accusation/Claim badges and vote reasons. Contracts: speech events {cycle, round A|B|reply, seat, skipped, text|null, accuse, defend, claim}; beliefs_recorded (God View only, audience []) for wl-bfo1; MatchResult.ballots; config speechRounds and replySlots.
