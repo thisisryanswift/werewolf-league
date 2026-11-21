@@ -16,8 +16,13 @@ function autoAgent(api: StubInteractionsApi): void {
   for (const it of api.interactions.values()) {
     if (it.status !== "in_progress") continue;
     if (typeof it.body.input === "string" && it.body.input.includes("Setup only")) continue;
-    const m = REQUIRED.exec(JSON.stringify(it.body.input));
+    const text = JSON.stringify(it.body.input);
+    const m = REQUIRED.exec(text);
     if (!m) {
+      if (text.includes('"accepted":false')) {
+        api.complete(it.id); // an error we can't parse: end the turn (default action), never loop
+        continue;
+      }
       // Opening move: speak, which is out of phase outside the Day's speeches.
       api.callTool(it.id, "speak", { text: "I speak out of turn." });
       continue;
@@ -56,7 +61,7 @@ describe("a Match on the managed-agent harness (stubbed API)", () => {
     const errors = api
       .creates()
       .flatMap((b) => (Array.isArray(b.input) ? b.input : []))
-      .filter((i: any) => i.result?.accepted === false && REQUIRED.test(String(i.result?.error)));
+      .filter((i: any) => i.result?.accepted === false && typeof i.result?.error === "string");
     expect(errors.length).toBeGreaterThan(0);
     expect(api.requests.every((r) => r.apiKey === "test-gemini-key")).toBe(true);
   });

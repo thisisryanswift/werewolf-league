@@ -54,7 +54,4 @@ export const fakeHarness: Harness = {
     if (pollsLeft > 0) return { status: "pending", handle: { ...handle, pollsLeft: pollsLeft - 1 } };
     return { status: "done", call: decision };
   },
-  async cancel(ctx) {
-    return ctx.chain;
-  },
 };

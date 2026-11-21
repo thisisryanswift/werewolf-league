@@ -53,10 +53,11 @@ export interface Harness {
   startTurn(ctx: PlayerContext, input: TurnInput): Promise<{ handle: TurnHandle; chain: Record<string, unknown> }>;
   poll(ctx: PlayerContext, handle: TurnHandle): Promise<PollResult>;
   /**
-   * Abandon an in-flight turn (deadline passed). Returns updated chain state; after it,
-   * `poll` never returns that turn's call, and the seat's next `startTurn` recovers
-   * (carrying every observation the seat missed). Calling it is optional: `startTurn`
-   * also settles a turn that is still in flight.
+   * Best-effort cancel of an in-flight turn that missed its deadline. Optional. After it,
+   * `poll` never returns that turn's call, and the seat's next `startTurn` recovers,
+   * carrying every observation the seat missed. Harnesses may return updated chain
+   * state; persist it if returned (then a call that landed just before the cancel is
+   * reported to the Agent as "not used"). `startTurn` also settles a turn still in flight.
    */
-  cancel(ctx: PlayerContext, handle: TurnHandle): Promise<Record<string, unknown>>;
+  cancel?(ctx: PlayerContext, handle: TurnHandle): Promise<Record<string, unknown> | void>;
 }

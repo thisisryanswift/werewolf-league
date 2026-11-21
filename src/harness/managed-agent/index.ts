@@ -69,6 +69,7 @@ export const NOTE_TIMED_OUT =
   "Your previous turn ran past its deadline and was cancelled, so the default action was used. The observation below includes everything you missed.";
 export const NOTE_TOO_LATE = "Your last call arrived after the deadline and was not used; the default action was used instead.";
 const NOTE_RESTART = "Your earlier conversation could not be continued. Everything you have been told so far follows.";
+const EARLIER = "[Earlier turn, now over; for context only]";
 const EXTRA_CALL = "Only one action per turn counts; this call was ignored.";
 
 export interface ManagedAgentOptions {
@@ -82,6 +83,11 @@ export interface ManagedAgentOptions {
    * interaction hanging a Match. 0 disables it.
    */
   maxTurnMs?: number;
+}
+
+/** Join observations, marking all but the last as earlier turns whose requests are over. */
+function markEarlier(entries: string[]): string {
+  return entries.map((e, i) => (i < entries.length - 1 ? `${EARLIER}\n${e}` : e)).join("\n\n");
 }
 
 export function toApiTools(tools: ToolSpec[]) {
@@ -142,13 +148,13 @@ export function managedAgentHarness(opts: ManagedAgentOptions): Harness {
     const parts = [PREAMBLE];
     if (ctx.agent.instructions) parts.push(`Agent Instructions:\n${ctx.agent.instructions}`);
     if (chain.transcript.length > 1 || chain.note) parts.push([chain.note, NOTE_RESTART].filter(Boolean).join(" "));
-    parts.push(...chain.transcript);
+    parts.push(markEarlier(chain.transcript));
     if (error) parts.push(`Your last call was rejected: ${error}`);
     return parts.join("\n\n");
   }
 
   function continuationInput(chain: Chain, parent: Parent, error: string | undefined) {
-    const observation = chain.transcript.slice(chain.delivered).join("\n\n");
+    const observation = markEarlier(chain.transcript.slice(chain.delivered));
     const main: Record<string, unknown> = { accepted: !error && chain.note !== NOTE_TOO_LATE };
     if (error) main.error = error;
     if (chain.note) main.note = chain.note;
@@ -194,7 +200,9 @@ export function managedAgentHarness(opts: ManagedAgentOptions): Harness {
           });
         } catch (err) {
           // The chain can't be continued (e.g. 4xx); restart it on the same environment.
-          if (!(err instanceof ApiError) || err.status >= 500) throw err;
+          // Transient (5xx, 429): rethrow so the Player DO's alarm retries the same turn.
+          if (!(err instanceof ApiError) || err.status >= 500 || err.status === 429) throw err;
+          console.warn(`managed-agent seat ${ctx.seat}: continuation rejected, restarting chain: ${err.message}`);
           parent = null;
         }
       }

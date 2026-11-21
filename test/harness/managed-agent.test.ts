@@ -46,7 +46,7 @@ async function seat(opts: { now?: () => number; maxTurnMs?: number } = {}) {
     },
     poll: (h: TurnHandle) => harness.poll(ctx, h),
     async cancel(h: TurnHandle) {
-      ctx.chain = await harness.cancel!(ctx, h);
+      ctx.chain = (await harness.cancel!(ctx, h)) ?? ctx.chain;
     },
     /** Start a turn and have the Agent answer it with a call. Returns the interaction ID. */
     async act(i: TurnInput, name: string, args: Record<string, unknown>) {
@@ -215,6 +215,15 @@ describe("Managed Agent harness: timeout recovery", () => {
     expect(body.environment).toBe("env-1");
     expect(body.input).toContain("BRIEFING-1");
     expect(body.input).toContain("NEW-B");
+  });
+
+  it("keeps the chain on a transient 429 from a continuation, so the Player DO can retry the turn", async () => {
+    const s = await seat();
+    const parent = await s.act(input("BRIEFING-1", "vote", { firstTurn: true }), "vote", { target: 2 });
+    s.api.failNextCreate = 429;
+    await expect(s.start(input("NEW-B", "speak"))).rejects.toThrow(/429/);
+    await s.start(input("NEW-B", "speak"));
+    expect(s.api.creates().at(-1).previous_interaction_id).toBe(parent);
   });
 
   it("cancels a turn stuck past the watchdog limit and reports an error, not a call", async () => {
