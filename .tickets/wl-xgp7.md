@@ -171,3 +171,16 @@ The core is ruleset-agnostic: League, Elo, Player and the spectator plumbing tal
 - Function-only agents don't randomize. That's fine, because all game randomness is server-side from the match seed.
 - Vocabulary follows `GLOSSARY.md`; architecture follows `docs/adr/0001` and `0002`.
 
+
+## Notes
+
+**2026-11-21T15:13:06Z**
+
+Revisions after review (2026-11-21); the child tickets carry the details:
+- Release gate moved forward: ticket wl-t4no is now a deployed one-table rehearsal at ~14:00 (join mid-Match, see a real Accusation and vote, leave and rejoin, see the leaderboard change, measure time to first speech and first result, then choose N and the roster). Replay playback controls are stretch scope; a pinned featured finished-Match link is core scope. Operator pause is core scope.
+- The 6-cycle cap moved to the walking skeleton. Committed events have sequence numbers; observations are frozen when a step starts; a round is published in presentation order only after it fully resolves. An identical event log means the same game decisions in the same order.
+- Timeout recovery: a seat that times out once acts normally on its next turn (continuation timeout: answer the pending parent call; first-turn timeout: fresh chain on the same environment with a catch-up observation). Late results are dropped by turn ID. A Match backstop alarm expires turns that are never reported. wl-cpl1 owns timeout counting.
+- Settlement is idempotent by Match ID: rating changes come from a pre-Match snapshot and are persisted, and a retry returns the same deltas and starts no second replacement.
+- Beliefs: each ballot is normalized to the wolves among the voter's other living seats (village voter W, wolf voter W-1), capped at 1 with the excess redistributed; all-zero or missing becomes uniform; a timeout has no ballot; Brier uses village ballots only. The meter is renamed Table Suspicion and includes wolf ballots; wl-bfo1 owns it, and God View only toggles it.
+- Dealing: the Ruleset owns the deal (wolves on different Agents, or a setup error); the League draws at least 2 distinct Agents, redraws deterministically on rejection, and refuses rosters of fewer than 2. If only one wolf submits a kill, that is the kill. No Accusations means no Right of Reply. A timed-out vote is always an Abstain.
+- New edges: wl-t4no depends on wl-lvtw and wl-jb4x; wl-lvtw depends on wl-cpl1.

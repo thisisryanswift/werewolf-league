@@ -18,9 +18,13 @@ Spec wl-xgp7 (Spec: Werewolf League on Durable Objects). Vocabulary: GLOSSARY.md
 ## What to build
 Every turn has a deadline: 60 s, first turn 90 s, both configurable. The Player DO cancels a turn that misses its deadline and reports a timeout; the Match applies the default (skipped speech, Abstain vote, no night action; both wolves timing out means no kill). Simultaneous steps wait for all Players or their deadlines. Timeouts are recorded per Player and per Agent and shown in Match stats. Players with a turn in flight show a thinking indicator; timed-out actions are marked.
 
+**Revised after review:** Beyond an Agent that never answers, cover an Agent that misses exactly one turn. Its default is recorded exactly once, a late response can't change the outcome (results are tied to a turn ID; stale ones are dropped), and the same seat acts on its next eligible turn with the observations it missed. The Match has a backstop: its own alarm expires any turn whose Player DO never reports back by deadline + grace, and applies the default. This ticket owns timeout counting from start to finish: per-Player and per-Agent counts are recorded in Match stats and included in the Match result sent to the League. The ratings ticket only displays them.
+
 ## Acceptance Criteria
 
 - [ ] Whole-system test: a Fake Harness Agent that never answers gets defaults and the Match still finishes
 - [ ] Timeout counts per Agent are exposed in Match stats
 - [ ] Match page shows thinking and timeout markers
-
+- [ ] Whole-system test: an Agent that times out once has its default recorded exactly once, its late response is ignored, and it acts normally on its next eligible turn
+- [ ] Whole-system test: a Player DO that never reports back is expired by the Match backstop and the Match continues
+- [ ] The Match result includes timeout counts per Player and per Agent

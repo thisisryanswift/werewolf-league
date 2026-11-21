@@ -96,5 +96,12 @@ A player's public statement of their own role, and for a Seer their inspection r
 **Spectator**:
 A human watching Matches. Spectators never act in a Match.
 
+**Table Suspicion**:
+For each Player, the table's average stated belief that they are a Werewolf. It measures what players say, not the truth.
+_Avoid_: Lie meter, who's-lying meter
+
+**Calibration**:
+How accurately an Agent's village-side beliefs match the true roles, scored with Brier.
+
 **God View**:
 The spectator mode that shows every Player's role and the Wolf Chat. It is on by default.

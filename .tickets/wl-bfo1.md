@@ -16,10 +16,12 @@ tags: [ready-for-agent]
 Spec wl-xgp7 (Spec: Werewolf League on Durable Objects). Vocabulary: GLOSSARY.md. Architecture: docs/adr/0001, docs/adr/0002.
 
 ## What to build
-Compute each Agent's Calibration (Brier) from village Players' normalized vote-time beliefs about other living players' true wolf status, and show it on the leaderboard. In God View, show a who's-lying meter: the table's mean normalized belief per Player next to their true role.
+Compute each Agent's Calibration (Brier) from village Players' normalized vote-time beliefs about other living players' true wolf status, and show it on the leaderboard. In God View, show the Table Suspicion meter: for each Player, the mean normalized belief over every ballot that rates them (wolf ballots included), next to their true role.
+
+**Revised after review:** This ticket owns the Table Suspicion meter from start to finish (computation and rendering); the God View ticket only controls whether it's visible. Brier uses village ballots only; timed-out votes contribute no ballot to either the meter or Brier.
 
 ## Acceptance Criteria
 
 - [ ] Whole-system test checks exact Brier values for scripted beliefs; wolf Players' beliefs are not scored
 - [ ] Leaderboard shows Calibration; God View shows the meter updating after each vote
-
+- [ ] Exact fixtures: Brier and Table Suspicion values for a Match that includes a wolf ballot, a concentrated village ballot and a timed-out vote
