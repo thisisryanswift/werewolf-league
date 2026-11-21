@@ -198,8 +198,8 @@ export function buildMatchView(events: MatchEvent[], opts: { narratorView: boole
   return { seats, status, feed: groupFeed(log), end: endScreen(log, seats), accusations: day.cycle === null ? null : { cycle: day.cycle } };
 }
 
-/** Round weights for Right of Reply, as the Ruleset scores them (Round r counts r times). */
-const REPLY_WEIGHT: Record<string, number> = { A: 1, B: 2 };
+/** Right of Reply weight of a round, as the Ruleset scores it: Round A counts 1, B 2, C 3…; a reply counts 0. */
+const replyWeight = (round: string) => (/^[A-Z]$/.test(round) ? round.charCodeAt(0) - 64 : 0);
 
 /** Each seat's Accusations on the latest Day; they reset when a new Day starts. */
 function dayAccusations(log: MatchEvent[], setup: SeatInfo[]): { cycle: number | null; bySeat: Map<number, SeatAccusations> } {
@@ -220,7 +220,7 @@ function dayAccusations(log: MatchEvent[], setup: SeatInfo[]): { cycle: number |
     if (e.kind !== "speech") continue;
     const seat = Number(e.data.seat);
     const from = bySeat.get(seat);
-    const weight = REPLY_WEIGHT[String(e.data.round)] ?? 0;
+    const weight = replyWeight(String(e.data.round));
     for (const to of ((e.data.accuse ?? []) as number[]).map(Number)) {
       if (from) add(from.accuses, to);
       const target = bySeat.get(to);

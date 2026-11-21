@@ -255,6 +255,13 @@ describe("Match view", () => {
     expect(seat4).toMatchObject({ by: [1], score: 0, mostAccused: false });
   });
 
+  it("weights a third Speech Round's Accusations three times, as the Ruleset does", () => {
+    const log = logOf([...night1, speech(1, "A", 3, { accuse: [2] }), speech(1, "A", 4, { accuse: [2] }), speech(1, "C", 1, { accuse: [4] })]);
+    const view = buildMatchView(log, { narratorView: false });
+    expect(view.seats.find((s) => s.seat === 4)!.accusations).toMatchObject({ score: 3, mostAccused: true });
+    expect(view.seats.find((s) => s.seat === 2)!.accusations).toMatchObject({ score: 2, mostAccused: false });
+  });
+
   it("keeps the Day's chips through the following Night, resets them when the next Day starts, and keeps the final Day's once Over", () => {
     const night2 = buildMatchView(logOf([...night1, ...day1]), { narratorView: false });
     expect(night2.accusations).toEqual({ cycle: 1 });
