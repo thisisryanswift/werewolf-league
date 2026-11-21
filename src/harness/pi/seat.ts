@@ -24,7 +24,8 @@ import { handleGameCall, type PiTurn, type TurnStore } from "./turn";
 
 /** Bash and notes calls use turns too, so leave room beyond the in-run retries. */
 export const PI_MAX_TURNS = 8;
-export const NOTES_PATH = "/root/notes.md";
+/** The sandbox runs as user `node`, which cannot write /root (measured in the smoke Match). */
+export const NOTES_PATH = "/home/node/notes.md";
 const PLACEHOLDER_MODEL = "anthropic/claude-haiku-5.5";
 /** How long startTurn waits for an aborted earlier run to settle before submitting. */
 const SETTLE_WAIT_MS = 5_000;
