@@ -1,7 +1,7 @@
 ---
 id: wl-gtil
 status: open
-deps: [wl-qpvr, wl-kh5w, wl-lvtw]
+deps: [wl-qpvr, wl-kh5w, wl-lvtw, wl-d5wn]
 links: []
 created: 2026-11-21T16:34:58Z
 type: task
@@ -24,7 +24,7 @@ Replace the basic grid with a dense grid built and tested for up to 36 live Matc
 - **Header:** a leaderboard strip of the top Agents by Overall Rating.
 - **Match view:** opens as a modal over the live grid, and the grid keeps updating underneath. Esc, a backdrop click or the browser back button closes it. The URL carries the Match (e.g. #match=<id>), so links open straight into it.
 - **Without the Narrator:** the grid must work fully before the Narrator ticket lands. Drama sorting falls back to Match number, there's no drama bar, the flagged filter is hidden, and promoted tiles are chosen by most recent activity.
-- **Data:** tiles consume the League's coalesced per-tile diffs (wl-kh5w).
+- **Data:** tiles consume the League's coalesced per-tile diffs (wl-d5wn).
 - **Scope boundary:** the modal content (seats, feed, God View panels) is wl-hozk's. This ticket owns the grid, the modal shell and the routing.
 - **Design reference:** variant E on prototype/spectator-ui, from the prototype ticket this depends on. Use its recorded verdict.
 
@@ -36,6 +36,7 @@ Replace the basic grid with a dense grid built and tested for up to 36 live Matc
 - [ ] The header leaderboard strip updates live when a Match settles
 - [ ] The modal opens from a tile or a #match=<id> link, closes via Esc, backdrop or back button, and the grid keeps updating underneath
 - [ ] Usable on a projector-sized screen
+- [ ] The featured finished-Match link from wl-af5m opens in the Match modal via #match=<id>
 
 
 ## Notes

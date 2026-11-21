@@ -146,7 +146,7 @@ The core is ruleset-agnostic: League, Elo, Player and the spectator plumbing tal
 - **Staggered starts:** the League starts at most 4 new Matches every 30 s (both configurable).
 - **429 backoff:** when a Player reports a 429, the League stops starting new Matches for a backoff period (configurable, default 60 s) and records the event.
 - **Coalesced feed:** Match DOs push tile summaries to the League. The League coalesces them and broadcasts small per-tile diffs to grid clients at most every ~500 ms (configurable), never one push per event. Leaderboard changes are pushed on settlement.
-- **Owners:** wl-kh5w owns scheduling and the feed; wl-gtil owns the dense grid and the Match modal (design: variant E, wl-qpvr).
+- **Owners:** wl-d5wn owns scheduling at scale and the feed (follow-up to the closed wl-kh5w); wl-gtil owns the dense grid and the Match modal (design: variant E, wl-qpvr).
 
 **Narrator (stretch, go/no-go ~13:30, wl-pbkx).** `narrate(godViewLog) → { dramaScore, flags[{ id, value, visibility }] }`, with a `gemini-decision-1` implementation and a scripted fake.
 - **When:** after each published step (dawn, each Speech Round, Right of Reply, vote), the Match DO sends the God View log to the Narrator. The Narrator sees roles, Wolf Chat and Seer results, because drama depends on what the wolves are doing.
