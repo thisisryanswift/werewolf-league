@@ -4,11 +4,13 @@
 // event log to the result, printing timings. The Worker reads GEMINI_API_KEY from
 // .dev.vars; this script only needs ADMIN_SECRET and never sees or prints the key.
 //
-// Usage: node scripts/run-real-match.mjs [baseUrl]   (MODEL=gemini-4-hydrogen by default)
+// Usage: node scripts/run-real-match.mjs [baseUrl]   (MODEL=gemini-4-hydrogen by default;
+// MODEL_B gives the second Agent another model). Prints the Match's measured cost at the end.
 import { readFileSync } from "node:fs";
 
 const base = process.argv[2] ?? "http://127.0.0.1:8787";
 const model = process.env.MODEL ?? "gemini-4-hydrogen";
+const modelB = process.env.MODEL_B ?? model;
 function devVarsSecret() {
   try {
     return /^ADMIN_SECRET=(.*)$/m.exec(readFileSync(new URL("../.dev.vars", import.meta.url), "utf8"))?.[1]?.trim();
@@ -26,7 +28,9 @@ const UA = "werewolf-league-real-smoke/1.0";
 const agents = Array.from({ length: 7 }, (_, i) =>
   i % 2 === 0
     ? { id: "hydrogen-a", name: "Hydrogen A", harness: "managed-agent", model }
-    : { id: "hydrogen-b", name: "Hydrogen B", harness: "managed-agent", model },
+    : modelB === model
+      ? { id: "hydrogen-b", name: "Hydrogen B", harness: "managed-agent", model }
+      : { id: modelB, name: modelB, harness: "managed-agent", model: modelB },
 );
 
 const t0 = Date.now();
@@ -56,6 +60,16 @@ for (;;) {
   seen = snap.events.length;
   if (snap.status === "finished") {
     console.log(`[${secs()}s] RESULT winner=${snap.result.winner} first_action_s=${firstAction} result_s=${secs()}`);
+    // A late reading (e.g. the last narration) may update the cost: report the latest match_cost event.
+    await new Promise((r) => setTimeout(r, 5000));
+    const final = await (await fetch(`${base}/api/matches/${matchId}`, { headers: { "user-agent": UA } })).json();
+    const cost = final.result.cost;
+    if (cost) {
+      console.log(`COST total=$${cost.total.toFixed(4)} narrator=$${cost.narrator.toFixed(4)} unpriced=${JSON.stringify(cost.unpriced)}`);
+      for (const [agent, usd] of Object.entries(cost.byAgent)) console.log(`COST agent ${agent} $${usd.toFixed(4)}`);
+      for (const [seat, usd] of Object.entries(cost.bySeat)) console.log(`COST seat ${seat} $${usd.toFixed(4)}`);
+      console.log(`TOKENS ${JSON.stringify(cost.tokens)}`);
+    }
     break;
   }
   if (Date.now() - t0 > 45 * 60_000) throw new Error("gave up after 45 min");
