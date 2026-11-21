@@ -1,6 +1,6 @@
 ---
 id: wl-af5m
-status: in_progress
+status: closed
 deps: [wl-kh5w]
 links: []
 created: 2026-11-21T15:06:09Z
@@ -23,3 +23,9 @@ Core: finished Matches stay openable on the Match page (the full log is sent on 
 - [ ] A finished Match opens and plays back its full event log
 - [ ] Finished Matches are listed from the grid page
 - [ ] The grid shows a pinned featured finished Match link that opens the complete Match
+
+## Notes
+
+**2026-11-21T16:34:34Z**
+
+Merged into integration/wl-xgp7 (impl/wl-af5m 5cc90e9). codex review: no findings. Verification on integration: pnpm test 120/120, typecheck clean. AC evidence: test/system/finished-matches.test.ts (a finished Match's WS sends one log message with seq 1..n ending in match_over; the featured Match defaults to the most recent finished Match; an operator pin persists, null clears it, unfinished or unknown Matches get 400, missing or wrong secret gets 401). In headless Chromium on wrangler dev the finished-Match list showed 12 links, and the featured link opened a complete 116-event Match. New contract: LeagueSnapshot.featured and POST /api/admin/league/featured {matchId|null}. Stretch playback controls (step/play/scrub) NOT built; they are deferred until the rehearsal gate passes, and none of this ticket's acceptance criteria require them.
