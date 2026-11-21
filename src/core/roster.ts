@@ -40,6 +40,8 @@ export interface LeagueConfig {
    * Lets the operator (or a test) replay or script a specific table.
    */
   seeds?: string[];
+  /** Agent ids left off the displayed leaderboard (their ratings and history are kept). */
+  hiddenAgents?: string[];
   /** Total League spend (USD) at which the League pauses itself; absent or null for no cap. */
   spendCap?: number | null;
 }
@@ -149,6 +151,12 @@ export function patchConfig(
       return { ok: false, error: "seeds must be a list of non-empty strings (at most 128 characters)" };
     }
     next.seeds = patch.seeds as string[];
+  }
+  if (patch.hiddenAgents !== undefined) {
+    if (!Array.isArray(patch.hiddenAgents) || !patch.hiddenAgents.every((x) => typeof x === "string" && x.length > 0 && x.length <= 128)) {
+      return { ok: false, error: "hiddenAgents must be a list of Agent ids" };
+    }
+    next.hiddenAgents = patch.hiddenAgents as string[];
   }
   if (patch.spendCap !== undefined) {
     const cap = patch.spendCap;

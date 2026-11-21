@@ -291,6 +291,7 @@ export class LeagueDO extends DurableObject<Env> {
     const records = this.agents;
     const names = new Map<string, string>(Object.entries(records).map(([id, r]) => [id, r.name]));
     for (const a of c.roster) names.set(a.id, a.name);
+    for (const id of c.hiddenAgents ?? []) names.delete(id);
     const { byAgent: spent, matchesByAgent: costed = {} } = this.spendRecord;
     const rows = rankStandings([...names].map(([id, name]) => standing(id, name, records[id], sides))).map((r) => {
       const n = costed[r.agentId] ?? 0;
