@@ -50,3 +50,7 @@ AC4 now MET (impl/wl-rhpr-notes 10a58b5, merged). The harness PREAMBLE allows on
 **2026-11-21T20:29:20Z**
 
 Human check 2026-11-21 ~15:30: notes ARE written in real Matches. Deployed Match db4957b4 has 12 notes_updated events with real content (e.g. Otto's Day 1 wolf strategy). No preamble change needed; AC4 is satisfied by that Match. Follow-up UI: wl-jz95 (expandable notes in the feed).
+
+**2026-11-21T20:32:02Z**
+
+Human decision: KEEP the looser notes preamble (merged). Notes were already written in deployed Match db4957b4 (12 notes_updated) before it; the preamble raised it to 31 updates per Match with no slowdown.

@@ -43,7 +43,7 @@ import {
 } from "../core/analyst";
 import type { AgentConfig } from "../core/harness";
 import { isNarrationEvent, latestDrama, LatestOnly, narrateMatch } from "../core/narrator";
-import { LEAGUE_NAME } from "../core/roster";
+import { leagueIdOf, leagueStub } from "../core/leagues";
 import type { Ruleset, Seat, ToolCall, ToolSpec, TurnRequest } from "../core/ruleset";
 import { matchCost, type MatchUsage } from "../core/pricing";
 import { atLeast, ledgerUsage, mergeModelUsage, recordReadings, type ModelUsage } from "../core/usage";
@@ -212,7 +212,7 @@ export class MatchDO extends DurableObject<Env> {
     const latest = this.meta!;
     if (latest.costDirty && latest.resultAcked && latest.result?.cost) {
       const cost = latest.result.cost;
-      const sent = await this.env.LEAGUE.getByName(latest.league ?? LEAGUE_NAME)
+      const sent = await leagueStub(this.env, latest.league)
         .updateMatchCost(latest.matchId, cost)
         .then(() => true)
         .catch(() => false);
@@ -323,6 +323,7 @@ export class MatchDO extends DurableObject<Env> {
     return {
       matchId: meta.matchId,
       ...(meta.matchNumber !== undefined ? { matchNumber: meta.matchNumber } : {}),
+      league: leagueIdOf(meta.league),
       rulesetId: meta.rulesetId,
       status: meta.status,
       seats: meta.seats,
@@ -498,7 +499,7 @@ export class MatchDO extends DurableObject<Env> {
     await this.ctx.storage.setAlarm(Date.now() + Number(this.env.LEAGUE_RETRY_MS ?? 2000));
     let ack: SettleAck;
     try {
-      ack = await this.env.LEAGUE.getByName(meta.league ?? LEAGUE_NAME).reportMatchResult(meta.matchId, meta.result);
+      ack = await leagueStub(this.env, meta.league).reportMatchResult(meta.matchId, meta.result);
     } catch {
       return; // the armed alarm retries
     }
@@ -532,7 +533,7 @@ export class MatchDO extends DurableObject<Env> {
       // Measured USD so far (Players and Narrator); only the total, so it never hints at roles.
       cost: this.cost(meta).total,
     };
-    const update = this.env.LEAGUE.getByName(meta.league ?? LEAGUE_NAME)
+    const update = leagueStub(this.env, meta.league)
       .updateTile(meta.matchId, summary, this.lastSeq())
       .catch(() => {});
     this.ctx.waitUntil(update);
@@ -681,7 +682,7 @@ export class MatchDO extends DurableObject<Env> {
         return this.finishAnalysis({ status: "failed", reason: "no_slot", detail: "waited too long for an Analyst slot" });
       }
       const lease = this.analystLeaseMs;
-      const slot = await this.env.LEAGUE.getByName(meta.league ?? LEAGUE_NAME)
+      const slot = await leagueStub(this.env, meta.league)
         .acquireAnalystSlot(meta.matchId, lease)
         .catch(() => "wait" as const);
       if (this.meta!.analysis?.status !== "waiting") return;
@@ -705,7 +706,7 @@ export class MatchDO extends DurableObject<Env> {
       if (!stopped) return this.wakeBy(Date.now() + retryMs);
     }
     if (!this.meta!.analysis!.released) {
-      const freed = await this.env.LEAGUE.getByName(meta.league ?? LEAGUE_NAME)
+      const freed = await leagueStub(this.env, meta.league)
         .releaseAnalystSlot(meta.matchId)
         .then(() => true)
         .catch(() => false);
@@ -750,7 +751,7 @@ export class MatchDO extends DurableObject<Env> {
     this.meta = { ...this.meta!, analysis: { ...this.meta!.analysis!, status: "running", startedAt, deadlineAt } };
     await this.wakeBy(deadlineAt + meta.deadlines.graceMs);
     // Renew the lease from now, so slow provisioning never lets it lapse mid-run (best effort).
-    await this.env.LEAGUE.getByName(meta.league ?? LEAGUE_NAME)
+    await leagueStub(this.env, meta.league)
       .acquireAnalystSlot(meta.matchId, this.analystLeaseMs)
       .catch(() => {});
     try {

@@ -1,4 +1,4 @@
-// Home page: the dense live grid of the League's Matches, with the Match modal
+// Home page: the dense live grid of one League's Matches (?league=<id>), with the Match modal
 // over it for #match=<id>. Narrator's View (on by default) is shared by the grid and
 // the modal. The full leaderboard and the finished Matches follow the grid.
 import { useState } from "react";
@@ -9,9 +9,12 @@ import { MatchModal } from "../grid/MatchModal";
 import { useMatchRoute } from "../grid/useMatchRoute";
 import { useLeagueFeed } from "../useLeagueFeed";
 import { formatUsd } from "../cost";
+import { leagueIdFromSearch } from "../../src/shared/leagues";
 
 export function HomePage() {
-  const { league, status, activity } = useLeagueFeed();
+  // ?league=<id> picks the League (default gemini-managed); the switcher reloads with a new one.
+  const [leagueId] = useState(() => leagueIdFromSearch(location.search));
+  const { league, status, activity } = useLeagueFeed(leagueId);
   const [narratorView, setNarratorView] = useState(true);
   const route = useMatchRoute();
   return (
