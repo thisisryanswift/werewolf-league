@@ -1,6 +1,6 @@
 ---
 id: wl-kh5w
-status: in_progress
+status: closed
 deps: [wl-b8rj]
 links: []
 created: 2026-11-21T15:06:09Z
@@ -28,3 +28,9 @@ League DO keeps N Matches live (default 6). When a Match finishes it starts a re
 - [ ] Grid updates live and tiles link to Match pages
 - [ ] Whole-system test: a result delivered twice (first acknowledgement lost) starts exactly one replacement Match
 - [ ] A roster of fewer than 2 Agents is refused, and a rejected deal is redrawn deterministically
+
+## Notes
+
+**2026-11-21T16:27:22Z**
+
+Merged into integration/wl-xgp7 (81f2874; impl/wl-kh5w with the codex P2 CSS brace fix). Verification on integration: pnpm test 74/74, typecheck clean. AC evidence: test/system/league.test.ts (keeps N live and replaces finished Matches; pause stops new starts; set N; admin routes return 401 without the secret; a result delivered twice after a lost ack starts exactly one replacement; a 2-Agent roster gives different-Agent wolves over 10+ Matches); test/league/draw.test.ts (deterministic redraw; rosters under 2 refused with 400). A wrangler dev WS client and headless Chromium showed live tiles linking to /matches/<id>. Contracts: GET /api/league, /api/league/ws, POST /api/admin/league/{pause,resume,config}; a fresh League starts paused with fakeRoster(); settlement hook LeagueDO.settle() for wl-lvtw. Known limit: a start that keeps failing loops every LEAGUE_RETRY_MS, with the reason shown in 'blocked'.
