@@ -198,6 +198,13 @@ export class LeagueDO extends DurableObject<Env> {
     if (c.paused || !this.capReached) return;
     this.config = { ...c, paused: true };
     this.blocked = SPEND_CAP_BLOCKED;
+    // Drop reserved Matches not yet launching: starting them would spend past the cap.
+    const live = this.live;
+    const unlaunched = Object.values(live).filter((m) => m.status === "starting" && !this.launching.has(m.matchId));
+    if (unlaunched.length) {
+      for (const m of unlaunched) delete live[m.matchId];
+      this.live = live;
+    }
   }
 
   /** Pacer start times (League clock) still inside the start window. */
