@@ -1,5 +1,6 @@
 // Bare Match page: the event log, live. God View is on (private events shown).
 import { describeEvent } from "../events";
+import { Speech } from "../events/Speech";
 import { useMatchFeed } from "../useMatchFeed";
 
 export function MatchPage({ matchId }: { matchId: string }) {
@@ -14,7 +15,8 @@ export function MatchPage({ matchId }: { matchId: string }) {
       <ol className="event-log">
         {events.map((e) => (
           <li key={e.seq} className={e.audience === "all" ? "" : "private"}>
-            <span className="seq">{e.seq}</span> {describeEvent(e, events)}
+            <span className="seq">{e.seq}</span>{" "}
+            {e.kind === "speech" ? <Speech event={e} log={events} /> : describeEvent(e, events)}
           </li>
         ))}
       </ol>

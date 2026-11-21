@@ -24,3 +24,25 @@ body {
   font-style: italic;
   opacity: 0.8;
 }
+.speech .round {
+  font-size: 0.8em;
+  opacity: 0.6;
+}
+.badge {
+  display: inline-block;
+  margin-left: 0.4em;
+  padding: 0 0.4em;
+  border-radius: 0.6em;
+  font-size: 0.85em;
+  border: 1px solid currentColor;
+}
+.badge.accuse {
+  color: #c0392b;
+}
+.badge.defend {
+  color: #2e86c1;
+}
+.badge.claim {
+  color: #8e44ad;
+  font-weight: 600;
+}
