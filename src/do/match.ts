@@ -26,6 +26,8 @@ import {
   type SubmitResult,
   type TurnAssignment,
 } from "../core/match";
+import { assembleInstructions } from "../core/agent-instructions";
+import type { AgentConfig } from "../core/harness";
 import { isNarrationEvent, latestDrama, LatestOnly, narrateMatch } from "../core/narrator";
 import { LEAGUE_NAME } from "../core/roster";
 import type { Ruleset, Seat, ToolCall, ToolSpec, TurnRequest } from "../core/ruleset";
@@ -34,6 +36,16 @@ import { getRuleset } from "../rulesets";
 import type { MatchEvent, RulesetEvent, ServerMessage } from "../shared/protocol";
 import { ratingsSettledEvent } from "../shared/turn-events";
 import type { SettleAck } from "./league";
+
+/**
+ * A seat's Agent Instructions: the Ruleset-named sections of the Agent's own
+ * instructions, or of the Ruleset's default text when the Agent has none.
+ */
+function seatInstructions(ruleset: Ruleset<unknown>, state: unknown, seat: Seat, agent: AgentConfig): string | undefined {
+  const source = agent.instructions ?? ruleset.instructions?.source;
+  if (!source) return undefined;
+  return assembleInstructions(source, ruleset.instructions?.sections(state, seat) ?? []) || undefined;
+}
 
 /** How soon the Match retries sending a turn to a Player DO that failed to accept it. */
 const DISPATCH_RETRY_MS = 1000;
@@ -162,6 +174,7 @@ export class MatchDO extends DurableObject<Env> {
           seat: s.seat,
           agent: init.agents[s.seat]!,
           tools: setup.tools[s.seat]!,
+          instructions: seatInstructions(ruleset, setup.state, s.seat, init.agents[s.seat]!),
         }),
       ),
     );

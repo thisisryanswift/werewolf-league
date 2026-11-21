@@ -1,0 +1,57 @@
+{
+  "model": "gemini-4-hydrogen",
+  "canary": "KUMQUAT-4417",
+  "agentsMd": "# House rules for this game\n\n- In every `vote` call, the `reason` field must begin with the exact word KUMQUAT-4417, then a space, then your reason.\n- Keep `reason` to one short sentence.\n",
+  "runs": [
+    {
+      "label": "A setup",
+      "id": "v1_ChdSTXdCYV8zRk1ZX055dE1Qc2J5ZC1RSRIXUk13QmFfM0ZNWV9OeXRNUHNieWQtUUk",
+      "environment": "0ff3ca6f607e6c95f53d3604a041a0c7",
+      "seconds": 5.729
+    },
+    {
+      "label": "B first turn (fresh chain on env)",
+      "id": "v1_ChZSc3dCYS1qZ0JaWGd5dE1Qckt5OVFBEhZSc3dCYS1qZ0JaWGd5dE1Qckt5OVFB",
+      "status": "requires_action",
+      "seconds": 5.3,
+      "stepTypes": [
+        "function_call:vote"
+      ],
+      "vote": {
+        "reason": "KUMQUAT-4417 Voting for P2.",
+        "target": "P2"
+      },
+      "canaryFollowed": true
+    },
+    {
+      "label": "C continuation",
+      "id": "v1_ChZSc3dCYS1qZ0JaWGd5dE1Qckt5OVFBEhdTOHdCYTZQREdvZVJ5dE1QN1pQemdBcw",
+      "status": "requires_action",
+      "seconds": 4.9,
+      "stepTypes": [
+        "function_result",
+        "function_call:vote"
+      ],
+      "vote": {
+        "reason": "KUMQUAT-4417 Voting for P3.",
+        "target": "P3"
+      },
+      "canaryFollowed": true
+    },
+    {
+      "label": "D fresh chain again on same env",
+      "id": "v1_ChdVTXdCYThxMEtmM2owX2dQMlliWm1RbxIXVU13QmE4cTBLZjNqMF9nUDJZYlptUW8",
+      "status": "requires_action",
+      "seconds": 5.9,
+      "stepTypes": [
+        "thought",
+        "function_call:vote"
+      ],
+      "vote": {
+        "reason": "KUMQUAT-4417 I am voting for P4.",
+        "target": "P4"
+      },
+      "canaryFollowed": true
+    }
+  ]
+}
