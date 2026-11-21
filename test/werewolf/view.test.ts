@@ -86,4 +86,14 @@ describe("Werewolf view and observations", () => {
     expect(text).toContain(`${nameOf(villager)} (seat ${villager}) was killed in the Night`);
     expect(text).toContain(me.prompt);
   });
+
+  it("names a dead Player's role by its display name", () => {
+    const { state: s0, villager } = table();
+    const { state: s2, events } = nightKill(s0, villager);
+    const next = werewolf.nextStep(s2);
+    if (next.type !== "turns") throw new Error();
+    const me = next.turns[0]!;
+    const text = werewolf.renderObservation(s2, me.seat, werewolf.view(events, { seat: me.seat }), me);
+    expect(text).toMatch(/Their role was (Seer|Doctor|Villager)\./);
+  });
 });
