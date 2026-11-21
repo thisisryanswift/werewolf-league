@@ -1,6 +1,7 @@
-// The real League roster: one Managed Agent per Gemini model, all sharing the
-// Werewolf Agent Instructions (docs/agent-instructions/werewolf.md). Pure, so the
-// operator script (scripts/apply-roster.mjs) and tests can both build it.
+// The real League roster: one Managed Agent per Gemini model. The Agents carry no
+// instructions of their own, so each seat gets the Ruleset's default Agent
+// Instructions (docs/agent-instructions/werewolf.md) narrowed to its role's
+// sections. Applied by the operator script scripts/apply-roster.mjs.
 
 import type { AgentConfig } from "../../core/harness";
 
@@ -12,21 +13,6 @@ export const REAL_MODELS = [
   { id: "flash-lite-3-5", name: "3.5 Flash-Lite", model: "gemini-3.5-flash-lite" },
 ] as const;
 
-/** A section marker on its own line, e.g. `<!-- section: shared -->`. */
-const SECTION_MARKER = /^<!-- section: [\w-]+ -->$/m;
-
-/**
- * The part of the instructions file an Agent sees: everything from the first
- * section marker line on, unmodified. The text above it is for humans.
- */
-export function agentInstructions(markdown: string): string {
-  const m = SECTION_MARKER.exec(markdown);
-  if (!m) throw new Error("Agent Instructions have no <!-- section: NAME --> marker line");
-  return markdown.slice(m.index).trim();
-}
-
-/** The real roster, given the instructions file's text. */
-export function realRoster(instructionsMarkdown: string): AgentConfig[] {
-  const instructions = agentInstructions(instructionsMarkdown);
-  return REAL_MODELS.map(({ id, name, model }) => ({ id, name, harness: "managed-agent", model, instructions }));
+export function realRoster(): AgentConfig[] {
+  return REAL_MODELS.map(({ id, name, model }) => ({ id, name, harness: "managed-agent", model }));
 }

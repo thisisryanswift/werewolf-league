@@ -1,12 +1,11 @@
 import { describe, expect, it } from "vitest";
-import instructionsFile from "../../docs/agent-instructions/werewolf.md?raw";
-import { agentInstructions, realRoster } from "../../src/rulesets/werewolf/roster";
 import { defaultLeagueConfig, patchConfig } from "../../src/core/roster";
 import { MANAGED_AGENT_HARNESS_ID } from "../../src/harness/managed-agent";
+import { realRoster } from "../../src/rulesets/werewolf/roster";
 
 describe("Werewolf realRoster", () => {
-  it("has one managed-agent Agent per model, sharing the instructions", () => {
-    const roster = realRoster(instructionsFile);
+  it("has one managed-agent Agent per model", () => {
+    const roster = realRoster();
     expect(roster.map((a) => a.model)).toEqual([
       "gemini-4-hydrogen",
       "gemini-3.8-flash",
@@ -14,25 +13,15 @@ describe("Werewolf realRoster", () => {
       "gemini-3.5-flash-lite",
     ]);
     expect(new Set(roster.map((a) => a.id)).size).toBe(4);
-    for (const a of roster) {
-      expect(a.harness).toBe(MANAGED_AGENT_HARNESS_ID);
-      expect(a.instructions).toBe(agentInstructions(instructionsFile));
-    }
+    for (const a of roster) expect(a.harness).toBe(MANAGED_AGENT_HARNESS_ID);
   });
 
-  it("drops the human-only text above the first section marker, keeping every section", () => {
-    const text = agentInstructions(instructionsFile);
-    expect(text.startsWith("<!-- section: shared -->")).toBe(true);
-    expect(text).not.toContain("## Wiring (for the harness");
-    for (const s of ["shared", "village", "seer", "doctor", "werewolf"]) expect(text).toContain(`<!-- section: ${s} -->`);
-  });
-
-  it("refuses instructions without a section marker", () => {
-    expect(() => realRoster("# no markers here")).toThrow(/marker/);
+  it("carries no instructions, so each seat gets the Ruleset default narrowed to its role", () => {
+    // Narrowing of the default per role is proven in test/system/agent-instructions.test.ts.
+    for (const a of realRoster()) expect(a.instructions).toBeUndefined();
   });
 
   it("is accepted by the League config route's validation", () => {
-    const r = patchConfig(defaultLeagueConfig(), { n: 1, roster: realRoster(instructionsFile) });
-    expect(r.ok).toBe(true);
+    expect(patchConfig(defaultLeagueConfig(), { n: 1, roster: realRoster() }).ok).toBe(true);
   });
 });
