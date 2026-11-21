@@ -154,7 +154,7 @@ body:has(.leaderboard) {
 @media (min-width: 64rem) {
   .leaderboard {
     float: right;
-    width: 34rem;
+    width: 39rem;
     margin: 0 0 1rem 1.5rem;
   }
 }

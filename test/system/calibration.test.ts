@@ -77,5 +77,24 @@ describe("Calibration", () => {
     expect(row(l, "cal-a").calibration).toBeCloseTo(2 / 15, 12);
     // cal-w only played a wolf: nothing to score.
     expect(row(l, "cal-w").calibration).toBeNull();
-  }, 90_000);
+
+    // Match 2, same deal: cal-a now puts all its belief on village seat vx. Each day, the
+    // 4 other village ballots give vx 1, the rest 0.2: errors vx 1, two wolves 0.64 each,
+    // three villagers 0.04 each = 2.4. vx's own ballot has no stated belief among its
+    // others, so it is uniform 1/3: two wolves (2/3)^2, four villagers (1/3)^2 = 4/3.
+    // Pooled over both Matches: 6 * (5 * 0.8 + 4 * 2.4 + 4/3) = 89.6 over 6 * 60 = 360 beliefs.
+    const vx = deal.village[0]!;
+    const roster2 = [
+      fakeAgent("cal-a", { script: "passive", args: { vote: { beliefs: { [vx]: 1 } } } }),
+      fakeAgent("cal-w", { script: "passive", args: { vote: { beliefs: { [vx]: 1 } } } }),
+    ];
+    await admin("config", { n: 1, roster: roster2, seeds: [deal.seed] });
+    const started2 = await admin("resume");
+    await admin("pause");
+    const tile2 = started2.tiles.find((t) => t.seed === deal.seed && t.matchId !== tile.matchId)!;
+    await waitFor(async () => (await league()).recent.some((r) => r.matchId === tile2.matchId), 60_000);
+    const l2 = await league();
+    expect(row(l2, "cal-a").calibration).toBeCloseTo(56 / 225, 12);
+    expect(row(l2, "cal-w").calibration).toBeNull();
+  }, 180_000);
 });
