@@ -5,6 +5,7 @@ import { viewByAudience, type Ruleset, type Seat, type ToolCall } from "../../co
 import { setup } from "./deal";
 import { day } from "./day";
 import { night } from "./night";
+import { instructions } from "./instructions";
 import { briefing, renderObservation } from "./text";
 import type { PhaseModule, Side, WerewolfState } from "./types";
 import { summary } from "./summary";
@@ -38,6 +39,7 @@ export const werewolf: Ruleset<WerewolfState> = {
     return settle(r.state, r.events);
   },
   view: viewByAudience,
+  instructions,
   briefing,
   renderObservation,
   result: resultOf,

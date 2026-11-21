@@ -80,7 +80,9 @@ export class StubInteractionsApi {
     }
     this.n += 1;
     const id = `int-${this.n}`;
-    const environment_id = body.environment === "remote" ? `env-${this.n}` : body.environment;
+    // "remote" or a config object ({ type: "remote", sources }) creates a new environment; a string ID reuses one.
+    const fresh = body.environment === "remote" || typeof body.environment === "object";
+    const environment_id = fresh ? `env-${this.n}` : body.environment;
     const it: StubInteraction = { id, status: "in_progress", environment_id, steps: [], body };
     this.interactions.set(id, it);
     return json(view(it));
