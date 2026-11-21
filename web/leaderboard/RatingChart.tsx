@@ -1,31 +1,50 @@
-// Line chart of each Agent's Overall Rating over Match Numbers, inline SVG.
+// Line chart of each Agent's Overall Rating, or one Side Rating, over rated
+// Matches, inline SVG. The page stacks one per metric on a shared y-domain.
 // One line per Agent in fixed palette order, a dashed 1200 baseline, a legend
 // plus direct end labels, and a crosshair tooltip on hover. The table below the
 // chart (the Leaderboard) is the accessible table view.
 import { useMemo, useRef, useState } from "react";
 import type { RatingsHistory } from "../../src/core/ratings-history";
 import { INITIAL_RATING } from "../../src/shared/protocol";
-import { niceTicks, OVERFLOW_COLOR, ratingDomain, SERIES_COLORS, spreadLabels } from "./chart-model";
+import { metricValues, niceTicks, OVERFLOW_COLOR, ratingDomain, SERIES_COLORS, spreadLabels, type RatingMetric } from "./chart-model";
 
 const W = 1800;
-const H = 620;
-const M = { top: 20, bottom: 56, left: 110 };
-const PH = H - M.top - M.bottom;
+const M = { top: 16, left: 110 };
 /** Right gutter wide enough for the longest "Name 1234" end label (about 11.5 units per character at 20px). */
 const rightFor = (names: string[]) => Math.min(700, Math.max(230, 40 + Math.max(0, ...names.map((n) => n.length + 5)) * 11.5));
 
 export const colorOf = (i: number) => SERIES_COLORS[i] ?? OVERFLOW_COLOR;
 
-export function RatingChart({ history }: { history: RatingsHistory }) {
-  const { agents, points } = history;
+export function RatingChart({
+  history,
+  metric = "overall",
+  yTitle = "Overall Rating",
+  height = 620,
+  domain,
+  legend = true,
+  xTitle = true,
+}: {
+  history: RatingsHistory;
+  metric?: RatingMetric;
+  yTitle?: string;
+  height?: number;
+  domain?: [number, number];
+  legend?: boolean;
+  xTitle?: boolean;
+}) {
+  const { agents } = history;
+  const points = useMemo(() => history.points.map((p) => ({ ...p, overall: metricValues(p, metric) })), [history, metric]);
   const [hover, setHover] = useState<number | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
 
+  const H = height;
+  const bottom = xTitle ? 56 : 36;
+  const PH = H - M.top - bottom;
   const right = rightFor(agents.map((a) => a.name));
   const PW = W - M.left - right;
   const geo = useMemo(() => {
     const all = points.flatMap((p) => Object.values(p.overall));
-    const [y0, y1] = ratingDomain(all, INITIAL_RATING);
+    const [y0, y1] = domain ?? ratingDomain(all, INITIAL_RATING);
     // x is the settlement index: Matches settle out of Match Number order, so the hover names the Match Number.
     const n = points.length;
     const x = (i: number) => M.left + (n <= 1 ? PW / 2 : (i / (n - 1)) * PW);
@@ -33,7 +52,7 @@ export function RatingChart({ history }: { history: RatingsHistory }) {
     const yTicks = niceTicks(y0, y1, 6);
     const xTickIdx = n <= 1 ? [0] : niceTicks(0, n - 1, 10).filter((i) => Number.isInteger(i));
     return { x, y, yTicks, xTickIdx };
-  }, [points, PW]);
+  }, [points, PW, PH, domain]);
 
   if (points.length === 0) return <p className="lg-chart-empty">No rated Matches yet. Lines appear as Matches settle.</p>;
 
@@ -56,19 +75,19 @@ export function RatingChart({ history }: { history: RatingsHistory }) {
 
   return (
     <figure className="lg-chart" data-testid="rating-chart">
-      <ul className="lg-chart-legend" aria-label="Agents">
+      {legend && <ul className="lg-chart-legend" aria-label="Agents">
         {agents.map((a, i) => (
           <li key={a.agentId}>
             <span className="lg-chart-swatch" style={{ background: colorOf(i) }} />
             {a.name}
           </li>
         ))}
-      </ul>
+      </ul>}
       <svg
         ref={svgRef}
         viewBox={`0 0 ${W} ${H}`}
         role="img"
-        aria-label={`Overall Rating of ${agents.length} Agents over ${points.length} rated Matches`}
+        aria-label={`${yTitle} of ${agents.length} Agents over ${points.length} rated Matches`}
         onPointerMove={onMove}
         onPointerLeave={() => setHover(null)}
       >
@@ -86,11 +105,13 @@ export function RatingChart({ history }: { history: RatingsHistory }) {
             {i + 1}
           </text>
         ))}
-        <text x={M.left + PW / 2} y={H - 6} className="axis-title" textAnchor="middle">
-          Rated Matches settled (Match Numbers on hover)
-        </text>
+        {xTitle && (
+          <text x={M.left + PW / 2} y={H - 6} className="axis-title" textAnchor="middle">
+            Rated Matches settled (Match Numbers on hover)
+          </text>
+        )}
         <text x={18} y={M.top + PH / 2} className="axis-title" textAnchor="middle" transform={`rotate(-90 18 ${M.top + PH / 2})`}>
-          Overall Rating
+          {yTitle}
         </text>
         {agents.map((a, i) => {
           const d = points

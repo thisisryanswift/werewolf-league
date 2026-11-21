@@ -1,9 +1,10 @@
-// /leaderboard?league=<id>: the Overall Rating history chart for one League, with
-// the Leaderboard table below it. The history refetches every 15 s and whenever
+// /leaderboard?league=<id>: stacked Overall, Village and Wolf Rating history charts
+// for one League (one legend, one y-scale), with the Leaderboard table below them. The history refetches every 15 s and whenever
 // the League feed sends a new leaderboard (a rated Match settled).
 import { useEffect, useState } from "react";
 import { Leaderboard } from "../components/Leaderboard";
 import { LeagueSwitcher } from "../grid/LeagueSwitcher";
+import { sharedDomain } from "../leaderboard/chart-model";
 import { RatingChart } from "../leaderboard/RatingChart";
 import { useLeagueFeed } from "../useLeagueFeed";
 import { leagueIdFromSearch, searchForLeague } from "../../src/shared/leagues";
@@ -11,6 +12,13 @@ import type { RatingsHistory } from "../../src/core/ratings-history";
 import "../grid/grid.css";
 
 const POLL_MS = 15_000;
+
+/** Stacked top to bottom; labels match the Leaderboard table's Side names. */
+const METRICS = [
+  { metric: "overall", yTitle: "Overall Rating" },
+  { metric: "village", yTitle: "Village Rating" },
+  { metric: "wolf", yTitle: "Wolf Rating" },
+];
 
 export function LeaderboardPage() {
   const [leagueId] = useState(() => leagueIdFromSearch(location.search));
@@ -50,11 +58,32 @@ export function LeaderboardPage() {
       </div>
       <div className="lg-below lg-board">
         <section className="lg-card lg-chart-card">
-          <h2>Overall Rating by Match{league ? ` · ${league.league.name}` : ""}</h2>
-          {history ? <RatingChart history={history} /> : <p className="lg-loading">Loading…</p>}
+          <h2>Overall, Village and Wolf Rating by Match{league ? ` · ${league.league.name}` : ""}</h2>
+          {history ? <RatingCharts history={history} /> : <p className="lg-loading">Loading…</p>}
         </section>
         {leaderboard ? <Leaderboard data={leaderboard} /> : <p className="lg-loading">Feed: {status}</p>}
       </div>
     </main>
+  );
+}
+
+function RatingCharts({ history }: { history: RatingsHistory }) {
+  if (history.points.length === 0) return <RatingChart history={history} />;
+  const domain = sharedDomain(history, METRICS.map((m) => m.metric));
+  return (
+    <div className="lg-chart-stack">
+      {METRICS.map((m, i) => (
+        <RatingChart
+          key={m.metric}
+          history={history}
+          metric={m.metric}
+          yTitle={m.yTitle}
+          height={i === METRICS.length - 1 ? 290 : 270}
+          domain={domain}
+          legend={i === 0}
+          xTitle={i === METRICS.length - 1}
+        />
+      ))}
+    </div>
   );
 }
