@@ -300,7 +300,7 @@ export class LeagueDO extends DurableObject<Env> {
     return { sides, rows };
   }
 
-  /** Overall Rating of every Agent after each of the last RATINGS_HISTORY_CAP rated settlements. */
+  /** Overall and Side Ratings of every Agent after each of the last RATINGS_HISTORY_CAP rated settlements. */
   ratingsHistory(): RatingsHistory {
     const names: Record<string, string> = Object.fromEntries(Object.entries(this.agents).map(([id, r]) => [id, r.name]));
     for (const a of this.config.roster) names[a.id] = a.name;
@@ -309,9 +309,14 @@ export class LeagueDO extends DurableObject<Env> {
     // Hidden Agents are off the leaderboard, so off its chart too.
     const hidden = new Set(this.config.hiddenAgents ?? []);
     if (!hidden.size) return h;
+    const visible = (r: Record<string, number>) => Object.fromEntries(Object.entries(r).filter(([id]) => !hidden.has(id)));
     return {
       agents: h.agents.filter((a) => !hidden.has(a.agentId)),
-      points: h.points.map((p) => ({ ...p, overall: Object.fromEntries(Object.entries(p.overall).filter(([id]) => !hidden.has(id))) })),
+      points: h.points.map((p) => ({
+        ...p,
+        overall: visible(p.overall),
+        sides: Object.fromEntries(Object.entries(p.sides).map(([side, r]) => [side, visible(r)])),
+      })),
     };
   }
 

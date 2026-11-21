@@ -21,11 +21,26 @@ describe("ratingsHistory", () => {
       { agentId: "c", name: "Charlie" },
     ]);
     expect(h.points).toEqual([
-      { matchNumber: 1, settledAt: 1000, overall: { a: 1208, b: 1192, c: 1200 } },
+      {
+        matchNumber: 1,
+        settledAt: 1000,
+        overall: { a: 1208, b: 1192, c: 1200 },
+        sides: { wolf: { a: 1216, b: 1200, c: 1200 }, village: { a: 1200, b: 1184, c: 1200 } },
+      },
       // a: wolf 1216, village 1190 -> 1203; c: wolf 1210 -> 1205
-      { matchNumber: 2, settledAt: 2000, overall: { a: 1203, b: 1192, c: 1205 } },
+      {
+        matchNumber: 2,
+        settledAt: 2000,
+        overall: { a: 1203, b: 1192, c: 1205 },
+        sides: { wolf: { a: 1216, b: 1200, c: 1210 }, village: { a: 1190, b: 1184, c: 1200 } },
+      },
       // b: wolf 1208, village 1184 -> 1196; c: wolf 1210, village 1192 -> 1201
-      { matchNumber: 3, settledAt: 3000, overall: { a: 1203, b: 1196, c: 1201 } },
+      {
+        matchNumber: 3,
+        settledAt: 3000,
+        overall: { a: 1203, b: 1196, c: 1201 },
+        sides: { wolf: { a: 1216, b: 1208, c: 1210 }, village: { a: 1190, b: 1184, c: 1192 } },
+      },
     ]);
   });
 
@@ -36,7 +51,17 @@ describe("ratingsHistory", () => {
     ];
     const h = ratingsHistory({ settlements, sides, names, cap: 1 });
     expect(h.agents).toEqual([{ agentId: "a", name: "Alpha" }]);
-    expect(h.points).toEqual([{ matchNumber: 2, settledAt: 2, overall: { a: 1215 } }]);
+    // Wolf starts at its first before in the window (1220); Village, never played, reads 1200.
+    expect(h.points).toEqual([{ matchNumber: 2, settledAt: 2, overall: { a: 1215 }, sides: { wolf: { a: 1230 }, village: { a: 1200 } } }]);
+  });
+
+  it("seeds a Side not played in the window from its last rating before the window", () => {
+    const settlements: RatedSettlement[] = [
+      { matchNumber: 1, settledAt: 1, ratings: { players: [], agents: [ch("a", "village", 1200, 100)] } },
+      { matchNumber: 2, settledAt: 2, ratings: { players: [], agents: [ch("a", "wolf", 1200, 20)] } },
+    ];
+    const h = ratingsHistory({ settlements, sides, names, cap: 1 });
+    expect(h.points).toEqual([{ matchNumber: 2, settledAt: 2, overall: { a: 1260 }, sides: { wolf: { a: 1220 }, village: { a: 1300 } } }]);
   });
 
   it("skips unrated settlements and is empty with none rated", () => {

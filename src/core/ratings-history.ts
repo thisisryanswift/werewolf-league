@@ -1,7 +1,8 @@
-// Overall Rating history for the leaderboard chart. Ruleset-agnostic and pure:
+// Overall and Side Rating history for the leaderboard chart. Ruleset-agnostic and pure:
 // replays the rating deltas stored on each rated settlement, in settlement order.
 // Each Agent starts from the `before` of its first change in the window (1200 for
-// a full history); a Side it has not played reads INITIAL_RATING.
+// a full history); a Side it has not played in the window reads its last rating
+// before the window, else INITIAL_RATING.
 
 import { INITIAL_RATING, type RatingChanges } from "../shared/protocol";
 
@@ -17,6 +18,8 @@ export interface RatingsHistoryPoint {
   settledAt: number;
   /** Overall Rating of every Agent seen so far, after this settlement; agentId -> rating (0.01 precision, unrounded for display). */
   overall: Record<string, number>;
+  /** Side Rating of every Agent seen so far, per Side, after this settlement; side -> agentId -> rating. A Side not yet played reads INITIAL_RATING. */
+  sides: Record<string, Record<string, number>>;
 }
 
 export interface RatingsHistory {
@@ -26,6 +29,8 @@ export interface RatingsHistory {
 
 export const RATINGS_HISTORY_CAP = 500;
 
+const round2 = (v: number) => Math.round(v * 100) / 100;
+
 export function ratingsHistory(opts: {
   settlements: Iterable<RatedSettlement>;
   sides: readonly string[];
@@ -33,10 +38,14 @@ export function ratingsHistory(opts: {
   cap?: number;
 }): RatingsHistory {
   const cap = opts.cap ?? RATINGS_HISTORY_CAP;
-  const rated = [...opts.settlements]
+  const all = [...opts.settlements]
     .filter((s) => Array.isArray(s.ratings?.agents) && s.ratings.agents.length > 0)
-    .sort((a, b) => a.settledAt - b.settledAt || (a.matchNumber ?? 0) - (b.matchNumber ?? 0))
-    .slice(-cap);
+    .sort((a, b) => a.settledAt - b.settledAt || (a.matchNumber ?? 0) - (b.matchNumber ?? 0));
+  const earlier = new Map<string, Record<string, number>>();
+  for (const s of all.slice(0, Math.max(0, all.length - cap))) {
+    for (const c of s.ratings!.agents) earlier.set(c.agentId, { ...earlier.get(c.agentId), [c.side]: c.after });
+  }
+  const rated = all.slice(-cap);
 
   // Every Agent in the window starts at its first `before` per Side, so all lines begin together.
   const ratings = new Map<string, Record<string, number>>();
@@ -47,14 +56,20 @@ export function ratingsHistory(opts: {
       ratings.set(c.agentId, r);
     }
   }
+  // A Side last played before the window keeps that rating.
+  for (const [id, r] of ratings) for (const [side, v] of Object.entries(earlier.get(id) ?? {})) r[side] ??= v;
   const overallOf = (r: Record<string, number>) =>
     opts.sides.length ? opts.sides.reduce((sum, side) => sum + (r[side] ?? INITIAL_RATING), 0) / opts.sides.length : INITIAL_RATING;
 
   const points = rated.map((s, i) => {
     for (const c of s.ratings!.agents) ratings.get(c.agentId)![c.side]! += c.delta;
     const overall: Record<string, number> = {};
-    for (const [id, r] of ratings) overall[id] = Math.round(overallOf(r) * 100) / 100;
-    return { matchNumber: s.matchNumber ?? i + 1, settledAt: s.settledAt, overall };
+    const sides: Record<string, Record<string, number>> = Object.fromEntries(opts.sides.map((side) => [side, {}]));
+    for (const [id, r] of ratings) {
+      overall[id] = round2(overallOf(r));
+      for (const side of opts.sides) sides[side]![id] = round2(r[side] ?? INITIAL_RATING);
+    }
+    return { matchNumber: s.matchNumber ?? i + 1, settledAt: s.settledAt, overall, sides };
   });
 
   return {

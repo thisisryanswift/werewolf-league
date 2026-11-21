@@ -1,4 +1,6 @@
 // Pure geometry for the rating-history chart: scales, ticks and end-label layout.
+import type { RatingsHistory, RatingsHistoryPoint } from "../../src/core/ratings-history";
+import { INITIAL_RATING } from "../../src/shared/protocol";
 
 /** Categorical slots in fixed order (dataviz reference palette, light mode). Agent i gets slot i; never cycled. */
 export const SERIES_COLORS = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#6250d6", "#e34948"];
@@ -37,3 +39,17 @@ export function spreadLabels(wanted: number[], gap: number, top: number, bottom:
   order.forEach((o, k) => (out[o.i] = placed[k]!));
   return out;
 }
+
+/** "overall" or a Side id ("wolf", "village"). */
+export type RatingMetric = string;
+
+/** The ratings a chart plots at one point; a payload without per-Side ratings reads as empty. */
+export const metricValues = (p: RatingsHistoryPoint, metric: RatingMetric): Record<string, number> =>
+  metric === "overall" ? p.overall : (p.sides?.[metric] ?? {});
+
+/** One y-domain for several stacked charts, so their lines compare on the same scale. */
+export const sharedDomain = (history: RatingsHistory, metrics: RatingMetric[]): [number, number] =>
+  ratingDomain(
+    history.points.flatMap((p) => metrics.flatMap((m) => Object.values(metricValues(p, m)))),
+    INITIAL_RATING,
+  );
