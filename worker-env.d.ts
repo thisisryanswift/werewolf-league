@@ -20,3 +20,9 @@ declare namespace Cloudflare {
   }
 }
 type Env = Cloudflare.Env;
+
+/** Markdown files bundled as text (wrangler.jsonc "rules"), e.g. the Agent Instructions. */
+declare module "*.md" {
+  const text: string;
+  export default text;
+}

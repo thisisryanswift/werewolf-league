@@ -99,6 +99,15 @@ export interface Ruleset<S = unknown> {
   applyActions(state: S, actions: Record<Seat, ToolCall | null>): { state: S; events: RulesetEvent[] };
   /** Filter events to those a viewer may see. */
   view<E extends { audience: EventAudience }>(events: E[], viewer: Viewer): E[];
+  /**
+   * Agent Instructions (optional). `source` is the default sectioned text (see
+   * core/agent-instructions.ts), used when an Agent has no instructions of its own;
+   * `sections` names the section keys a seat receives, in order.
+   */
+  instructions?: {
+    source: string;
+    sections(state: S, seat: Seat): string[];
+  };
   /** The rules text given to a Player on its first turn. */
   briefing(state: S, seat: Seat): string;
   /** Render a frozen observation: new events since the Player's last turn plus its turn request. */

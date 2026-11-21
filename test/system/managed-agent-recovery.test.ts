@@ -139,7 +139,13 @@ describe("managed-agent timeout recovery through real Match and Player DOs", () 
     expect(input).toContain("You are playing Werewolf.");
     expect(input).toContain(`You are seat ${wolf}. Your secret role: Werewolf.`);
     expect(input).toContain("Seats:");
-    expect(input).toContain("Stub instructions.");
+    // The Agent Instructions live in the environment's /.agents/AGENTS.md, not in the input.
+    expect(input).not.toContain("Stub instructions.");
+    expect(stub.api.creates().find((b: any) => b.environment?.sources)?.environment.sources[0]).toMatchObject({
+      type: "inline",
+      target: "/.agents/AGENTS.md",
+      content: "Stub instructions.",
+    });
     // Missed events: everything the stalled first turn showed, plus the partner's Wolf Chat it missed.
     for (const line of happened(stalled.body.input)) expect(input).toContain(line);
     const partner = dealtWolves(seed).find((w) => w !== wolf)!;
