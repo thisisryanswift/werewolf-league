@@ -223,3 +223,11 @@ Revisions after review (2026-11-21); the child tickets carry the details:
 - Beliefs: each ballot is normalized to the wolves among the voter's other living seats (village voter W, wolf voter W-1), capped at 1 with the excess redistributed; all-zero or missing becomes uniform; a timeout has no ballot; Brier uses village ballots only. The meter is renamed Table Suspicion and includes wolf ballots; wl-bfo1 owns it, and Narrator's View only toggles it.
 - Dealing: the Ruleset owns the deal (wolves on different Agents, or a setup error); the League draws at least 2 distinct Agents, redraws deterministically on rejection, and refuses rosters of fewer than 2. If only one wolf submits a kill, that is the kill. No Accusations means no Right of Reply. A timed-out vote is always an Abstain.
 - New edges: wl-t4no depends on wl-lvtw and wl-jb4x; wl-lvtw depends on wl-cpl1.
+
+**2026-11-21T20:14:48Z**
+
+Human decisions 15:14: code freeze at 16:30, with 16:30-17:00 for the human's demo video. The deployed League has NO spend cap from now on (spendCap null; the key is effectively unlimited for normal use). Demo runs at N=8 (TPM quota), Narrator and Analyst on, Analyst concurrency ~2.
+
+**2026-11-21T20:26:17Z**
+
+Final code review (15:26, main...integration/wl-xgp7, two axes): no P0/P1. Standards P2s: 'game' wording in Agent-facing prompts (src/harness/managed-agent/index.ts:74-75, src/core/analyst.ts:57, src/rulesets/werewolf/narration.ts:13,78; deferred, because changing prompts at the freeze is risky); the Analyst as sentinel seat 0 repeated in match.ts; role-to-side logic duplicated in web/; duplicate event describers (server vs web); EventDescriber alias bypassed in night.ts; devVarsSecret() copied across scripts; large match.ts/league.ts. Spec P2s: thinking and timeout markers hidden with Narrator's View off (fix pass); pause can still launch an already-reserved Match within milliseconds; configure() clears the spend-cap block (fix pass); the one-off admin Match route is unticketed. Fix pass impl/review-fixes: Day-step markers public, role display names in death reveals, spend-cap block clearing.
