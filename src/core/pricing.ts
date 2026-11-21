@@ -25,6 +25,11 @@ export const PRICES: Record<string, ModelPrice> = {
   "gemini-3.5-flash-lite": { input: 0.3, cached: 0.03, output: 2.5 },
   // Decisions bills input only; it reports no cached tokens, so cached is priced as input.
   "gemini-decision-1": { input: 0.1, cached: 0.1, output: 0 },
+  // OpenRouter (pi harness), per OpenRouter's public model list on 2026-11-21. Haiku 5.5's
+  // >100k-token prompt tier is not modelled; pi turns stay far below it.
+  "google/gemini-4-hydrogen": { input: 1.5, cached: 0.075, output: 7.5 },
+  "anthropic/claude-haiku-5.5": { input: 0.1, cached: 0.01, output: 0.5 },
+  "deepseek/deepseek-v4.1-flash": { input: 0.0498, cached: 0.000996, output: 0.1992 },
   // The Fake Harness and fake Narrator call no model.
   fake: { input: 0, cached: 0, output: 0 },
 };

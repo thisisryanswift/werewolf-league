@@ -142,7 +142,7 @@ export class PlayerDO extends DurableObject<Env> {
     const ctx = this.context(seating);
 
     if (!turn.handle) {
-      const started = await harness.startTurn(ctx, turn.input).catch((err: unknown) => {
+      const started = await harness.startTurn(ctx, { ...turn.input, turnId: turn.turnId }).catch((err: unknown) => {
         // Rethrown: the alarm retries the same turn.
         if (isRateLimited(err)) this.reportRateLimit(seating, "startTurn");
         throw err;
