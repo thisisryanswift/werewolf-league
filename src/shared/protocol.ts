@@ -32,3 +32,77 @@ export function mergeEvents(existing: MatchEvent[], incoming: MatchEvent[]): Mat
   for (const e of incoming) if (!bySeq.has(e.seq)) bySeq.set(e.seq, e);
   return [...bySeq.values()].sort((a, b) => a.seq - b.seq);
 }
+
+// ---- League feed ------------------------------------------------------
+
+/**
+ * A ruleset-agnostic, public summary of a live Match for its grid tile.
+ * The Ruleset supplies it; it never contains private information.
+ */
+export interface MatchSummary {
+  /** Display name of the current phase, e.g. "Day" or "Night"; "Over" once finished. */
+  phase: string;
+  /** The phase's number (Day 2 -> 2), if the Ruleset numbers its phases. */
+  round: number | null;
+  /** Seats still in the game. */
+  alive: number[];
+  /** The latest public speech line, if any. */
+  latestSpeech: { seat: number; text: string } | null;
+}
+
+/** One seat of a Match as shown on a tile. */
+export interface TileSeat {
+  seat: number;
+  agentId: string;
+  label: string;
+}
+
+/** A live Match on the League grid. */
+export interface MatchTile {
+  matchId: string;
+  seed: string;
+  /** "starting" until its Match DO has started. */
+  status: "starting" | "running";
+  seats: TileSeat[];
+  /** Null until the Match first reports a summary. */
+  summary: MatchSummary | null;
+  startedAt: number;
+}
+
+/** Public view of a League Agent (no Agent Instructions or harness options). */
+export interface RosterAgent {
+  id: string;
+  name: string;
+  harness: string;
+  model?: string;
+}
+
+export interface LeagueConfigView {
+  /** Matches kept live at once. */
+  n: number;
+  paused: boolean;
+  /** Seats per Match. */
+  seats: number;
+  rulesetId: string;
+  roster: RosterAgent[];
+}
+
+/** A recently settled Match. */
+export interface SettledMatch {
+  matchId: string;
+  winner: string;
+  settledAt: number;
+}
+
+export interface LeagueSnapshot {
+  config: LeagueConfigView;
+  tiles: MatchTile[];
+  /** Most recently settled League Matches, newest first. */
+  recent: SettledMatch[];
+  stats: { started: number; settled: number };
+  /** Why the League cannot start Matches right now (e.g. a roster that is too small), else null. */
+  blocked: string | null;
+}
+
+/** Messages sent from the League WebSocket: the full snapshot, on join and on every change. */
+export type LeagueMessage = { type: "league"; league: LeagueSnapshot };

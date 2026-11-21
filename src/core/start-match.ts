@@ -1,5 +1,5 @@
 // Start a Match from a list of Agents (one per seat). Used by the admin route
-// now and by the League DO later.
+// and the League DO.
 
 import { DEFAULT_RULESET_ID } from "../rulesets";
 import type { AgentConfig } from "./harness";
@@ -18,13 +18,19 @@ export function labelSeats(agents: AgentConfig[]): SeatAgent[] {
   });
 }
 
-export async function startMatch(
-  env: Env,
-  opts: { matchId?: string; rulesetId?: string; seed?: string; config?: Record<string, unknown>; agents: AgentConfig[] },
-): Promise<MatchInit> {
+export interface MatchOptions {
+  matchId?: string;
+  rulesetId?: string;
+  seed?: string;
+  config?: Record<string, unknown>;
+  agents: AgentConfig[];
+}
+
+/** The MatchInit for a table, with a fresh Match ID and seed unless given. */
+export function buildMatchInit(opts: MatchOptions): MatchInit {
   const matchId = opts.matchId ?? crypto.randomUUID();
   const seats = labelSeats(opts.agents);
-  const init: MatchInit = {
+  return {
     matchId,
     rulesetId: opts.rulesetId ?? DEFAULT_RULESET_ID,
     seed: opts.seed ?? crypto.randomUUID(),
@@ -32,6 +38,10 @@ export async function startMatch(
     seats,
     agents: Object.fromEntries(opts.agents.map((a, i) => [i + 1, a])),
   };
-  await env.MATCH.getByName(matchId).start(init);
+}
+
+export async function startMatch(env: Env, opts: MatchOptions): Promise<MatchInit> {
+  const init = buildMatchInit(opts);
+  await env.MATCH.getByName(init.matchId).start(init);
   return init;
 }
