@@ -1,0 +1,32 @@
+<!doctype html>
+<!--
+  PROTOTYPE (throwaway). Question: "What should a Match tile (grid card) look like?"
+  Four structurally different tile designs, switchable via ?variant=A|B|C|D (and ?nv=0 to turn
+  Narrator's View off). Each variant is shown in the same six fixed game states, at promoted
+  (large) and small size, plus a density strip of 12 small tiles. Static: nothing animates.
+  Data mirrors the real MatchTile/TileSummary shape (src/shared/protocol.ts), plus Match
+  Numbers (wl-ks6l). Run: python3 -m http.server -d prototype/spectator-ui 8792
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PROTOTYPE · Match tile lab</title>
+  <link rel="stylesheet" href="tile-lab.css">
+</head>
+<body>
+  <header class="lab-head">
+    <h1>Match tile lab</h1>
+    <p id="lab-desc"></p>
+  </header>
+  <main id="lab"></main>
+  <div id="lab-bar" role="toolbar" aria-label="Prototype controls (not part of the design)">
+    <button id="lb-prev" type="button" aria-label="Previous variant">◀</button>
+    <span id="lb-label" aria-live="polite"></span>
+    <button id="lb-next" type="button" aria-label="Next variant">▶</button>
+    <span class="lb-sep"></span>
+    <label><input id="lb-nv" type="checkbox"> Narrator's View</label>
+  </div>
+  <script src="tile-lab.js"></script>
+</body>
+</html>
