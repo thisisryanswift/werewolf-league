@@ -111,15 +111,25 @@ export class MatchDO extends DurableObject<Env> {
 
   // ---- RPC -------------------------------------------------------------
 
-  /** Start the Match. Idempotent: a second call for a started Match is a no-op. */
+  private starting: Promise<void> | null = null;
+
+  /**
+   * Start the Match. Idempotent once started. Nothing is persisted until every
+   * Player is provisioned, so a failed start leaves no Match behind and can be retried.
+   */
   async start(init: MatchInit): Promise<void> {
     if (this.meta) return;
+    if (this.starting) return this.starting;
+    this.starting = this.doStart(init).finally(() => {
+      this.starting = null;
+    });
+    return this.starting;
+  }
+
+  private async doStart(init: MatchInit): Promise<void> {
     const ruleset = getRuleset(init.rulesetId);
     const setup = ruleset.setup(init.config, init.seed, init.seats);
     if (!setup.ok) throw new Error(setup.error);
-    this.meta = { ...init, status: "running", result: null, tools: setup.tools, stepCount: 0, lastSeen: {} };
-    this.rulesetState = setup.state;
-    this.commit(setup.events);
     await Promise.all(
       init.seats.map((s) =>
         this.env.PLAYER.getByName(`${init.matchId}:${s.seat}`).provision({
@@ -130,6 +140,10 @@ export class MatchDO extends DurableObject<Env> {
         }),
       ),
     );
+    // Persist and schedule together (no await between the writes).
+    this.meta = { ...init, status: "running", result: null, tools: setup.tools, stepCount: 0, lastSeen: {} };
+    this.rulesetState = setup.state;
+    this.commit(setup.events);
     await this.ctx.storage.setAlarm(Date.now());
   }
 

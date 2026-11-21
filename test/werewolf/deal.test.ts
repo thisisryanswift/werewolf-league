@@ -41,6 +41,36 @@ describe("Werewolf deal", () => {
     expect(team.audience).toEqual(team.data.wolves);
   });
 
+  it("never gives both Werewolf seats to the same Agent", () => {
+    // Two Agents only: seats 1-6 are copies of A, seat 7 is B. Every deal must use B as a wolf.
+    const seats = seatsOf(7).map((s) =>
+      s.seat === 7 ? { ...s, agentId: "B", label: "B" } : { ...s, agentId: "A", label: `A #${s.seat}` },
+    );
+    for (let i = 0; i < 200; i++) {
+      const r = werewolf.setup({}, `mirror-${i}`, seats);
+      if (!r.ok) throw new Error(r.error);
+      const wolves = r.events.find((e) => e.kind === "wolf_team")!.data.wolves as number[];
+      expect(wolves).toHaveLength(2);
+      expect(wolves).toContain(7);
+    }
+  });
+
+  it("deals the same seats for the same seed when Agents repeat", () => {
+    const seats = seatsOf(7).map((s) => ({ ...s, agentId: `agent-${s.seat % 3}` }));
+    const wolvesOf = (seed: string) => {
+      const r = werewolf.setup({}, seed, seats);
+      if (!r.ok) throw new Error(r.error);
+      return r.events.find((e) => e.kind === "wolf_team")!.data.wolves;
+    };
+    expect(wolvesOf("repeat")).toEqual(wolvesOf("repeat"));
+  });
+
+  it("refuses to deal when every seat is the same Agent", () => {
+    const seats = seatsOf(7).map((s) => ({ ...s, agentId: "solo" }));
+    const r = werewolf.setup({}, "solo", seats);
+    expect(r).toEqual({ ok: false, error: expect.stringContaining("different Agents") });
+  });
+
   it("starts with Night 1", () => {
     const r = setupOk("seed-4");
     const step = werewolf.nextStep(r.state);

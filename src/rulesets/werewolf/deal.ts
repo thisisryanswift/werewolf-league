@@ -1,6 +1,6 @@
 // Setup: deal roles from the match seed and announce them.
 
-import type { SeatAgent, SetupResult } from "../../core/ruleset";
+import type { Seat, SeatAgent, SetupResult } from "../../core/ruleset";
 import { rngFrom } from "../../core/rng";
 import type { RulesetEvent } from "../../shared/protocol";
 import { TOOLS_BY_ROLE } from "./tools";
@@ -15,11 +15,30 @@ export function roleList(n: number): Role[] {
   return ["werewolf", "werewolf", ...Array<Role>(n - 2).fill("villager")];
 }
 
+/**
+ * Two Werewolf seats from different Agents, chosen from the seed: the first seat in a
+ * seeded shuffle, then the first later seat on another Agent. Null if all seats share an Agent.
+ */
+export function pickWolves(seed: string, seats: SeatAgent[]): [Seat, Seat] | null {
+  const order = rngFrom(`${seed}:deal:wolves`).shuffle(seats);
+  const first = order[0];
+  const second = order.find((s) => first && s.agentId !== first.agentId);
+  return first && second ? [first.seat, second.seat] : null;
+}
+
 export function setup(rawConfig: Record<string, unknown>, seed: string, seats: SeatAgent[]): SetupResult<WerewolfState> {
   const config = parseConfig(rawConfig);
   if (seats.length < 4) return { ok: false, error: `Werewolf needs at least 4 seats, got ${seats.length}` };
-  const roles = rngFrom(`${seed}:deal`).shuffle(roleList(seats.length));
-  const players = seats.map((s, i) => ({ ...s, role: roles[i]!, alive: true }));
+  const wolfPair = pickWolves(seed, seats);
+  if (!wolfPair) return { ok: false, error: "Werewolf needs its two Werewolf seats on different Agents, but every seat is the same Agent" };
+  // Remaining roles are shuffled over the remaining seats.
+  const others = rngFrom(`${seed}:deal:others`).shuffle(roleList(seats.length).filter((r) => r !== "werewolf"));
+  let next = 0;
+  const players = seats.map((s) => ({
+    ...s,
+    role: wolfPair.includes(s.seat) ? ("werewolf" as Role) : others[next++]!,
+    alive: true,
+  }));
   const state: WerewolfState = {
     config,
     seed,

@@ -3,9 +3,16 @@ import { describe, expect, it } from "vitest";
 import { werewolf } from "../../src/rulesets/werewolf";
 import { ADMIN, fakeAgent, finished, startMatch } from "./helpers";
 
-/** Wolf seats the Ruleset deals for a 7-seat table with this seed. */
+const adminStart = (body: Record<string, unknown>) =>
+  exports.default.fetch("http://test/api/admin/matches", {
+    method: "POST",
+    headers: { ...ADMIN, "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+/** Wolf seats the Ruleset deals for a 7-seat table of distinct Agents with this seed. */
 function wolvesFor(seed: string): number[] {
-  const seats = Array.from({ length: 7 }, (_, i) => ({ seat: i + 1, agentId: "x", label: "x" }));
+  const seats = Array.from({ length: 7 }, (_, i) => ({ seat: i + 1, agentId: `x${i}`, label: "x" }));
   const r = werewolf.setup({}, seed, seats);
   if (!r.ok) throw new Error(r.error);
   return r.events.find((e) => e.kind === "wolf_team")!.data.wolves as number[];
@@ -76,6 +83,29 @@ describe("a fake Match end to end", () => {
       }
     }
     expect(snap.events.some((e) => e.kind === "player_died")).toBe(false);
+  });
+
+  it("rejects a deal the Ruleset refuses with a 4xx and starts no Match", async () => {
+    const agents = Array.from({ length: 7 }, () => fakeAgent("solo"));
+    const res = await adminStart({ matchId: "solo-table", seed: "s", agents });
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { error: string }).error).toContain("different Agents");
+    expect((await exports.default.fetch("http://test/api/matches/solo-table")).status).toBe(404);
+  });
+
+  it("a failed provisioning leaves no stuck Match, and the start can be retried", async () => {
+    const bad = Array.from({ length: 7 }, (_, i) =>
+      i === 3 ? { id: "ghost", name: "ghost", harness: "no-such-harness" } : fakeAgent(`r${i + 1}`),
+    );
+    const res = await adminStart({ matchId: "retry-me", seed: "r", agents: bad });
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { error: string }).error).toContain("no-such-harness");
+    expect((await exports.default.fetch("http://test/api/matches/retry-me")).status).toBe(404);
+
+    const good = Array.from({ length: 7 }, (_, i) => fakeAgent(`r${i + 1}`));
+    const retry = await adminStart({ matchId: "retry-me", seed: "r", agents: good });
+    expect(retry.status).toBe(201);
+    expect((await finished("retry-me")).result?.winner).toMatch(/wolf|village/);
   });
 
   it("gives committed events strictly increasing sequence numbers", async () => {

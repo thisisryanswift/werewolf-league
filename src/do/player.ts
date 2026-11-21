@@ -30,12 +30,18 @@ export class PlayerDO extends DurableObject<Env> {
     return { ...seating, chain: this.ctx.storage.kv.get<Record<string, unknown>>("chain") ?? {} };
   }
 
-  /** Called by the Match at start: remember the seat and provision the Harness environment. */
+  /**
+   * Called by the Match at start: provision the Harness environment, then remember
+   * the seat. The seat is only recorded after provisioning succeeds, so a failed
+   * start can be retried. Re-provisioning the same Agent is a no-op.
+   */
   async provision(seating: Seating): Promise<void> {
-    if (this.ctx.storage.kv.get("seating")) return;
-    this.ctx.storage.kv.put("seating", seating);
-    const chain = await harnessFor(seating.agent, this.env).provision(this.context(seating));
+    const existing = this.ctx.storage.kv.get<Seating>("seating");
+    if (existing && JSON.stringify(existing) === JSON.stringify(seating)) return;
+    const harness = harnessFor(seating.agent, this.env);
+    const chain = await harness.provision({ ...seating, chain: {} });
     this.ctx.storage.kv.put("chain", chain);
+    this.ctx.storage.kv.put("seating", seating);
   }
 
   /** Called by the Match: take a turn. Returns at once; the work runs on the alarm. */

@@ -23,13 +23,18 @@ export async function handleApi(request: Request, env: Env, url: URL): Promise<R
   if (url.pathname === "/api/admin/matches" && request.method === "POST") {
     if (!isAdmin(request, env)) return Response.json({ error: "unauthorized" }, { status: 401 });
     const body = (await request.json().catch(() => ({}))) as {
+      /** Optional; lets a caller retry a failed start under the same ID. */
+      matchId?: string;
       seed?: string;
       config?: Record<string, unknown>;
       agents?: AgentConfig[];
     };
     const agents = body.agents?.length ? body.agents : defaultFakeAgents();
+    if (body.matchId !== undefined && !/^[\w-]{1,64}$/.test(body.matchId)) {
+      return Response.json({ error: "matchId must be 1-64 word characters or dashes" }, { status: 400 });
+    }
     try {
-      const init = await startMatch(env, { seed: body.seed, config: body.config, agents });
+      const init = await startMatch(env, { matchId: body.matchId, seed: body.seed, config: body.config, agents });
       return Response.json({ matchId: init.matchId, seed: init.seed }, { status: 201 });
     } catch (err) {
       return Response.json({ error: String(err) }, { status: 400 });
