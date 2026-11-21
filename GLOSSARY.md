@@ -93,6 +93,18 @@ A player's public statement of their own role, and for a Seer their inspection r
 
 ## Spectating
 
+**Narrator**:
+An observer that reads a Match, including its secrets, and scores it for Spectators. It never affects play, ratings, Calibration or Table Suspicion.
+_Avoid_: AI judge, judge (reserved for hackathon judges), Storyteller and moderator (in Werewolf those mean whoever runs the game), commentator
+
+**Drama Score**:
+The Narrator's calm-to-explosive rating of a Match's current state.
+_Avoid_: Hype, excitement, heat
+
+**Drama Flag**:
+A named storyline the Narrator detects in a Match, such as a claim war. Each is either public-safe or secret, and secret ones appear only in God View.
+_Avoid_: Flag (on its own), alert, tag
+
 **Spectator**:
 A human watching Matches. Spectators never act in a Match.
 

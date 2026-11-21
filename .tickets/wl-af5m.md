@@ -1,7 +1,7 @@
 ---
 id: wl-af5m
 status: closed
-deps: [wl-kh5w]
+deps: [wl-kh5w, wl-gtil]
 links: []
 created: 2026-11-21T15:06:09Z
 type: task
@@ -16,7 +16,7 @@ tags: [ready-for-agent]
 Spec wl-xgp7 (Spec: Werewolf League on Durable Objects). Vocabulary: GLOSSARY.md. Architecture: docs/adr/0001, docs/adr/0002.
 
 ## What to build
-Core: finished Matches stay openable on the Match page (the full log is sent on join), and the grid shows a pinned link to a featured finished real Match, so a judge arriving during Night 1 can see a complete Match right away. Stretch, only after the rehearsal gate passes: a finished-Match list and playback controls (step, play, scrub).
+Core: finished Matches stay openable on the Match page (the full log is sent on join), and the grid shows a pinned link to a featured finished real Match (it opens the Match modal via its #match=<id> link from wl-gtil), so a judge arriving during Night 1 can see a complete Match right away. Stretch, only after the rehearsal gate passes: a finished-Match list and playback controls (step, play, scrub).
 
 ## Acceptance Criteria
 
