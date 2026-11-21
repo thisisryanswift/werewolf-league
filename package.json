@@ -7,7 +7,8 @@
     "build": "vite build",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p web/tsconfig.json",
-    "smoke:fake": "node scripts/watch-fake-match.mjs"
+    "smoke:fake": "node scripts/watch-fake-match.mjs",
+    "smoke:league": "node scripts/watch-league.mjs"
   },
   "devDependencies": {
     "@cloudflare/vitest-plugin": "^1.8.2",
