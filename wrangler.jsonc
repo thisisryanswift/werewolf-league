@@ -21,7 +21,10 @@
   ],
   "vars": {
     // How often a Player DO polls its Harness for a finished turn.
-    "PLAYER_POLL_MS": "1000"
+    "PLAYER_POLL_MS": "1000",
+    // Managed-agent watchdog: cancel a turn still running after this long (0 = off).
+    // Turn deadlines proper live in the Player DO; this only stops a stuck interaction.
+    "MANAGED_AGENT_MAX_TURN_MS": "120000"
   },
   "observability": { "enabled": true }
 }
