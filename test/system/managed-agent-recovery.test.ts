@@ -8,6 +8,7 @@ import type { AgentConfig } from "../../src/core/harness";
 import { API_BASE } from "../../src/harness/managed-agent/api";
 import { StubInteractionsApi } from "../harness/stub-interactions-api";
 import { dealtWolves, finished, startMatch, waitFor } from "./helpers";
+import { expectNoAgentIdentity, playerTexts } from "./player-text";
 
 const deadlines = { turnMs: 400, firstTurnMs: 500, graceMs: 400 };
 
@@ -119,6 +120,7 @@ describe("managed-agent timeout recovery through real Match and Player DOs", () 
 
     // Let the Match finish on the stub, so no Player DO alarm outlives it.
     const snap = await finished(matchId);
+    expectNoAgentIdentity(playerTexts(stub.api), agents);
     expect(snap.events.some((e) => e.kind === "turn_timed_out" && e.data.seat === wolf)).toBe(true);
   });
 
@@ -147,6 +149,7 @@ describe("managed-agent timeout recovery through real Match and Player DOs", () 
     // The briefing appears once, not once per missed turn.
     expect(input.split("You are playing Werewolf.").length - 1).toBe(1);
     await finished(matchId);
+    expectNoAgentIdentity(playerTexts(stub.api), agents);
   });
 
   it("a call that lands as the deadline passes is never applied, and the next turn tells the Agent it was not used", async () => {
@@ -165,6 +168,7 @@ describe("managed-agent timeout recovery through real Match and Player DOs", () 
     expect(JSON.stringify(next.body.input[0].result)).toContain("not used");
 
     const snap = await finished(matchId);
+    expectNoAgentIdentity(playerTexts(stub.api), agents);
     const chats = snap.events.filter((e) => e.kind === "wolf_chat" && e.data.seat === wolf);
     expect(chats.map((e) => e.data.text)).not.toContain("too late");
     expect(snap.events.some((e) => e.kind === "turn_timed_out" && e.data.seat === wolf)).toBe(true);
