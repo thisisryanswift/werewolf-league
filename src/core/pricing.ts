@@ -25,11 +25,18 @@ export const PRICES: Record<string, ModelPrice> = {
   "gemini-3.5-flash-lite": { input: 0.3, cached: 0.03, output: 2.5 },
   // Decisions bills input only; it reports no cached tokens, so cached is priced as input.
   "gemini-decision-1": { input: 0.1, cached: 0.1, output: 0 },
-  // OpenRouter (pi harness), per OpenRouter's public model list on 2026-11-21. Haiku 5.5's
-  // >100k-token prompt tier is not modelled; pi turns stay far below it.
+  // OpenRouter (pi harness), per OpenRouter's /api/v1/models on 2026-11-21; cached is its
+  // input_cache_read. Long-prompt tiers (GPT-6.1 Terra >272k, Grok 4.7 >200k tokens) are
+  // not modelled; pi turns stay far below them.
   "google/gemini-4-hydrogen": { input: 1.5, cached: 0.075, output: 7.5 },
+  "anthropic/claude-sonnet-5.5": { input: 2, cached: 0.1, output: 10 },
+  // Off the roster; kept so earlier Matches' recorded usage stays priced.
   "anthropic/claude-haiku-5.5": { input: 0.1, cached: 0.01, output: 0.5 },
+  "openai/gpt-6.1-terra": { input: 1, cached: 0.05, output: 5 },
+  "meta/muse-ember": { input: 0.1, cached: 0.004, output: 0.5 },
+  "z-ai/glm-5.3-flashx": { input: 0.37, cached: 0.075, output: 1.25 },
   "deepseek/deepseek-v4.1-flash": { input: 0.0498, cached: 0.000996, output: 0.1992 },
+  "x-ai/grok-4.7": { input: 2, cached: 0.5, output: 6 },
   // The Fake Harness and fake Narrator call no model.
   fake: { input: 0, cached: 0, output: 0 },
 };

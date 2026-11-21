@@ -50,7 +50,15 @@ describe("multiple Leagues", () => {
     expect(pi.league).toMatchObject({ id: "pi-open" });
     expect(pi.config.paused).toBe(true);
     expect(pi.tiles).toEqual([]);
-    expect(pi.config.roster.map((a) => a.name)).toEqual(["Hydrogen · Pi", "Claude Haiku 5.5 · Pi", "DeepSeek V4.1 Flash · Pi"]);
+    expect(pi.config.roster.map((a) => a.name)).toEqual([
+      "Hydrogen · Pi",
+      "Claude Sonnet 5.5 · Pi",
+      "GPT-6.1 Terra · Pi",
+      "Muse Ember · Pi",
+      "GLM-5.3 FlashX · Pi",
+      "DeepSeek V4.1 Flash · Pi",
+      "Grok 4.7 · Pi",
+    ]);
     expect(pi.config.roster.every((a) => a.harness === "pi")).toBe(true);
 
     expect((await exports.default.fetch("http://test/api/leagues/nope")).status).toBe(404);

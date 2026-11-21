@@ -3,7 +3,7 @@ import type { Harness, PlayerContext } from "../../src/core/harness";
 import type { ToolCall } from "../../src/core/ruleset";
 import { PI_HARNESS_ID, piHarness, SWEEP_AGE_MS, sweepSandboxes, type PiSeatClient } from "../../src/harness/pi";
 import { INSTANCE_PREFIX, instanceName } from "../../src/harness/pi/seat-name";
-import type { PiPoll, PiSeatConfig } from "../../src/harness/pi/seat";
+import { templateFor, withModel, type PiPoll, type PiSeatConfig } from "../../src/harness/pi/seat";
 import { ACCEPTED, handleGameCall, IGNORED, type CheckCall, type PiTurn, type TurnStore } from "../../src/harness/pi/turn";
 import { piRoster } from "../../src/rulesets/werewolf/roster";
 import { PRICES } from "../../src/core/pricing";
@@ -158,6 +158,52 @@ describe("pi roster", () => {
     expect(roster.every((a) => a.harness === PI_HARNESS_ID)).toBe(true);
     expect(roster.map((a) => a.model)).toContain("google/gemini-4-hydrogen");
     for (const a of roster) expect(PRICES[a.model!], a.model).toBeDefined();
+  });
+
+  it("is the seven approved OpenRouter models, each named '<Model> · Pi'", () => {
+    expect(piRoster().map((a) => a.model)).toEqual([
+      "google/gemini-4-hydrogen",
+      "anthropic/claude-sonnet-5.5",
+      "openai/gpt-6.1-terra",
+      "meta/muse-ember",
+      "z-ai/glm-5.3-flashx",
+      "deepseek/deepseek-v4.1-flash",
+      "x-ai/grok-4.7",
+    ]);
+    expect(piRoster().every((a) => a.name.endsWith(" · Pi"))).toBe(true);
+    expect(new Set(piRoster().map((a) => a.id)).size).toBe(7);
+  });
+});
+
+describe("pi catalog fallback (Pi's OpenRouter catalog is stale)", () => {
+  const catalog = [
+    { id: "~x-ai/grok-latest", api: "anthropic-messages", reasoning: true, contextWindow: 9_000_000 },
+    { id: "anthropic/claude-old", api: "anthropic-messages", reasoning: true, contextWindow: 200_000 },
+    { id: "openai/gpt-old", api: "openai-completions", reasoning: false, contextWindow: 4_000 },
+    { id: "openai/gpt-new", api: "openai-completions", reasoning: true, contextWindow: 400_000 },
+    { id: "qwen/qwen-x", api: "openai-completions", reasoning: true, contextWindow: 128_000 },
+  ];
+  const provider = { getModels: () => catalog };
+
+  it("clones the best same-vendor entry (reasoning-capable, largest context)", () => {
+    expect(templateFor(catalog, "openai/gpt-6.1-terra")?.id).toBe("openai/gpt-new");
+    expect(templateFor(catalog, "anthropic/claude-sonnet-5.5")?.api).toBe("anthropic-messages");
+  });
+
+  it("falls back to a generic OpenAI-compatible entry when no same-vendor entry exists", () => {
+    // `~x-ai/...` is an alias, not a same-vendor entry; meta has none at all.
+    for (const model of ["x-ai/grok-4.7", "meta/muse-ember"]) {
+      const t = templateFor(catalog, model);
+      expect(t?.api, model).toBe("openai-completions");
+      expect(t?.reasoning, model).toBe(true);
+    }
+  });
+
+  it("adds the missing model to the provider's catalog and leaves known models alone", () => {
+    const p = withModel(provider, "meta/muse-ember");
+    const added = p.getModels().find((m) => m.id === "meta/muse-ember");
+    expect(added).toMatchObject({ id: "meta/muse-ember", api: "openai-completions", reasoning: true });
+    expect(withModel(provider, "qwen/qwen-x")).toBe(provider);
   });
 });
 

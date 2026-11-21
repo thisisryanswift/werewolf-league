@@ -25,8 +25,12 @@ export function realRoster(): AgentConfig[] {
  */
 export const PI_MODELS = [
   { id: "hydrogen-pi", name: "Hydrogen · Pi", model: "google/gemini-4-hydrogen" },
-  { id: "claude-haiku-5-5-pi", name: "Claude Haiku 5.5 · Pi", model: "anthropic/claude-haiku-5.5" },
+  { id: "claude-sonnet-5-5-pi", name: "Claude Sonnet 5.5 · Pi", model: "anthropic/claude-sonnet-5.5" },
+  { id: "gpt-6-1-terra-pi", name: "GPT-6.1 Terra · Pi", model: "openai/gpt-6.1-terra" },
+  { id: "muse-ember-pi", name: "Muse Ember · Pi", model: "meta/muse-ember" },
+  { id: "glm-5-3-flashx-pi", name: "GLM-5.3 FlashX · Pi", model: "z-ai/glm-5.3-flashx" },
   { id: "deepseek-v4-1-flash-pi", name: "DeepSeek V4.1 Flash · Pi", model: "deepseek/deepseek-v4.1-flash" },
+  { id: "grok-4-7-pi", name: "Grok 4.7 · Pi", model: "x-ai/grok-4.7" },
 ] as const;
 
 export function piRoster(): AgentConfig[] {

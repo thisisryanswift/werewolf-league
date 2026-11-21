@@ -28,7 +28,7 @@ export const PI_MAX_TURNS = 8;
 export const PI_THINKING = "low";
 /** The sandbox runs as user `node`, which cannot write /root (measured in the smoke Match). */
 export const NOTES_PATH = "/home/node/notes.md";
-const PLACEHOLDER_MODEL = "anthropic/claude-haiku-5.5";
+const PLACEHOLDER_MODEL = "anthropic/claude-sonnet-5.5";
 /** How long startTurn waits for an aborted earlier run to settle before submitting. */
 const SETTLE_WAIT_MS = 5_000;
 
@@ -53,17 +53,33 @@ const SANDBOX_SECTION = [
 ].join("\n");
 
 
+type CatalogEntry = { id: string; api?: string; reasoning?: boolean; contextWindow?: number };
+
+/** Prefer reasoning-capable entries (pi runs with thinkingLevel "low"), then the largest context window. */
+function bestOf<M extends CatalogEntry>(entries: readonly M[]): M | undefined {
+  return [...entries].sort((a, b) => Number(!!b.reasoning) - Number(!!a.reasoning) || (b.contextWindow ?? 0) - (a.contextWindow ?? 0))[0];
+}
+
+/**
+ * The catalog entry a missing model is cloned from: the best same-vendor entry (same wire
+ * format), else the best generic OpenAI-compatible (`openai-completions`) entry, else the
+ * first. The vendor match is exact (`x-ai/`), so OpenRouter's `~x-ai/...` aliases don't count.
+ */
+export function templateFor<M extends CatalogEntry>(catalog: readonly M[], model: string): M | undefined {
+  const vendor = model.split("/")[0] + "/";
+  return bestOf(catalog.filter((m) => m.id.startsWith(vendor))) ?? bestOf(catalog.filter((m) => m.api === "openai-completions")) ?? catalog[0];
+}
+
 /**
  * Pi's OpenRouter catalog is stale (it lacks e.g. google/gemini-4-hydrogen, so runs end
- * `no_model`). Add a missing model by cloning a catalog entry from the same vendor (same
- * wire format), else the first one. Prices come from our PRICES table, not this entry.
+ * `no_model`). Add a missing model by cloning a catalog entry (see templateFor). Prices
+ * come from our PRICES table, not this entry.
  */
-export function withModel<P extends { getModels(): readonly { id: string }[] }>(provider: P, model: string | undefined): P {
+export function withModel<P extends { getModels(): readonly CatalogEntry[] }>(provider: P, model: string | undefined): P {
   if (!model) return provider;
   const catalog = provider.getModels();
   if (catalog.some((m) => m.id === model)) return provider;
-  const vendor = model.split("/")[0] + "/";
-  const template = catalog.find((m) => m.id.startsWith(vendor)) ?? catalog[0];
+  const template = templateFor(catalog, model);
   if (!template) return provider;
   const extra = { ...template, id: model, name: model };
   const models = [...catalog, extra];
