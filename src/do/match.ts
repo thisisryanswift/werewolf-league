@@ -299,7 +299,6 @@ export class MatchDO extends DurableObject<Env> {
    */
   async submitAction(turnId: string, seat: Seat, call: ToolCall | null, usage?: ModelUsage, notes?: string): Promise<SubmitResult> {
     if (this.recordSeatUsage(seat, usage)) this.lateCost();
-    this.recordNotes(seat, notes);
     const meta = this.meta;
     const step = this.step;
     const turn = step?.turns.find((t) => t.turnId === turnId && t.seat === seat);
@@ -313,6 +312,9 @@ export class MatchDO extends DurableObject<Env> {
       await this.armAlarm(meta, step);
       return { status: "stale" };
     }
+    // Only a current, on-time turn's notes are published (a stale report never overwrites newer ones).
+    // Before validation: an invalid call's notes are still the seat's latest.
+    this.recordNotes(seat, notes);
     if (call) {
       const v = this.ruleset(meta).validate(this.rulesetState, seat, call);
       if (!v.ok) return { status: "invalid", error: v.error };
