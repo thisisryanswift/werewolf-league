@@ -38,7 +38,7 @@ A second Harness, harness: "pi", so the League can field non-Gemini models runni
 
 **Checkpoint: passed in the spike** (see the note). Remaining risk is integration: the validate-only RPC, the Agent37 bash/notes tool wired into Pi, and a full Match.
 
-**Spend:** OpenRouter (\$100 key cap) and Agent37 (capped auto-refill) bill separately from the Gemini credit. Before starting, the human sets a credit limit on the OpenRouter key and a small Agent37 wallet top-up. Start with 1-2 pi Agents at low N.
+**Spend:** OpenRouter ($100 key cap) and Agent37 (capped auto-refill) bill separately from the Gemini credit. Before starting, the human sets a credit limit on the OpenRouter key and a small Agent37 wallet top-up. Start with 1-2 pi Agents at low N.
 
 **References:** https://developers.cloudflare.com/agents/harnesses/pi/ (plus extensions/ and models/pi-ai/); https://www.agent37.com/docs/llms.txt (instances/create, exec, templates).
 
