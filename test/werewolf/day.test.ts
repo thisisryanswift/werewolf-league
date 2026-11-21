@@ -295,13 +295,13 @@ describe("Werewolf Day vote: beliefs", () => {
   /** A village voter's other seats: the other villagers, then the wolves. */
   const villageOthers = (t: { villagers: number[]; wolves: number[] }) => [...t.villagers.slice(1), ...t.wolves];
 
-  it("records beliefs for God View only, and a timed-out vote has no ballot", () => {
+  it("records beliefs for Narrator's View only, and a timed-out vote has no ballot", () => {
     const { recorded, ballots, seat } = ballotOf("village", {});
     expect(recorded.audience).toEqual([]);
     expect(ballots.map((b) => b.seat)).toEqual([seat]);
     expect(werewolf.view([recorded], { seat })).toEqual([]);
-    expect(werewolf.view([recorded], { spectator: true, godView: false })).toEqual([]);
-    expect(werewolf.view([recorded], { spectator: true, godView: true })).toEqual([recorded]);
+    expect(werewolf.view([recorded], { spectator: true, narratorView: false })).toEqual([]);
+    expect(werewolf.view([recorded], { spectator: true, narratorView: true })).toEqual([recorded]);
   });
 
   it("a concentrated village ballot [1, 0, 0, ...] with target 2 is capped at 1 and the excess spread evenly", () => {

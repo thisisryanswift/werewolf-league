@@ -1,5 +1,5 @@
 // Home page: the dense live grid of the League's Matches, with the Match modal
-// over it for #match=<id>. God View (on by default) is shared by the grid and
+// over it for #match=<id>. Narrator's View (on by default) is shared by the grid and
 // the modal. The full leaderboard and the finished Matches follow the grid.
 import { useState } from "react";
 import { Leaderboard } from "../components/Leaderboard";
@@ -11,12 +11,12 @@ import { useLeagueFeed } from "../useLeagueFeed";
 
 export function HomePage() {
   const { league, status, activity } = useLeagueFeed();
-  const [godView, setGodView] = useState(true);
+  const [narratorView, setNarratorView] = useState(true);
   const route = useMatchRoute();
   return (
     <main className="lg-page">
       {league ? (
-        <LeagueGrid league={league} status={status} activity={activity} godView={godView} onGodViewChange={setGodView} />
+        <LeagueGrid league={league} status={status} activity={activity} narratorView={narratorView} onNarratorViewChange={setNarratorView} />
       ) : (
         <p className="lg-loading" data-testid="feed-status">
           Feed: {status}
@@ -28,7 +28,7 @@ export function HomePage() {
           <FinishedMatchList recent={league.recent} />
         </div>
       )}
-      {route.matchId && <MatchModal key={route.matchId} matchId={route.matchId} godView={godView} onGodViewChange={setGodView} onClose={route.close} />}
+      {route.matchId && <MatchModal key={route.matchId} matchId={route.matchId} narratorView={narratorView} onNarratorViewChange={setNarratorView} onClose={route.close} />}
     </main>
   );
 }

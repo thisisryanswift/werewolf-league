@@ -190,7 +190,7 @@ body:has(.leaderboard) {
 .leaderboard thead button:focus-visible {
   text-decoration: underline;
 }
-/* Table Suspicion meter (God View only) */
+/* Table Suspicion meter (Narrator's View only) */
 .table-suspicion ul {
   list-style: none;
   padding: 0;

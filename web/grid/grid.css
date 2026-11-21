@@ -11,8 +11,8 @@
   --lg-teal: #1d9a8a;
   --lg-red: #e8213b;
   --lg-pale-red: #f6b3bd;
-  --lg-seer: #6a3fd0; /* God View pips: S */
-  --lg-doctor: #1f6fd1; /* God View pips: D */
+  --lg-seer: #6a3fd0; /* Narrator's View pips: S */
+  --lg-doctor: #1f6fd1; /* Narrator's View pips: D */
   --lg-starting: #ecebe6;
   --lg-border: 4px;
   --lg-shadow: 6px 6px 0 var(--lg-ink);
@@ -83,7 +83,7 @@ body:has(.lg-page) {
 .lg-count,
 .lg-board li,
 .lg-chip,
-.lg-god,
+.lg-narrator,
 .lg-feed,
 .lg-page .featured {
   background: var(--lg-paper);
@@ -127,12 +127,12 @@ body:has(.lg-page) {
 .lg-feed-connecting {
   background: var(--lg-yellow);
 }
-.lg-god {
+.lg-narrator {
   font: 800 14px/1.4 var(--lg-font);
   color: inherit;
   cursor: pointer;
 }
-.lg-god.on {
+.lg-narrator.on {
   background: var(--lg-ink);
   color: var(--lg-yellow);
 }
@@ -165,7 +165,7 @@ body:has(.lg-page) {
   font-weight: 800;
 }
 .lg-chip:focus-visible,
-.lg-god:focus-visible,
+.lg-narrator:focus-visible,
 .lg-tile:focus-visible,
 .lg-page .featured a:focus-visible {
   outline: 3px solid var(--lg-red);

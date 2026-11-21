@@ -83,10 +83,10 @@ export type SetupResult<S> =
 export type Validation = { ok: true } | { ok: false; error: string };
 
 /**
- * What a Player sees: either one seat, or a Spectator (God View sees every
- * audience). Spectator feeds send the God View and filter client-side.
+ * What a Player sees: either one seat, or a Spectator (Narrator's View sees every
+ * audience). Spectator feeds send the Narrator's View and filter client-side.
  */
-export type Viewer = { seat: Seat } | { spectator: true; godView: boolean };
+export type Viewer = { seat: Seat } | { spectator: true; narratorView: boolean };
 
 export interface Ruleset<S = unknown> {
   id: string;
@@ -120,13 +120,13 @@ export interface Ruleset<S = unknown> {
   result(state: S): MatchResult | null;
   /**
    * Summary for the League grid tile: public fields, plus private ones only under
-   * `godView`. `publicEvents` is the committed
+   * `narratorView`. `publicEvents` is the committed
    * log filtered to the "all" audience (for the latest speech line).
    */
   summary(state: S, publicEvents: RulesetEvent[]): MatchSummary;
   /**
    * Optional: what the Narrator asks about this Ruleset's Matches. Without it a
-   * Match is never narrated. `log` renders the God View log (every audience,
+   * Match is never narrated. `log` renders the Narrator's View log (every audience,
    * secrets included) as text.
    */
   narration?: {
@@ -138,7 +138,7 @@ export interface Ruleset<S = unknown> {
 /** Default `view` for rulesets that use the shared audience field. */
 export function viewByAudience<E extends { audience: EventAudience }>(events: E[], viewer: Viewer): E[] {
   if ("spectator" in viewer) {
-    return viewer.godView ? events : events.filter((e) => e.audience === "all");
+    return viewer.narratorView ? events : events.filter((e) => e.audience === "all");
   }
   return events.filter((e) => e.audience === "all" || e.audience.includes(viewer.seat));
 }
