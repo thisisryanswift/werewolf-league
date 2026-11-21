@@ -58,11 +58,11 @@ export class Agent37 {
     await this.json(res, "delete");
   }
 
-  /** Instances whose name starts with `prefix`. */
-  async list(prefix: string): Promise<{ id: string; name: string; created_at?: string }[]> {
+  /** Instances whose name starts with `prefix`; `created` is in Unix seconds. */
+  async list(prefix: string): Promise<{ id: string; name: string; created?: number }[]> {
     const res = await this.fetchFn(`${AGENT37_API}/instances`, { headers: this.bearer() });
     const body = await this.json(res, "list");
-    const data = (body.data ?? []) as { id: string; name?: string; created_at?: string }[];
-    return data.filter((i) => String(i.name ?? "").startsWith(prefix)).map((i) => ({ id: i.id, name: String(i.name), created_at: i.created_at }));
+    const data = (body.data ?? []) as { id: string; name?: string; created?: number }[];
+    return data.filter((i) => String(i.name ?? "").startsWith(prefix)).map((i) => ({ id: i.id, name: String(i.name), created: i.created }));
   }
 }

@@ -16,6 +16,7 @@ import { fakeRoster, LEAGUE_NAME } from "../core/roster";
 import { startMatch } from "../core/start-match";
 import { narratorConfigError } from "../narrator";
 import { isAdmin } from "./auth";
+import { sweepSandboxes } from "../harness/pi";
 
 const unauthorized = () => Response.json({ error: "unauthorized" }, { status: 401 });
 
@@ -31,7 +32,12 @@ export async function handleApi(request: Request, env: Env, url: URL): Promise<R
   const adminOp = /^\/api\/admin\/league\/(pause|resume|config|featured)$/.exec(url.pathname);
   if (adminOp && request.method === "POST") {
     if (!isAdmin(request, env)) return unauthorized();
-    if (adminOp[1] === "pause") return Response.json(await league.pause());
+    if (adminOp[1] === "pause") {
+      const paused = await league.pause();
+      // Best effort and bounded: pause never waits long on the sandbox provider.
+      await Promise.race([sweepSandboxes(env.AGENT37_API_KEY), new Promise((r) => setTimeout(r, 5_000))]);
+      return Response.json(paused);
+    }
     if (adminOp[1] === "resume") return Response.json(await league.resume());
     const body = await request.json().catch(() => null);
     if (typeof body !== "object" || body === null) return Response.json({ error: "expected a JSON object" }, { status: 400 });

@@ -8,6 +8,8 @@
 import type { Harness, PlayerContext, PollResult, TurnHandle } from "../../core/harness";
 import type { PiPoll, PiSeatConfig } from "./seat";
 import type { UsageReading } from "../../core/usage";
+import { Agent37, type Fetch } from "./agent37";
+import { INSTANCE_PREFIX } from "./seat-name";
 
 export const PI_HARNESS_ID = "pi";
 
@@ -74,4 +76,24 @@ export function piHarness(seatFor: SeatResolver): Harness {
 /** The production resolver: one PiSeatDO per Player, named like the Player DO. */
 export function piSeatsFrom(env: Env): SeatResolver {
   return (ctx) => env.PI_SEAT.getByName(`${ctx.matchId}:${ctx.seat}`) as unknown as PiSeatClient;
+}
+
+/** A sandbox older than this outlived any Match (the longest run ~45 min), so its delete at Match end failed. */
+export const SWEEP_AGE_MS = 2 * 60 * 60_000;
+
+/**
+ * Best-effort cleanup on League pause: delete pi sandboxes left over from Matches whose
+ * close-time delete failed. Never throws; returns how many it deleted.
+ */
+export async function sweepSandboxes(apiKey: string | undefined, now = Date.now(), fetchFn?: Fetch): Promise<number> {
+  if (!apiKey) return 0;
+  try {
+    const api = new Agent37(apiKey, fetchFn);
+    const stale = (await api.list(INSTANCE_PREFIX)).filter((i) => i.created !== undefined && now - i.created * 1000 > SWEEP_AGE_MS);
+    const done = await Promise.allSettled(stale.map((i) => api.delete(i.id)));
+    return done.filter((d) => d.status === "fulfilled").length;
+  } catch (err) {
+    console.warn(`pi sandbox sweep failed: ${String(err)}`);
+    return 0;
+  }
 }

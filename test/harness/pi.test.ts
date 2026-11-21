@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Harness, PlayerContext } from "../../src/core/harness";
 import type { ToolCall } from "../../src/core/ruleset";
-import { PI_HARNESS_ID, piHarness, type PiSeatClient } from "../../src/harness/pi";
+import { PI_HARNESS_ID, piHarness, SWEEP_AGE_MS, sweepSandboxes, type PiSeatClient } from "../../src/harness/pi";
 import type { PiPoll, PiSeatConfig } from "../../src/harness/pi/seat";
 import { ACCEPTED, handleGameCall, IGNORED, type CheckCall, type PiTurn, type TurnStore } from "../../src/harness/pi/turn";
 import { piRoster } from "../../src/rulesets/werewolf/roster";
@@ -157,5 +157,32 @@ describe("pi roster", () => {
     expect(roster.every((a) => a.harness === PI_HARNESS_ID)).toBe(true);
     expect(roster.map((a) => a.model)).toContain("google/gemini-4-hydrogen");
     for (const a of roster) expect(PRICES[a.model!], a.model).toBeDefined();
+  });
+});
+
+describe("pi sandbox sweep (League pause)", () => {
+  it("deletes only pi sandboxes older than any Match, and never throws", async () => {
+    const now = 10_000_000_000;
+    const deleted: string[] = [];
+    const fakeFetch = async (url: string, init?: RequestInit) => {
+      if (init?.method === "DELETE") {
+        deleted.push(url.split("/").pop()!);
+        return Response.json({ deleted: true });
+      }
+      return Response.json({
+        data: [
+          { id: "old", name: "wl-pi-m1-2", created: (now - SWEEP_AGE_MS - 1000) / 1000 },
+          { id: "live", name: "wl-pi-m2-2", created: (now - 60_000) / 1000 },
+          { id: "other", name: "someone-else", created: 0 },
+        ],
+      });
+    };
+    expect(await sweepSandboxes("k", now, fakeFetch)).toBe(1);
+    expect(deleted).toEqual(["old"]);
+    const down = async (): Promise<Response> => {
+      throw new Error("down");
+    };
+    expect(await sweepSandboxes("k", now, down)).toBe(0);
+    expect(await sweepSandboxes(undefined, now, fakeFetch)).toBe(0);
   });
 });

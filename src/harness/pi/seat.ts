@@ -19,6 +19,7 @@ import { openrouterProvider } from "@earendil-works/pi-ai/providers/openrouter";
 import type { Usage, UsageReading } from "../../core/harness";
 import type { ToolCall, ToolSpec } from "../../core/ruleset";
 import { Agent37 } from "./agent37";
+import { instanceName } from "./seat-name";
 import { handleGameCall, type PiTurn, type TurnStore } from "./turn";
 
 /** Bash and notes calls use turns too, so leave room beyond the in-run retries. */
@@ -43,13 +44,11 @@ export type PiPoll =
 
 const SANDBOX_SECTION = [
   "You have a private Linux sandbox with no network access. Use the `bash` tool to run short commands in it.",
-  `Keep notes for yourself in ${NOTES_PATH} (e.g. \`echo '...' >> ${NOTES_PATH}\`, \`cat ${NOTES_PATH}\`); the file persists for the whole Match.`,
+  `Keep notes for yourself in ${NOTES_PATH}; the file persists for the whole Match.`,
+  `Each turn, before your game action, append one short line of what you learned to it (e.g. \`echo 'Day 1: ...' >> ${NOTES_PATH}\`), and read it back (\`cat ${NOTES_PATH}\`) when you need to remember earlier turns.`,
   "Act in the game only through the game tools. Call exactly one game tool per turn: the one the observation asks for.",
 ].join("\n");
 
-/** Agent37 instance names: deterministic per seat, so a retried provision finds its own sandbox. */
-export const INSTANCE_PREFIX = "wl-pi-";
-export const instanceName = (matchId: string, seat: number) => `${INSTANCE_PREFIX}${matchId}-${seat}`.replace(/[^a-zA-Z0-9-]/g, "-").slice(0, 60);
 
 export class PiSeatDO extends DurableObject<Env> {
   private readonly harness: PiHarness;
