@@ -6,8 +6,7 @@ import { MANAGED_AGENT_HARNESS_ID, managedAgentHarness } from "./managed-agent";
 
 const HARNESSES: Record<string, (env: Env) => Harness> = {
   fake: () => fakeHarness,
-  [MANAGED_AGENT_HARNESS_ID]: (env) =>
-    managedAgentHarness({ apiKey: env.GEMINI_API_KEY, maxTurnMs: Number(env.MANAGED_AGENT_MAX_TURN_MS ?? 0) }),
+  [MANAGED_AGENT_HARNESS_ID]: (env) => managedAgentHarness({ apiKey: env.GEMINI_API_KEY }),
 };
 
 export function harnessFor(agent: AgentConfig, env: Env): Harness {

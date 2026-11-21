@@ -30,9 +30,10 @@ const input = (text: string, actionKind = "vote", extra: Partial<TurnInput> = {}
 });
 
 /** One seat driven like the Player DO drives it. */
-async function seat(opts: { now?: () => number; maxTurnMs?: number } = {}) {
+async function seat(opts: { hangCancels?: boolean } = {}) {
   const api = new StubInteractionsApi();
-  const harness: Harness = managedAgentHarness({ apiKey: "test-key", fetch: api.fetch, ...opts });
+  api.hangCancels = !!opts.hangCancels;
+  const harness: Harness = managedAgentHarness({ apiKey: "test-key", fetch: api.fetch });
   const ctx: PlayerContext = { matchId: "m1", seat: 3, agent: AGENT, tools: TOOLS, chain: {} };
   ctx.chain = await harness.provision(ctx);
   const s = {
@@ -61,14 +62,30 @@ async function seat(opts: { now?: () => number; maxTurnMs?: number } = {}) {
 }
 
 describe("Managed Agent harness: provisioning and the first turn", () => {
-  it("provisions a fresh environment at Match start with the seat's tools, then cancels the setup interaction", async () => {
-    const { api, ctx } = await seat();
+  it("provisions a fresh environment with the seat's tools and returns its IDs before any cancel request", async () => {
+    // Even if every cancel hangs, provisioning returns the setup interaction and environment IDs.
+    const { api, ctx } = await seat({ hangCancels: true });
     const [setup] = api.creates();
     expect(setup.environment).toBe("remote");
     expect(setup.tools.map((t: any) => t.name)).toEqual(["speak", "vote"]);
-    expect(api.requests.some((r) => r.path === `/${api.latest().id}/cancel`)).toBe(true);
+    expect(api.requests.some((r) => r.path.endsWith("/cancel"))).toBe(false);
     expect(api.requests.every((r) => r.apiKey === "test-key")).toBe(true);
     expect(ctx.chain.environment).toBe("env-1");
+    expect(JSON.stringify(ctx.chain)).toContain(api.latest().id);
+  });
+
+  it("cancels the setup interaction when the first turn starts, before creating the turn", async () => {
+    const s = await seat();
+    const setupId = s.api.latest().id;
+    await s.start(input("BRIEFING-1", "vote", { firstTurn: true }));
+    expect(s.api.interactions.get(setupId)!.status).toBe("cancelled");
+    const cancelAt = s.api.requests.findIndex((r) => r.path === `/${setupId}/cancel`);
+    const turnAt = s.api.requests.findLastIndex((r) => r.method === "POST" && r.path === "");
+    expect(cancelAt).toBeGreaterThan(-1);
+    expect(cancelAt).toBeLessThan(turnAt);
+    // Only once.
+    await s.start(input("NEXT", "vote"));
+    expect(s.api.requests.filter((r) => r.path === `/${setupId}/cancel`)).toHaveLength(1);
   });
 
   it("sends rules, Agent Instructions and the seat's fixed tools on the first turn, on the provisioned environment", async () => {
@@ -232,14 +249,6 @@ describe("Managed Agent harness: timeout recovery", () => {
     expect(s.api.creates().at(-1).previous_interaction_id).toBe(parent);
   });
 
-  it("cancels a turn stuck past the watchdog limit and reports an error, not a call", async () => {
-    let t = 0;
-    const s = await seat({ now: () => t, maxTurnMs: 1000 });
-    const h = await s.start(input("BRIEFING-1", "vote", { firstTurn: true }));
-    t = 1500;
-    expect(await s.poll(h)).toMatchObject({ status: "error" });
-    expect(s.api.interactions.get(String(h.interactionId))!.status).toBe("cancelled");
-  });
 });
 
 describe("Managed Agent harness: late results", () => {

@@ -1,8 +1,9 @@
 // Managed Agent harness: plays a seat through a Gemini Managed Agent interaction chain.
 //
-// - provision(): creates the seat's environment at Match start (a setup interaction on
-//   "remote", cancelled at once; M1 showed environment_id is on the create() response and
-//   survives the cancel).
+// - provision(): creates the seat's environment at Match start with a setup interaction on
+//   "remote" and returns its IDs at once, so they are persisted before anything else. The
+//   setup interaction is cancelled when the first turn starts (M1: environment_id is on the
+//   create() response and survives the cancel).
 // - startTurn(): a first turn (`input.firstTurn`) starts a chain on the seat's environment
 //   with the Agent Instructions and the Match's text (briefing + observation); later turns
 //   chain with previous_interaction_id + environment and put the observation inside the
@@ -44,7 +45,6 @@ interface InFlight {
   parent: Parent | null;
   /** Transcript length once this interaction has been seen by the Agent. */
   upTo: number;
-  startedAt: number;
   /** Set by cancel(): the turn is over and its call must never be reported. */
   cancelled?: boolean;
 }
@@ -60,6 +60,8 @@ interface Chain {
   inFlight: InFlight | null;
   /** Said once in the next result, e.g. that the last turn timed out. */
   note?: string;
+  /** Setup interaction from provision(), cancelled when the first turn starts. */
+  setupInteraction?: string;
 }
 
 export const PREAMBLE = [
@@ -73,19 +75,12 @@ export const NOTE_TIMED_OUT =
 export const NOTE_TOO_LATE = "Your last call arrived after the deadline and was not used; the default action was used instead.";
 const NOTE_RESTART = "Your earlier conversation could not be continued. Everything you have been told so far follows.";
 const EARLIER = "[Earlier turn, now over; for context only]";
+const SETUP_CANCEL_TIMEOUT_MS = 5_000;
 const EXTRA_CALL = "Only one action per turn counts; this call was ignored.";
 
 export interface ManagedAgentOptions {
   apiKey: string | undefined;
   fetch?: Fetch;
-  /** Clock, for tests. */
-  now?: () => number;
-  /**
-   * Watchdog: a poll that finds the turn still running after this long cancels it and
-   * reports an error. Deadlines proper belong to the Player DO; this only stops a stuck
-   * interaction hanging a Match. 0 disables it.
-   */
-  maxTurnMs?: number;
 }
 
 /** Join observations, marking all but the last as earlier turns whose requests are over. */
@@ -113,8 +108,6 @@ export function managedAgentHarness(opts: ManagedAgentOptions): Harness {
   if (!opts.apiKey) throw new Error("GEMINI_API_KEY is not set; the managed-agent harness cannot run");
   // Late-bound so the Worker's global fetch is used at call time.
   const api = new InteractionsClient(opts.apiKey, opts.fetch ?? ((i, init) => fetch(i, init)));
-  const now = opts.now ?? Date.now;
-  const maxTurnMs = opts.maxTurnMs ?? 0;
 
   /** Settle the previous in-flight interaction and fold its outcome into the chain. */
   async function reconcile(ctx: PlayerContext, chain: Chain): Promise<Chain> {
@@ -188,15 +181,26 @@ export function managedAgentHarness(opts: ManagedAgentOptions): Harness {
         input: `${PREAMBLE}\n\nSetup only: your sandbox is being prepared. Do nothing; the Match starts soon.`,
       });
       const environment = setup.environment_id ?? (await api.get(setup.id)).environment_id;
-      // Best effort: the setup interaction is never continued.
-      await api.cancel(setup.id).catch(() => undefined);
-      if (!environment) throw new Error("setup interaction returned no environment_id");
-      const chain: Chain = { environment, parent: null, transcript: [], delivered: 0, inFlight: null };
-      return { ...chain, setupInteraction: setup.id };
+      if (!environment) throw new Error(`setup interaction ${setup.id} returned no environment_id`);
+      const chain: Chain = {
+        environment,
+        parent: null,
+        transcript: [],
+        delivered: 0,
+        inFlight: null,
+        setupInteraction: setup.id,
+      };
+      return chain as unknown as Record<string, unknown>;
     },
 
     async startTurn(ctx, input: TurnInput) {
-      let chain = await reconcile(ctx, ctx.chain as unknown as Chain);
+      let chain = ctx.chain as unknown as Chain;
+      if (chain.setupInteraction) {
+        // Best effort and bounded: the setup interaction is never continued.
+        await api.cancel(chain.setupInteraction, SETUP_CANCEL_TIMEOUT_MS).catch(() => undefined);
+        chain = { ...chain, setupInteraction: undefined };
+      }
+      chain = await reconcile(ctx, chain);
       // An invalid-call retry repeats the same frozen observation, which the Agent has seen.
       if (input.firstTurn && !input.error) {
         // The Match's first-turn text holds the briefing and everything seen so far:
@@ -232,7 +236,7 @@ export function managedAgentHarness(opts: ManagedAgentOptions): Harness {
         ...chain,
         parent,
         note: undefined,
-        inFlight: { id: created.id, parent, upTo, startedAt: now() },
+        inFlight: { id: created.id, parent, upTo },
       };
       return { handle: { interactionId: created.id }, chain: next as unknown as Record<string, unknown> };
     },
@@ -249,13 +253,7 @@ export function managedAgentHarness(opts: ManagedAgentOptions): Harness {
         if (err instanceof ApiError && (err.status >= 500 || err.status === 429)) return { status: "pending", handle };
         throw err;
       }
-      if (ACTIVE.has(it.status)) {
-        if (maxTurnMs > 0 && now() - f.startedAt > maxTurnMs) {
-          await api.cancel(id).catch(() => undefined);
-          return { status: "error", message: `interaction ${id} ran past ${maxTurnMs} ms and was cancelled` };
-        }
-        return { status: "pending", handle };
-      }
+      if (ACTIVE.has(it.status)) return { status: "pending", handle };
       if (it.status === "requires_action" || it.status === "completed") {
         const call = it.status === "requires_action" ? pendingCalls(it, toolNames(ctx))[0] : undefined;
         return { status: "done", call: call ? { name: call.name, args: call.args } : null };

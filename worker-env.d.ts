@@ -15,8 +15,6 @@ declare namespace Cloudflare {
     PLAYER_POLL_MS: string;
     /** Gemini API key for the managed-agent harness. Secret: .dev.vars / Wrangler secret only. */
     GEMINI_API_KEY?: string;
-    /** Managed-agent watchdog: cancel a turn still running after this many ms (0 = off). */
-    MANAGED_AGENT_MAX_TURN_MS?: string;
   }
 }
 type Env = Cloudflare.Env;

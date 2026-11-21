@@ -117,7 +117,13 @@ export class PlayerDO extends DurableObject<Env> {
     const seating = this.ctx.storage.kv.get<Seating>("seating");
     if (!seating) return;
     try {
-      await harnessFor(seating.agent, this.env).cancel?.(this.context(seating), handle);
+      const ctx = this.context(seating);
+      const before = JSON.stringify(ctx.chain);
+      const chain = await harnessFor(seating.agent, this.env).cancel?.(ctx, handle);
+      // Persist the Harness's cancelled marker, unless a newer turn changed the chain meanwhile.
+      if (chain && JSON.stringify(this.ctx.storage.kv.get("chain") ?? {}) === before) {
+        this.ctx.storage.kv.put("chain", chain);
+      }
     } catch {
       // Best effort: the Match drops a late result by turn ID anyway.
     }

@@ -40,12 +40,20 @@ export class InteractionsClient {
     private readonly fetchFn: Fetch,
   ) {}
 
-  private async call(method: string, path: string, body?: unknown): Promise<Interaction> {
-    const res = await this.fetchFn(API_BASE + path, {
+  private async call(method: string, path: string, body?: unknown, timeoutMs?: number): Promise<Interaction> {
+    const request = this.fetchFn(API_BASE + path, {
       method,
       headers: { "x-goog-api-key": this.apiKey, "content-type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
+    const res = await (timeoutMs === undefined
+      ? request
+      : Promise.race([
+          request,
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error(`${method} interactions${path} timed out after ${timeoutMs} ms`)), timeoutMs),
+          ),
+        ]));
     const text = await res.text();
     if (!res.ok) throw new ApiError(res.status, `${method} interactions${path} -> ${res.status}: ${text.slice(0, 500)}`);
     return JSON.parse(text) as Interaction;
@@ -57,8 +65,9 @@ export class InteractionsClient {
   get(id: string): Promise<Interaction> {
     return this.call("GET", `/${id}`);
   }
-  cancel(id: string): Promise<Interaction> {
-    return this.call("POST", `/${id}/cancel`, {});
+  /** Cancel; with `timeoutMs`, give up waiting (the cancel may still land). */
+  cancel(id: string, timeoutMs?: number): Promise<Interaction> {
+    return this.call("POST", `/${id}/cancel`, {}, timeoutMs);
   }
 }
 

@@ -26,6 +26,13 @@ export class StubInteractionsApi {
   interactions = new Map<string, StubInteraction>();
   /** When set, the next create() answers with this HTTP status. */
   failNextCreate: number | null = null;
+  /** When true, cancel requests never get a response (a hung cancel). */
+  hangCancels = false;
+  /**
+   * Interactions whose Agent call lands just as the cancel arrives: cancelling them
+   * leaves them in requires_action with this call (the late-result race).
+   */
+  landOnCancel = new Map<string, { name: string; args: Record<string, unknown> }>();
   private n = 0;
 
   fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
@@ -37,7 +44,10 @@ export class StubInteractionsApi {
     this.requests.push({ method: req.method, path, body, apiKey: req.headers.get("x-goog-api-key") });
     if (req.method === "POST" && path === "") return this.create(body);
     const cancel = /^\/([^/]+)\/cancel$/.exec(path);
-    if (req.method === "POST" && cancel) return this.cancel(cancel[1]!);
+    if (req.method === "POST" && cancel) {
+      if (this.hangCancels) return new Promise<Response>(() => {});
+      return this.cancel(cancel[1]!);
+    }
     const get = /^\/([^/]+)$/.exec(path);
     if (req.method === "GET" && get) {
       const it = this.interactions.get(get[1]!);
@@ -79,6 +89,8 @@ export class StubInteractionsApi {
   private cancel(id: string): Response {
     const it = this.interactions.get(id);
     if (!it) return json({ error: { message: "not found" } }, 404);
+    const landing = this.landOnCancel.get(id);
+    if (landing && it.status === "in_progress") this.callTool(id, landing.name, landing.args);
     if (it.status === "in_progress") it.status = "cancelled";
     return json(view(it));
   }
