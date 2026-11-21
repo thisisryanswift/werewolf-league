@@ -36,8 +36,10 @@ export function mergeEvents(existing: MatchEvent[], incoming: MatchEvent[]): Mat
 // ---- League feed ------------------------------------------------------
 
 /**
- * A ruleset-agnostic, public summary of a live Match for its grid tile.
- * The Ruleset supplies it; it never contains private information.
+ * A ruleset-agnostic summary of a live Match for its grid tile. The Ruleset
+ * supplies the public fields; the Match runner adds the Narrator's Drama fields.
+ * Secret Drama Flags are sent to every Spectator and hidden client-side when
+ * God View is off (see `visibleDramaFlags`), like private Match events.
  */
 export interface MatchSummary {
   /** Display name of the current phase, e.g. "Day" or "Night"; "Over" once finished. */
@@ -48,6 +50,24 @@ export interface MatchSummary {
   alive: number[];
   /** The latest public speech line, if any. */
   latestSpeech: { seat: number; text: string } | null;
+  /** Narrator Drama Score from 0 (calm) to 1 (explosive); absent before the first narration. */
+  dramaScore?: number;
+  /** Active Drama Flags of the latest narration; absent before the first narration. */
+  dramaFlags?: TileDramaFlag[];
+}
+
+/** Public-safe Drama Flags are shown to everyone; secret ones only in God View. */
+export type DramaFlagVisibility = "public-safe" | "secret";
+
+/** An active Drama Flag on a tile (set by the Narrator). */
+export interface TileDramaFlag {
+  id: string;
+  visibility: DramaFlagVisibility;
+}
+
+/** The Drama Flags a Spectator may see: all of them in God View, else only public-safe ones. */
+export function visibleDramaFlags<F extends { visibility: DramaFlagVisibility }>(flags: F[], godView: boolean): F[] {
+  return godView ? flags : flags.filter((f) => f.visibility === "public-safe");
 }
 
 /** One seat of a Match as shown on a tile. */
