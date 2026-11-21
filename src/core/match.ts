@@ -19,6 +19,8 @@ export interface MatchInit {
   deadlines?: Partial<DeadlineConfig>;
   /** The Narrator for this Match; absent or null means no narration. */
   narrator?: NarratorConfig | null;
+  /** The League DO (by name) the Match reports to; absent means LEAGUE_NAME. */
+  league?: string;
 }
 
 export type MatchStatus = "running" | "finished";

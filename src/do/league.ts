@@ -8,7 +8,7 @@ import { DurableObject } from "cloudflare:workers";
 import { drawTable } from "../core/draw";
 import type { MatchInit, MatchReport } from "../core/match";
 import { FeedCoalescer } from "../core/league-feed";
-import { defaultLeagueConfig, patchConfig, type LeagueConfig } from "../core/roster";
+import { defaultLeagueConfig, LEAGUE_NAME, patchConfig, type LeagueConfig } from "../core/roster";
 import { applyMatch, calibrationByAgent, rankStandings, ratePlayers, snapshotOf, standing, type AgentRecord, type RatingSnapshot } from "../core/ratings";
 import { buildMatchInit } from "../core/start-match";
 import { backoffUntil, recentStarts, startBudget } from "../core/start-pacer";
@@ -34,6 +34,8 @@ interface LiveMatch extends MatchTile {
   startFailures: number;
   /** The seated Agents' Side Ratings when the table was drawn: every Player is rated from this. */
   ratingsBefore?: RatingSnapshot;
+  /** True once a 429 backoff has held this reserved Match back; see releaseUnwanted. */
+  held?: boolean;
 }
 
 /**
@@ -312,6 +314,7 @@ export class LeagueDO extends DurableObject<Env> {
       count: r.count + 1,
       recent: [{ ...report, at: now }, ...r.recent].slice(0, RATE_LIMIT_EVENTS),
     };
+    this.holdStarting();
     this.broadcast();
     await this.armWake();
   }
@@ -442,6 +445,8 @@ export class LeagueDO extends DurableObject<Env> {
         narrator: config.narrator,
         agents: draw.agents,
       });
+      // Report back to this League (there is one in production; tests may run others).
+      init.league = this.ctx.id.name ?? LEAGUE_NAME;
       live[init.matchId] = {
         matchId: init.matchId,
         seed,
@@ -467,9 +472,23 @@ export class LeagueDO extends DurableObject<Env> {
   /** Matches whose `start` call is in flight; they may already exist, so they are never released. */
   private launching = new Set<string>();
 
+  /** Mark every reserved, not-yet-started Match as held back by the backoff. */
+  private holdStarting(): void {
+    const live = this.live;
+    let changed = false;
+    for (const m of Object.values(live)) {
+      if (m.status === "starting" && !m.held) {
+        live[m.matchId] = { ...m, held: true };
+        changed = true;
+      }
+    }
+    if (changed) this.live = live;
+  }
+
   /**
-   * Release reservations the League no longer wants: every not-yet-started
-   * Match while paused, and the newest ones above N. A reserved Match has
+   * Release Matches a backoff held back that the League no longer wants: all of
+   * them while paused, and the newest above N. (A Match reserved just before a
+   * pause, with no backoff, still starts, as before.) A reserved Match has
    * persisted nothing until its start succeeds, so releasing it leaves nothing
    * behind; it no longer counts as started.
    */
@@ -480,7 +499,7 @@ export class LeagueDO extends DurableObject<Env> {
     const excess = config.paused ? all.length : all.length - config.n;
     if (excess <= 0) return;
     const releasable = all
-      .filter((m) => m.status === "starting" && !this.launching.has(m.matchId))
+      .filter((m) => m.status === "starting" && m.held && !this.launching.has(m.matchId))
       .sort((a, b) => b.startedAt - a.startedAt)
       .slice(0, excess);
     if (!releasable.length) return;
@@ -495,6 +514,7 @@ export class LeagueDO extends DurableObject<Env> {
     this.reserve(); // refill freed slots as pacing allows
     if (this.now() < this.rateLimit.until) {
       // Backing off after a 429: hold reserved Matches until it ends.
+      this.holdStarting();
       this.broadcast();
       return this.armWake();
     }

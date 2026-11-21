@@ -69,8 +69,10 @@ export async function connect(matchId: string) {
  * A League feed client: folds every message (join snapshot, then coalesced
  * "tiles" diffs) into the snapshot a grid would show, one state per message.
  */
-export async function connectLeague() {
-  const res = await exports.default.fetch("http://test/api/league/ws", { headers: { Upgrade: "websocket" } });
+export async function connectLeague(
+  open: () => Promise<Response> = () => exports.default.fetch("http://test/api/league/ws", { headers: { Upgrade: "websocket" } }),
+) {
+  const res = await open();
   const ws = res.webSocket;
   if (!ws) throw new Error(`no websocket: ${res.status}`);
   const messages: LeagueMessage[] = [];

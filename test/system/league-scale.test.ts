@@ -1,30 +1,33 @@
 // League at scale (wl-d5wn): staggered starts, 429 backoff and the coalesced
-// feed, end to end through the Worker, the League DO and real Match/Player DOs.
-// The League's clock is faked and its alarm driven by hand where time matters.
+// feed, end to end through the League DO and real Match/Player DOs.
+// These tests run their own League ("scale"): its Matches and Players report
+// back to it, so faking its clock never touches the default League other test
+// files use. The clock is faked per instance and the alarm driven by hand where
+// time matters.
 import { env, runDurableObjectAlarm, runInDurableObject } from "cloudflare:test";
 import { exports } from "cloudflare:workers";
 import { afterEach, describe, expect, it } from "vitest";
 import type { LeagueDO } from "../../src/do/league";
 import type { LeagueSnapshot } from "../../src/shared/protocol";
-import { ADMIN, connectLeague, fakeAgent, UNPACED, waitFor } from "./helpers";
+import { connectLeague, fakeAgent, UNPACED, waitFor } from "./helpers";
 
-const stub = () => env.LEAGUE.getByName("default");
+const LEAGUE = "scale";
+const stub = () => env.LEAGUE.getByName(LEAGUE);
 
-async function league(): Promise<LeagueSnapshot> {
-  const res = await exports.default.fetch("http://test/api/league");
-  if (!res.ok) throw new Error(`league snapshot failed: ${res.status}`);
-  return res.json();
+const league = (): Promise<LeagueSnapshot> => stub().snapshot();
+
+/** The admin operations, called on this file's League (the Worker routes only reach the default one). */
+async function admin(op: "pause" | "resume" | "config", body: Record<string, unknown> = {}): Promise<LeagueSnapshot> {
+  if (op === "pause") return stub().pause();
+  if (op === "resume") return stub().resume();
+  const r = await stub().configure(body);
+  if (!r.ok) throw new Error(`config: 400 ${r.error}`);
+  return r.league;
 }
 
-async function admin(op: string, body: unknown = {}): Promise<LeagueSnapshot> {
-  const res = await exports.default.fetch(`http://test/api/admin/league/${op}`, {
-    method: "POST",
-    headers: { ...ADMIN, "content-type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error(`${op}: ${res.status} ${await res.text()}`);
-  return res.json();
-}
+/** A grid client on this file's League feed. */
+const connectScaleLeague = () =>
+  connectLeague(() => stub().fetch(new Request("http://test/ws", { headers: { Upgrade: "websocket" } })));
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -45,11 +48,11 @@ async function fakeClock() {
   const clock = { t: Math.max(Date.now() - 6 * 60 * 60_000, lastFake + 5 * 60_000) };
   lastFake = clock.t;
   await runInDurableObject(stub(), (instance: LeagueDO) => {
-    const proto = Object.getPrototypeOf(instance) as LeagueDO;
-    const original = proto.now;
-    proto.now = () => clock.t;
+    // An own property on this instance only: other Leagues keep the real clock.
+    const target = instance as unknown as { now: () => number };
+    target.now = () => clock.t;
     restoreClock = () => {
-      proto.now = original;
+      delete (target as { now?: unknown }).now;
     };
   });
   return {
@@ -201,6 +204,7 @@ describe("League at scale", () => {
       expect(await matchExists(matchId)).toBe(false);
       // The released reservation does not count as a started Match.
       expect(after.stats.started).toBe(before.stats.started);
+      await admin("pause");
       await admin("config", { n: 1 });
       await drain();
     });
@@ -210,7 +214,7 @@ describe("League at scale", () => {
     const time = await fakeClock();
     // Seat polls are refused with a 429 for many polls in a row (several seconds).
     const roster = [fakeAgent("sus-429", { delayPolls: 1, pollEveryMs: 200, rateLimitPolls: 100 }), ...slowRoster("sus")];
-    await admin("config", { ...UNPACED, ...SHORT, n: 1, backoffMs: 60_000, deadlines: { firstTurnMs: 25_000 }, roster });
+    await admin("config", { ...UNPACED, ...SHORT, n: 1, backoffMs: 60_000, deadlines: { firstTurnMs: 25_000, turnMs: 2_000, graceMs: 200 }, roster });
     const before = await league();
     await admin("resume");
     const first = await waitFor(async () => {
@@ -266,7 +270,7 @@ describe("League feed at scale", () => {
       deadlines: { firstTurnMs: 5_000, turnMs: 500, graceMs: 100 },
       roster: slowRoster("burst", { script: "silent" }),
     });
-    const feed = await connectLeague();
+    const feed = await connectScaleLeague();
     await admin("resume");
     const tile = await waitFor(async () => feed.latest().tiles.find((t) => t.summary && t.status === "running"));
 
@@ -303,7 +307,7 @@ describe("League feed at scale", () => {
     // One Agent misses its first turn, so the tile counts a timeout.
     const roster = [fakeAgent("ts-late", { silentTurns: [1], say: "hello" }), fakeAgent("ts-b", { say: "I suspect seat 3." }), fakeAgent("ts-c")];
     await admin("config", { ...UNPACED, ...SHORT, n: 1, deadlines: { firstTurnMs: 400, turnMs: 400, graceMs: 100 }, roster });
-    const feed = await connectLeague();
+    const feed = await connectScaleLeague();
     await admin("resume");
     const tiles = () => feed.states.flatMap((s) => s.tiles);
     const thinkingAtNight = await waitFor(async () => tiles().find((t) => t.summary?.phase === "Night" && t.summary.thinking > 0));

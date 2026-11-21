@@ -17,6 +17,8 @@ interface Seating {
   tools: ToolSpec[];
   /** Assembled Agent Instructions for this seat (see PlayerContext). */
   instructions?: string;
+  /** The League the Match reports to (429s go there too); absent means LEAGUE_NAME. */
+  league?: string;
 }
 
 interface CurrentTurn extends TurnAssignment {
@@ -136,7 +138,7 @@ export class PlayerDO extends DurableObject<Env> {
     const last = this.ctx.storage.kv.get<number>("rateLimitReportedAt") ?? 0;
     if (now - last < RATE_LIMIT_REPORT_MS) return Promise.resolve();
     this.ctx.storage.kv.put("rateLimitReportedAt", now);
-    const report = this.env.LEAGUE.getByName(LEAGUE_NAME)
+    const report = this.env.LEAGUE.getByName(seating.league ?? LEAGUE_NAME)
       .reportRateLimit({ matchId: seating.matchId, seat: seating.seat, agentId: seating.agent.id, source })
       .catch(() => {});
     this.ctx.waitUntil(report);

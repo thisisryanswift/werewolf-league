@@ -175,6 +175,7 @@ export class MatchDO extends DurableObject<Env> {
           agent: init.agents[s.seat]!,
           tools: setup.tools[s.seat]!,
           instructions: seatInstructions(ruleset, setup.state, s.seat, init.agents[s.seat]!),
+          ...(init.league ? { league: init.league } : {}),
         }),
       ),
     );
@@ -312,7 +313,7 @@ export class MatchDO extends DurableObject<Env> {
     await this.ctx.storage.setAlarm(Date.now() + Number(this.env.LEAGUE_RETRY_MS ?? 2000));
     let ack: SettleAck;
     try {
-      ack = await this.env.LEAGUE.getByName(LEAGUE_NAME).reportMatchResult(meta.matchId, meta.result);
+      ack = await this.env.LEAGUE.getByName(meta.league ?? LEAGUE_NAME).reportMatchResult(meta.matchId, meta.result);
     } catch {
       return; // the armed alarm retries
     }
@@ -341,7 +342,7 @@ export class MatchDO extends DurableObject<Env> {
       thinking: thinkingSeats(events).length,
       timeouts: events.filter((e) => e.kind === "turn_timed_out").length,
     };
-    const update = this.env.LEAGUE.getByName(LEAGUE_NAME)
+    const update = this.env.LEAGUE.getByName(meta.league ?? LEAGUE_NAME)
       .updateTile(meta.matchId, summary, this.lastSeq())
       .catch(() => {});
     this.ctx.waitUntil(update);
