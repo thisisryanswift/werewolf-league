@@ -1,6 +1,8 @@
-// Subscribe to the League WebSocket. Every message is a full snapshot, so the
-// latest one wins and reconnects need no merging.
+// Subscribe to the League WebSocket. The join message (also on every reconnect)
+// is a full snapshot; coalesced "tiles" messages after it carry per-tile diffs,
+// folded into the snapshot with applyLeagueDiff.
 import { useEffect, useState } from "react";
+import { applyLeagueDiff } from "../src/shared/league-feed";
 import type { LeagueMessage, LeagueSnapshot } from "../src/shared/protocol";
 import type { FeedStatus } from "./useMatchFeed";
 
@@ -20,6 +22,7 @@ export function useLeagueFeed(): { league: LeagueSnapshot | null; status: FeedSt
       ws.onmessage = (m) => {
         const msg = JSON.parse(m.data as string) as LeagueMessage;
         if (msg.type === "league") setLeague(msg.league);
+        else if (msg.type === "tiles") setLeague((prev) => (prev ? applyLeagueDiff(prev, msg) : prev));
       };
       ws.onclose = () => {
         if (stopped) return;

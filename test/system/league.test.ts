@@ -3,8 +3,8 @@ import { exports } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 import type { MatchReport } from "../../src/core/match";
 import type { LeagueDO } from "../../src/do/league";
-import type { LeagueMessage, LeagueSnapshot } from "../../src/shared/protocol";
-import { ADMIN, fakeAgent, snapshot, waitFor } from "./helpers";
+import type { LeagueSnapshot } from "../../src/shared/protocol";
+import { ADMIN, connectLeague, fakeAgent, snapshot, UNPACED, waitFor } from "./helpers";
 
 async function league(): Promise<LeagueSnapshot> {
   const res = await exports.default.fetch("http://test/api/league");
@@ -47,7 +47,7 @@ describe("League scheduling", () => {
   });
 
   it("keeps N Matches running, replaces finished ones, takes a new N and stops on pause", async () => {
-    await ok(admin("config", { n: 2, roster: roster(3) }));
+    await ok(admin("config", { ...UNPACED, n: 2, roster: roster(3) }));
     await ok(admin("resume"));
     const two = await waitFor(async () => {
       const s = await league();
@@ -91,7 +91,7 @@ describe("League scheduling", () => {
 
   it("starts Matches with the configured turn deadlines", async () => {
     expect((await admin("config", { deadlines: { turnMs: -1 } })).status).toBe(400);
-    await ok(admin("config", { n: 1, roster: roster(3), deadlines: { turnMs: 45_000, firstTurnMs: 77_000 } }));
+    await ok(admin("config", { ...UNPACED, n: 1, roster: roster(3), deadlines: { turnMs: 45_000, firstTurnMs: 77_000 } }));
     await ok(admin("resume"));
     const matchId = (await waitFor(async () => (await league()).tiles.find((t) => t.status === "running"))).matchId;
     const started = await waitFor(async () => {
@@ -104,7 +104,7 @@ describe("League scheduling", () => {
   });
 
   it("never deals both Werewolf seats to one Agent, even from a 2-Agent roster", async () => {
-    await ok(admin("config", { n: 3, roster: roster(2) }));
+    await ok(admin("config", { ...UNPACED, n: 3, roster: roster(2) }));
     await ok(admin("resume"));
     const s = await waitFor(async () => {
       const l = await league();
@@ -156,7 +156,7 @@ describe("League scheduling", () => {
 
 async function lostAckScenario(stub: DurableObjectStub<LeagueDO>, calls: { matchId: string; duplicate: boolean }[]) {
   const before = await league();
-  await ok(admin("config", { n: 1, roster: roster(3) }));
+  await ok(admin("config", { ...UNPACED, n: 1, roster: roster(3) }));
   await ok(admin("resume"));
   const first = (await waitFor(async () => (await league()).tiles[0])).matchId;
 
@@ -181,27 +181,27 @@ async function lostAckScenario(stub: DurableObjectStub<LeagueDO>, calls: { match
 
 describe("League feed", () => {
   it("sends the snapshot on join, then live tile updates as a Match progresses", async () => {
-    const res = await exports.default.fetch("http://test/api/league/ws", { headers: { Upgrade: "websocket" } });
-    const ws = res.webSocket!;
-    const messages: LeagueMessage[] = [];
-    ws.addEventListener("message", (m) => messages.push(JSON.parse(m.data as string)));
-    ws.accept();
-    await waitFor(async () => messages.length >= 1);
-    expect(messages[0]!.type).toBe("league");
-    expect(messages[0]!.league.config.paused).toBe(true);
+    const feed = await connectLeague();
+    expect(feed.messages[0]!.type).toBe("league");
+    expect(feed.latest().config.paused).toBe(true);
 
-    await ok(admin("config", { n: 1, roster: roster(3, { delayPolls: 3 }) }));
+    await ok(admin("config", { ...UNPACED, n: 1, roster: roster(3, { delayPolls: 3 }) }));
     await ok(admin("resume"));
     // The tile's summary moves from Night 1 to Day 1.
-    const day = await waitFor(async () => messages.find((m) => m.league.tiles[0]?.summary?.phase === "Day")?.league.tiles[0]);
+    const day = await waitFor(async () => feed.states.find((s) => s.tiles[0]?.summary?.phase === "Day")?.tiles[0]);
     expect(day.summary).toMatchObject({ phase: "Day", round: 1 });
-    const night = messages.find((m) => m.league.tiles[0]?.summary?.phase === "Night")!.league.tiles[0]!;
+    const night = feed.states.find((s) => s.tiles[0]?.summary?.phase === "Night")!.tiles[0]!;
     expect(night.matchId).toBe(day.matchId);
     expect(night.summary).toMatchObject({ round: 1, alive: [1, 2, 3, 4, 5, 6, 7], latestSpeech: null });
     expect(day.seats).toHaveLength(7);
+    // After the join snapshot, updates arrive as coalesced tile diffs.
+    expect(feed.messages.slice(1).every((m) => m.type === "tiles")).toBe(true);
     // When the Match ends its tile gives way to a new Match.
-    await waitFor(async () => messages.some((m) => m.league.tiles[0] && m.league.tiles[0].matchId !== day.matchId));
+    await waitFor(async () => feed.states.some((s) => s.tiles[0] && s.tiles[0].matchId !== day.matchId));
     await drain();
-    ws.close(1000, "bye");
+    // The folded feed agrees with the League's own snapshot.
+    await waitFor(async () => feed.latest().tiles.length === 0);
+    expect(feed.latest().stats).toEqual((await league()).stats);
+    feed.close();
   });
 });

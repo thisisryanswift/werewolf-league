@@ -48,6 +48,34 @@ export interface MatchSummary {
   alive: number[];
   /** The latest public speech line, if any. */
   latestSpeech: { seat: number; text: string } | null;
+  /** The Ruleset's name for the current step within the phase (e.g. "Vote"), or null. */
+  step: string | null;
+  /**
+   * Private information for God View only (e.g. each seat's role). Like the
+   * Match feed, it is sent to every Spectator and hidden client-side when God View is off.
+   */
+  godView?: { roles: Record<number, string>; step?: string | null };
+}
+
+/** A Drama Flag on a tile (set by the Narrator, wl-pbkx). Secret flags are God View only. */
+export interface TileDramaFlag {
+  id: string;
+  visibility: "public" | "secret";
+}
+
+/**
+ * Everything a grid tile shows: the Ruleset's summary plus counts the Match
+ * runner derives from its own events.
+ */
+export interface TileSummary extends MatchSummary {
+  /** Players whose turn is in flight (a count only, so it never says who). */
+  thinking: number;
+  /** Turns timed out so far in this Match, all seats. */
+  timeouts: number;
+  /** Narrator Drama Score from 0 to 1; absent until the Narrator lands. */
+  dramaScore?: number;
+  /** Active Drama Flags; absent until the Narrator lands. */
+  dramaFlags?: TileDramaFlag[];
 }
 
 /** One seat of a Match as shown on a tile. */
@@ -65,7 +93,7 @@ export interface MatchTile {
   status: "starting" | "running";
   seats: TileSeat[];
   /** Null until the Match first reports a summary. */
-  summary: MatchSummary | null;
+  summary: TileSummary | null;
   startedAt: number;
 }
 
@@ -84,7 +112,25 @@ export interface LeagueConfigView {
   /** Seats per Match. */
   seats: number;
   rulesetId: string;
+  /** Start pacing: at most this many new Matches in any `startWindowMs` window. */
+  startsPerWindow: number;
+  startWindowMs: number;
+  /** How long new starts stop after a Player reports a 429. */
+  backoffMs: number;
+  /** Minimum time between League feed messages. */
+  feedIntervalMs: number;
   roster: RosterAgent[];
+}
+
+/** A Player's model API call refused with a 429, as reported to the League. */
+export interface RateLimitEvent {
+  matchId: string;
+  seat: number;
+  agentId: string;
+  /** Which Harness call hit it, e.g. "provision", "startTurn" or "poll". */
+  source: string;
+  /** League clock time of the report. */
+  at: number;
 }
 
 /** A recently settled Match. */
@@ -110,7 +156,34 @@ export interface LeagueSnapshot {
   stats: { started: number; settled: number };
   /** Why the League cannot start Matches right now (e.g. a roster that is too small), else null. */
   blocked: string | null;
+  /** 429 backoff: when new starts resume (null if not backing off), and the reports so far, newest first. */
+  rateLimit: { backoffUntil: number | null; count: number; recent: RateLimitEvent[] };
 }
 
-/** Messages sent from the League WebSocket: the full snapshot, on join and on every change. */
-export type LeagueMessage = { type: "league"; league: LeagueSnapshot };
+/**
+ * A tile's changes since the last feed message: a new tile is sent whole; a
+ * changed one carries only the changed top-level fields, and `summary` only the
+ * changed summary fields (merged shallowly into the client's copy).
+ */
+export type TileDiff = { matchId: string } & Partial<Omit<MatchTile, "matchId" | "summary">> & {
+    summary?: Partial<TileSummary> | null;
+  };
+
+/**
+ * A coalesced League feed update (at most one per feed interval): per-tile diffs,
+ * removed tiles, and any League-wide snapshot fields that changed. `rev` increases
+ * by one per message; fold it into the snapshot with `applyLeagueDiff`.
+ */
+export interface LeagueTilesMessage {
+  type: "tiles";
+  rev: number;
+  tiles: TileDiff[];
+  removed: string[];
+  league?: Partial<Omit<LeagueSnapshot, "tiles">>;
+}
+
+/**
+ * Messages sent from the League WebSocket: the full snapshot on join, then
+ * coalesced "tiles" diffs. Consumers switch on `type`.
+ */
+export type LeagueMessage = { type: "league"; league: LeagueSnapshot } | LeagueTilesMessage;

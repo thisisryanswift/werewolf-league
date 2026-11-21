@@ -29,7 +29,8 @@ import {
 import { LEAGUE_NAME } from "../core/roster";
 import type { Ruleset, Seat, ToolCall, ToolSpec, TurnRequest } from "../core/ruleset";
 import { getRuleset } from "../rulesets";
-import type { MatchEvent, RulesetEvent, ServerMessage } from "../shared/protocol";
+import type { MatchEvent, RulesetEvent, ServerMessage, TileSummary } from "../shared/protocol";
+import { thinkingSeats } from "../shared/turn-events";
 
 /** How soon the Match retries sending a turn to a Player DO that failed to accept it. */
 const DISPATCH_RETRY_MS = 1000;
@@ -255,7 +256,6 @@ export class MatchDO extends DurableObject<Env> {
         return;
       }
       this.resolve(meta, ruleset, pending);
-      this.pushSummary(ruleset);
     }
 
     const current = this.meta!;
@@ -264,6 +264,7 @@ export class MatchDO extends DurableObject<Env> {
       const result: MatchReport = { ...next.result, timeouts: countTimeouts(this.events(), current.seats) };
       const done: MatchMeta = { ...current, status: "finished", result };
       this.meta = done;
+      this.pushSummary(ruleset);
       await this.deliverResult(done);
       return;
     }
@@ -306,8 +307,14 @@ export class MatchDO extends DurableObject<Env> {
     const meta = this.meta;
     if (!meta) return;
     // Runner events (turn markers, step_resolved) are not game events.
-    const publicEvents = this.events().filter((e) => e.audience === "all" && !isRunnerEvent(e));
-    const summary = ruleset.summary(this.rulesetState, publicEvents);
+    const events = this.events();
+    const publicEvents = events.filter((e) => e.audience === "all" && !isRunnerEvent(e));
+    const summary: TileSummary = {
+      ...ruleset.summary(this.rulesetState, publicEvents),
+      // Counts only: the runner's turn events are seat-private, so naming seats could reveal roles.
+      thinking: thinkingSeats(events).length,
+      timeouts: events.filter((e) => e.kind === "turn_timed_out").length,
+    };
     const update = this.env.LEAGUE.getByName(LEAGUE_NAME)
       .updateTile(meta.matchId, summary, this.lastSeq())
       .catch(() => {});
@@ -351,6 +358,8 @@ export class MatchDO extends DurableObject<Env> {
     this.meta = { ...meta, stepCount: stepNo, assigned: [...new Set([...assigned, ...turns.map((t) => t.seat)])] };
     this.step = step;
     this.commit(turnStartedEvents(step));
+    // One push per step, once its turns are marked: the League coalesces these for the grid.
+    this.pushSummary(ruleset);
     await this.sendTurns(meta, stepNo);
   }
 

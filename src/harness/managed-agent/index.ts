@@ -250,7 +250,8 @@ export function managedAgentHarness(opts: ManagedAgentOptions): Harness {
       try {
         it = await api.get(id);
       } catch (err) {
-        if (err instanceof ApiError && (err.status >= 500 || err.status === 429)) return { status: "pending", handle };
+        if (err instanceof ApiError && err.status === 429) return { status: "pending", handle, rateLimited: true };
+        if (err instanceof ApiError && err.status >= 500) return { status: "pending", handle };
         throw err;
       }
       if (ACTIVE.has(it.status)) return { status: "pending", handle };

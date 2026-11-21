@@ -12,6 +12,8 @@
 //   say: string         — for actions without legal targets (e.g. a chat), call the tool with { text: say }
 //   args: { [actionKind]: object } — extra call arguments per action kind, over the defaults below
 //   echo: string        — put a digest of the observation into this argument (tests compare observations)
+//   rateLimitTurns: number[] — the first poll of these turns is refused with a 429 (1-based, like silentTurns)
+//   pollEveryMs: number — ask the Player DO to poll no more often than this (keeps big test Leagues cheap)
 
 import type { Harness, PollResult, TurnInput } from "../core/harness";
 import type { ToolCall } from "../core/ruleset";
@@ -26,6 +28,8 @@ interface FakeOptions {
   say?: string;
   args?: Record<string, Record<string, unknown>>;
   echo?: string;
+  rateLimitTurns?: number[];
+  pollEveryMs?: number;
 }
 
 /** Default extra arguments per action kind, so scripted calls are well-formed. */
@@ -70,15 +74,22 @@ export const fakeHarness: Harness = {
     const opts = (ctx.agent.options ?? {}) as FakeOptions;
     const turns = Number(ctx.chain.turns ?? 0) + 1;
     return {
-      handle: { decision: decide(opts, input, turns), pollsLeft: opts.delayPolls ?? 0 },
+      handle: {
+        decision: decide(opts, input, turns),
+        pollsLeft: opts.delayPolls ?? 0,
+        rateLimited: opts.rateLimitTurns?.includes(turns) ?? false,
+        pollEveryMs: opts.pollEveryMs ?? 0,
+      },
       chain: { ...ctx.chain, turns },
     };
   },
   async poll(_ctx, handle): Promise<PollResult> {
     const decision = handle.decision as ToolCall | null | "never";
     const pollsLeft = Number(handle.pollsLeft ?? 0);
-    if (decision === "never") return { status: "pending", handle };
-    if (pollsLeft > 0) return { status: "pending", handle: { ...handle, pollsLeft: pollsLeft - 1 } };
+    const retryAfterMs = Number(handle.pollEveryMs ?? 0) || undefined;
+    if (handle.rateLimited) return { status: "pending", handle: { ...handle, rateLimited: false }, rateLimited: true, retryAfterMs };
+    if (decision === "never") return { status: "pending", handle, retryAfterMs };
+    if (pollsLeft > 0) return { status: "pending", handle: { ...handle, pollsLeft: pollsLeft - 1 }, retryAfterMs };
     return { status: "done", call: decision };
   },
 };

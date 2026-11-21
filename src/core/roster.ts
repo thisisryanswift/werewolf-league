@@ -22,7 +22,17 @@ export interface LeagueConfig {
   deadlines?: Partial<DeadlineConfig>;
   /** Agents the League draws from. Copies may share a Match. */
   roster: AgentConfig[];
+  /** At most this many new Matches start in any `startWindowMs` window. */
+  startsPerWindow: number;
+  startWindowMs: number;
+  /** After a Player reports a 429, no new Matches start for this long. */
+  backoffMs: number;
+  /** Minimum time between League feed messages. */
+  feedIntervalMs: number;
 }
+
+/** Scheduling and feed defaults (spec wl-xgp7, "Scale and League feed"). */
+export const DEFAULT_PACING = { startsPerWindow: 4, startWindowMs: 30_000, backoffMs: 60_000, feedIntervalMs: 500 };
 
 /** Scripted Agents that answer after a few polls: a local demo roster that never calls Gemini. */
 export function fakeRoster(): AgentConfig[] {
@@ -36,10 +46,18 @@ export function fakeRoster(): AgentConfig[] {
 
 /** A fresh League starts paused, so it spends nothing until the operator resumes it. */
 export function defaultLeagueConfig(): LeagueConfig {
-  return { n: 6, paused: true, seats: 7, rulesetId: DEFAULT_RULESET_ID, rulesetConfig: {}, roster: fakeRoster() };
+  return {
+    n: 24,
+    paused: true,
+    seats: 7,
+    rulesetId: DEFAULT_RULESET_ID,
+    rulesetConfig: {},
+    roster: fakeRoster(),
+    ...DEFAULT_PACING,
+  };
 }
 
-export const MAX_LIVE_MATCHES = 24;
+export const MAX_LIVE_MATCHES = 36;
 
 const isAgent = (a: unknown): a is AgentConfig => {
   const x = a as Record<string, unknown>;
@@ -64,6 +82,12 @@ export function patchConfig(
       return { ok: false, error: `n must be an integer from 0 to ${MAX_LIVE_MATCHES}` };
     }
     next.n = patch.n as number;
+  }
+  for (const [key, min] of [["startsPerWindow", 1], ["startWindowMs", 0], ["backoffMs", 0], ["feedIntervalMs", 0]] as const) {
+    const v = patch[key];
+    if (v === undefined) continue;
+    if (!Number.isInteger(v) || (v as number) < min) return { ok: false, error: `${key} must be an integer of at least ${min}` };
+    next[key] = v as number;
   }
   if (patch.seats !== undefined) {
     if (!Number.isInteger(patch.seats) || (patch.seats as number) < 2 || (patch.seats as number) > 16) {
