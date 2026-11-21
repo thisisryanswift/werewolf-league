@@ -7,8 +7,9 @@
 // this component never filters by God View itself.
 import type { MatchEvent } from "../../src/shared/protocol";
 import { tableSuspicion, type Ballot } from "../../src/shared/beliefs";
+import { spectatorLabel } from "../../src/shared/seat-label";
 
-type SeatInfo = { seat: number; label: string };
+type SeatInfo = { seat: number; label: string; displayName?: string };
 
 export function TableSuspicion({ events }: { events: MatchEvent[] }) {
   const recorded = events.filter((e) => e.kind === "beliefs_recorded");
@@ -32,7 +33,7 @@ export function TableSuspicion({ events }: { events: MatchEvent[] }) {
               return (
                 <li key={s.seat} data-seat={s.seat} data-suspicion={m ? m.mean.toFixed(4) : ""} className={dead.has(s.seat) ? "dead" : ""}>
                   <span className="ts-who">
-                    Seat {s.seat} ({s.label})
+                    Seat {s.seat} ({spectatorLabel(s)})
                   </span>
                   <span className={`ts-role role-${roles.get(s.seat) ?? "unknown"}`}>{roles.get(s.seat) ?? "?"}</span>
                   <span className="ts-bar" aria-hidden="true">
