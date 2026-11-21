@@ -139,7 +139,7 @@ body:has(.mv-page) {
   text-transform: uppercase;
 }
 .mv-panel-seats {
-  margin: 16px 0 0 64px;
+  margin: 16px 0 0;
 }
 .mv-panel h2 {
   margin: 0 0 6px;
@@ -152,7 +152,7 @@ body:has(.mv-page) {
   margin: 0;
 }
 .mv-note {
-  margin: 12px 0 0 64px;
+  margin: 12px 0 0;
   font-weight: 600;
 }
 
@@ -166,36 +166,7 @@ body:has(.mv-page) {
   padding: 0 4px;
   border: 2px solid var(--mv-ink);
   background: var(--mv-paper);
-}
-.mv-key-b {
-  color: var(--mv-red);
-}
-.mv-seatwrap {
-  position: relative;
-  padding-left: 64px;
-}
-.mv-gutter {
-  position: absolute;
-  left: 0;
-  top: 0;
-  overflow: visible;
-}
-.mv-arc {
-  fill: none;
-  stroke: var(--mv-ink);
-  stroke-width: 2.5;
-  stroke-dasharray: 5 4;
-}
-.mv-arc.b {
-  stroke: var(--mv-red);
-  stroke-width: 5;
-  stroke-dasharray: none;
-}
-.mv-ah-a {
-  fill: var(--mv-ink);
-}
-.mv-ah-b {
-  fill: var(--mv-red);
+  text-transform: none;
 }
 .mv-seats {
   list-style: none;
@@ -270,6 +241,37 @@ body:has(.mv-page) {
   background: var(--mv-ink);
   color: var(--mv-yellow);
   padding: 1px 5px;
+}
+/* Accusation chips: wrap onto new lines inside the seat card, never over its content. */
+.mv-accs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  min-width: 0;
+}
+.mv-acc {
+  font: 700 14px/1.25 var(--mv-mono);
+  border: 2px solid var(--mv-ink);
+  padding: 1px 6px;
+  background: var(--mv-paper);
+  overflow-wrap: anywhere;
+}
+.mv-acc-in {
+  background: #ffd6dc;
+}
+.mv-acc-top {
+  background: var(--mv-red);
+  color: #fff;
+  font-weight: 900;
+}
+.mv-acc-reply {
+  background: var(--mv-ink);
+  color: var(--mv-yellow);
+  font-weight: 900;
+  text-transform: uppercase;
+}
+.mv-acc-def {
+  background: #c8f0e8;
 }
 .mv-claim {
   justify-self: start;
