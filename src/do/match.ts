@@ -52,6 +52,7 @@ import { getRuleset } from "../rulesets";
 import type { MatchCost, MatchEvent, RulesetEvent, ServerMessage, TileSummary } from "../shared/protocol";
 import { matchCostEvent, notesUpdatedEvent, ratingsSettledEvent, thinkingSeats } from "../shared/turn-events";
 import type { SettleAck } from "./league";
+import type { Seating } from "./player";
 
 /**
  * A seat's Agent Instructions: the Ruleset-named sections of the Agent's own
@@ -68,6 +69,8 @@ const MAX_CLOSE_ATTEMPTS = 5;
 
 /** How soon the Match retries sending a turn to a Player DO that failed to accept it. */
 const DISPATCH_RETRY_MS = 1000;
+/** How long a failed start waits for its seats' releases before rethrowing (they carry on in their Player DOs). */
+const START_RELEASE_TIMEOUT_MS = 15_000;
 
 interface MatchMeta extends Omit<MatchInit, "deadlines"> {
   status: MatchStatus;
@@ -288,18 +291,21 @@ export class MatchDO extends DurableObject<Env> {
     const ruleset = getRuleset(init.rulesetId);
     const setup = ruleset.setup(init.config, init.seed, init.seats);
     if (!setup.ok) throw new Error(setup.error);
-    await Promise.all(
-      init.seats.map((s) =>
-        this.env.PLAYER.getByName(`${init.matchId}:${s.seat}`).provision({
-          matchId: init.matchId,
-          seat: s.seat,
-          agent: init.agents[s.seat]!,
-          tools: setup.tools[s.seat]!,
-          instructions: seatInstructions(ruleset, setup.state, s.seat, init.agents[s.seat]!),
-          ...(init.league ? { league: init.league } : {}),
-        }),
-      ),
-    );
+    const seatings = init.seats.map((s) => ({
+      matchId: init.matchId,
+      seat: s.seat,
+      agent: init.agents[s.seat]!,
+      tools: setup.tools[s.seat]!,
+      instructions: seatInstructions(ruleset, setup.state, s.seat, init.agents[s.seat]!),
+      ...(init.league ? { league: init.league } : {}),
+    }));
+    // Wait for every seat (not just the first failure), so no provision finishes after the release.
+    const provisioned = await Promise.allSettled(seatings.map((s) => this.env.PLAYER.getByName(`${init.matchId}:${s.seat}`).provision(s)));
+    const failed = provisioned.find((p): p is PromiseRejectedResult => p.status === "rejected");
+    if (failed) {
+      await this.releaseSeats(seatings);
+      throw failed.reason;
+    }
     // Persist and schedule together (no await between the writes).
     this.meta = {
       ...init,
@@ -314,6 +320,19 @@ export class MatchDO extends DurableObject<Env> {
     this.commit(setup.events);
     this.pushSummary(ruleset);
     await this.ctx.storage.setAlarm(Date.now());
+  }
+
+  /**
+   * A start failed: release every seat's Harness environment (e.g. a pi sandbox), so
+   * nothing outlives the Match that never started. Best effort and bounded: never throws,
+   * and a seat that fails to release is left to the Harness's own sweep.
+   */
+  private async releaseSeats(seatings: Seating[]): Promise<void> {
+    const released = Promise.allSettled(seatings.map((s) => this.env.PLAYER.getByName(`${s.matchId}:${s.seat}`).release(s)));
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const bound = new Promise<void>((resolve) => (timer = setTimeout(resolve, START_RELEASE_TIMEOUT_MS)));
+    await Promise.race([released, bound]);
+    clearTimeout(timer);
   }
 
   snapshot(): (MatchSnapshot & { events: MatchEvent[] }) | null {

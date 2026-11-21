@@ -19,6 +19,7 @@
 //   pollEveryMs: number — ask the Player DO to poll no more often than this (keeps big test Leagues cheap)
 //   rateLimitPolls: number — the first this-many polls of every turn are refused with a 429 (sustained 429s)
 //   rateLimitProvision: bool — the seat's first provision attempt throws a 429 (later attempts succeed)
+//   failProvision: number — the seat's first this-many provision attempts throw (a non-429 error)
 //   notes: unknown[]    — turn n's answer reports notes[n-1] as the seat's notes (null or past the end: no
 //                         write). Not type-checked, so tests can send unreadable notes.
 
@@ -40,6 +41,7 @@ interface FakeOptions {
   rateLimitTurns?: number[];
   pollEveryMs?: number;
   rateLimitProvision?: boolean;
+  failProvision?: number;
   rateLimitPolls?: number;
   notes?: unknown[];
 }
@@ -60,6 +62,18 @@ function usageOf(ctx: PlayerContext, handle: TurnHandle): { usage?: UsageReading
 
 /** Seats whose one refused provision attempt has happened (per isolate; enough for tests). */
 const provisionRefused = new Set<string>();
+
+/** Provision and close calls per seat (`matchId:seat`), per isolate, so tests can check cleanup. */
+const calls = new Map<string, { provision: number; close: number }>();
+export function fakeCalls(key: string): { provision: number; close: number } {
+  return calls.get(key) ?? { provision: 0, close: 0 };
+}
+function count(key: string, kind: "provision" | "close"): number {
+  const c = { ...fakeCalls(key) };
+  c[kind]++;
+  calls.set(key, c);
+  return c[kind];
+}
 
 /** Default extra arguments per action kind, so scripted calls are well-formed. */
 const DEFAULT_ARGS: Record<string, Record<string, unknown>> = {
@@ -98,6 +112,8 @@ function decide(opts: FakeOptions, input: TurnInput, turnNo: number): ToolCall |
 export const fakeHarness: Harness = {
   async provision(ctx) {
     const key = `${ctx.matchId}:${ctx.seat}`;
+    const attempt = count(key, "provision");
+    if (attempt <= ((ctx.agent.options as FakeOptions | undefined)?.failProvision ?? 0)) throw new Error("fake provision failed");
     if ((ctx.agent.options as FakeOptions | undefined)?.rateLimitProvision && !provisionRefused.has(key)) {
       provisionRefused.add(key);
       throw Object.assign(new Error("fake 429: quota exhausted"), { status: 429 });
@@ -145,6 +161,7 @@ export const fakeHarness: Harness = {
     return usageOf(ctx, handle);
   },
   async close(ctx) {
+    count(`${ctx.matchId}:${ctx.seat}`, "close");
     const usage = setupUsageOf(ctx);
     return { chain: { ...ctx.chain, setupPending: false }, ...(usage.length ? { usage } : {}) };
   },
