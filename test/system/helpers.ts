@@ -26,6 +26,7 @@ export async function startMatch(body: Record<string, unknown>): Promise<string>
 
 export interface Snapshot {
   matchId: string;
+  matchNumber?: number;
   status: "running" | "finished";
   result: { winner: string; sides: Record<string, string>; timeouts: TimeoutCounts } | null;
   stats: { timeouts: TimeoutCounts };

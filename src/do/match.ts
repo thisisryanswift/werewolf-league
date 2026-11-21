@@ -201,6 +201,7 @@ export class MatchDO extends DurableObject<Env> {
     const events = this.events();
     return {
       matchId: meta.matchId,
+      ...(meta.matchNumber !== undefined ? { matchNumber: meta.matchNumber } : {}),
       rulesetId: meta.rulesetId,
       status: meta.status,
       seats: meta.seats,
@@ -464,7 +465,12 @@ export class MatchDO extends DurableObject<Env> {
     // Subscribe and send the full log in one synchronous step, so a Spectator
     // neither misses nor duplicates an event.
     this.ctx.acceptWebSocket(server);
-    const log: ServerMessage = { type: "log", matchId: meta.matchId, events: this.events() };
+    const log: ServerMessage = {
+      type: "log",
+      matchId: meta.matchId,
+      ...(meta.matchNumber !== undefined ? { matchNumber: meta.matchNumber } : {}),
+      events: this.events(),
+    };
     server.send(JSON.stringify(log));
     return new Response(null, { status: 101, webSocket: client });
   }
