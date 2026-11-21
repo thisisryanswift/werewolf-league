@@ -9,7 +9,7 @@ import { niceTicks, OVERFLOW_COLOR, ratingDomain, SERIES_COLORS, spreadLabels } 
 
 const W = 1800;
 const H = 620;
-const M = { top: 20, right: 230, bottom: 56, left: 72 };
+const M = { top: 20, right: 230, bottom: 56, left: 110 };
 const PW = W - M.left - M.right;
 const PH = H - M.top - M.bottom;
 
@@ -23,7 +23,7 @@ export function RatingChart({ history }: { history: RatingsHistory }) {
   const geo = useMemo(() => {
     const all = points.flatMap((p) => Object.values(p.overall));
     const [y0, y1] = ratingDomain(all, INITIAL_RATING);
-    // x is the point index (Match Numbers can skip unrated Matches); ticks show Match Numbers.
+    // x is the settlement index: Matches settle out of Match Number order, so the hover names the Match Number.
     const n = points.length;
     const x = (i: number) => M.left + (n <= 1 ? PW / 2 : (i / (n - 1)) * PW);
     const y = (v: number) => M.top + PH - ((v - y0) / (y1 - y0)) * PH;
@@ -80,11 +80,11 @@ export function RatingChart({ history }: { history: RatingsHistory }) {
         <line x1={M.left} x2={M.left + PW} y1={geo.y(INITIAL_RATING)} y2={geo.y(INITIAL_RATING)} className="baseline" />
         {geo.xTickIdx.map((i) => (
           <text key={i} x={geo.x(i)} y={M.top + PH + 28} className="tick" textAnchor="middle">
-            {points[i]?.matchNumber}
+            {i + 1}
           </text>
         ))}
         <text x={M.left + PW / 2} y={H - 6} className="axis-title" textAnchor="middle">
-          Match Number
+          Rated Matches settled (Match Numbers on hover)
         </text>
         <text x={18} y={M.top + PH / 2} className="axis-title" textAnchor="middle" transform={`rotate(-90 18 ${M.top + PH / 2})`}>
           Overall Rating

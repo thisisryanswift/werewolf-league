@@ -15,7 +15,7 @@ export interface RatingsHistoryPoint {
   /** Match Number, or the settlement's position in the window if it has none. */
   matchNumber: number;
   settledAt: number;
-  /** Overall Rating of every Agent seen so far, after this settlement; agentId -> rating (0.1 precision). */
+  /** Overall Rating of every Agent seen so far, after this settlement; agentId -> rating (0.01 precision, unrounded for display). */
   overall: Record<string, number>;
 }
 
@@ -53,7 +53,7 @@ export function ratingsHistory(opts: {
   const points = rated.map((s, i) => {
     for (const c of s.ratings!.agents) ratings.get(c.agentId)![c.side]! += c.delta;
     const overall: Record<string, number> = {};
-    for (const [id, r] of ratings) overall[id] = Math.round(overallOf(r) * 10) / 10;
+    for (const [id, r] of ratings) overall[id] = Math.round(overallOf(r) * 100) / 100;
     return { matchNumber: s.matchNumber ?? i + 1, settledAt: s.settledAt, overall };
   });
 
