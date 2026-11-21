@@ -37,7 +37,8 @@ export function mergeEvents(existing: MatchEvent[], incoming: MatchEvent[]): Mat
 
 /**
  * A ruleset-agnostic, public summary of a live Match for its grid tile.
- * The Ruleset supplies it; it never contains private information.
+ * The Ruleset supplies it. Everything is public except `godView`, which
+ * (like the Match feed's private events) is hidden client-side when God View is off.
  */
 export interface MatchSummary {
   /** Display name of the current phase, e.g. "Day" or "Night"; "Over" once finished. */

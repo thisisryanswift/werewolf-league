@@ -385,7 +385,9 @@ export class LeagueDO extends DurableObject<Env> {
     const live = Object.values(this.live);
     const until = this.rateLimit.until;
     const wakes: number[] = [];
-    if (live.some((m) => m.status === "starting")) wakes.push(now < until ? until : retry ? now + this.retryMs : now);
+    // After a failed start (whose slot may have been freed), try again after the retry delay.
+    if (retry) wakes.push(Math.max(now + this.retryMs, until));
+    else if (live.some((m) => m.status === "starting")) wakes.push(Math.max(now, until));
     if (!config.paused && live.length < config.n) {
       const { nextAt } = startBudget(this.starts, now, config, until);
       if (nextAt !== null) wakes.push(nextAt);

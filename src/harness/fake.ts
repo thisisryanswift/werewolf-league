@@ -14,6 +14,7 @@
 //   echo: string        — put a digest of the observation into this argument (tests compare observations)
 //   rateLimitTurns: number[] — the first poll of these turns is refused with a 429 (1-based, like silentTurns)
 //   pollEveryMs: number — ask the Player DO to poll no more often than this (keeps big test Leagues cheap)
+//   rateLimitProvision: bool — the seat's first provision attempt throws a 429 (later attempts succeed)
 
 import type { Harness, PollResult, TurnInput } from "../core/harness";
 import type { ToolCall } from "../core/ruleset";
@@ -30,7 +31,11 @@ interface FakeOptions {
   echo?: string;
   rateLimitTurns?: number[];
   pollEveryMs?: number;
+  rateLimitProvision?: boolean;
 }
+
+/** Seats whose one refused provision attempt has happened (per isolate; enough for tests). */
+const provisionRefused = new Set<string>();
 
 /** Default extra arguments per action kind, so scripted calls are well-formed. */
 const DEFAULT_ARGS: Record<string, Record<string, unknown>> = {
@@ -68,6 +73,11 @@ function decide(opts: FakeOptions, input: TurnInput, turnNo: number): ToolCall |
 
 export const fakeHarness: Harness = {
   async provision(ctx) {
+    const key = `${ctx.matchId}:${ctx.seat}`;
+    if ((ctx.agent.options as FakeOptions | undefined)?.rateLimitProvision && !provisionRefused.has(key)) {
+      provisionRefused.add(key);
+      throw Object.assign(new Error("fake 429: quota exhausted"), { status: 429 });
+    }
     return { ...ctx.chain, environment: `fake-env-${ctx.matchId}-${ctx.seat}`, turns: 0 };
   },
   async startTurn(ctx, input) {

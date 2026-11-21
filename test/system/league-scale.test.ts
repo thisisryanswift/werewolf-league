@@ -39,8 +39,11 @@ const slowRoster = (prefix: string, opts: Record<string, unknown> = {}) =>
  * League's alarm, as if that much time had passed.
  */
 let restoreClock = () => {};
+/** Latest fake time used so far: each fake clock starts after it, so an earlier test's backoff is over. */
+let lastFake = 0;
 async function fakeClock() {
-  const clock = { t: Date.now() - 30 * 60_000 };
+  const clock = { t: Math.max(Date.now() - 30 * 60_000, lastFake + 5 * 60_000) };
+  lastFake = clock.t;
   await runInDurableObject(stub(), (instance: LeagueDO) => {
     const proto = Object.getPrototypeOf(instance) as LeagueDO;
     const original = proto.now;
@@ -52,6 +55,7 @@ async function fakeClock() {
   return {
     advance: async (ms: number) => {
       clock.t += ms;
+      lastFake = clock.t;
       return runDurableObjectAlarm(stub());
     },
   };
@@ -133,8 +137,8 @@ describe("League at scale", () => {
     await time.advance(30_000);
     expect((await league()).stats.started).toBe(startedAt429);
 
-    // Once it ends, new Matches start again.
-    await time.advance(30_001);
+    // Once it ends (and any backoff extended by later 429s has ended too), new Matches start again.
+    await time.advance(120_000);
     const resumed = await waitFor(async () => {
       const s = await league();
       return s.stats.started > startedAt429 ? s : null;
@@ -142,6 +146,52 @@ describe("League at scale", () => {
     expect(resumed.stats.started).toBeGreaterThan(startedAt429);
     // Drain on the fake clock: 429s reported meanwhile then back off only until a time already past.
     await drain();
+  });
+
+  it("a 429 while provisioning holds the Match in 'starting' through the backoff, then starts it", { timeout: 120_000 }, async () => {
+    const time = await fakeClock();
+    const roster = [fakeAgent("pv-429", { rateLimitProvision: true }), ...slowRoster("pv")];
+    await admin("config", { ...UNPACED, ...SHORT, n: 1, backoffMs: 60_000, roster });
+    const before = await league();
+    await admin("resume");
+    const limited = await waitFor(async () => {
+      const s = await league();
+      return s.rateLimit.count > before.rateLimit.count ? s : null;
+    });
+    expect(limited.rateLimit.recent[0]).toMatchObject({ agentId: "pv-429", source: "provision" });
+    // The failed start is not retried into the ground: the same Match waits out the backoff.
+    await sleep(500);
+    const held = await league();
+    expect(held.tiles).toHaveLength(1);
+    expect(held.tiles[0]!.status).toBe("starting");
+    expect(held.stats.started).toBe(limited.stats.started);
+
+    await time.advance(60_001);
+    await waitFor(async () => (await league()).tiles.find((t) => t.matchId === held.tiles[0]!.matchId && t.status === "running"));
+    await drain();
+  });
+
+  it("wakes itself for the next start window (real clock)", async () => {
+    await admin("config", { ...SHORT, n: 4, startsPerWindow: 2, startWindowMs: 400, feedIntervalMs: 20, roster: slowRoster("wake") });
+    const base = (await league()).stats.started;
+    const began = Date.now();
+    await admin("resume");
+    await waitFor(async () => (await league()).stats.started - base >= 4);
+    // Two windows were needed, and no one ran the alarm by hand.
+    expect(Date.now() - began).toBeGreaterThanOrEqual(350);
+    expect((await league()).stats.started - base).toBe(4);
+    await drain();
+  });
+
+  it("retries a start that keeps failing, freeing and refilling its slot", async () => {
+    await admin("config", { ...UNPACED, n: 1, roster: [fakeAgent("bad-1"), { id: "bad-2", name: "bad-2", harness: "no-such-harness" }] });
+    const base = (await league()).stats.started;
+    await admin("resume");
+    // Every table includes the broken Agent eventually; each dropped slot is refilled by a new start.
+    await waitFor(async () => (await league()).stats.started - base >= 3);
+    await admin("pause");
+    await admin("config", { ...UNPACED, roster: slowRoster("after-bad") });
+    await waitFor(async () => (await league()).tiles.length === 0);
   });
 });
 
