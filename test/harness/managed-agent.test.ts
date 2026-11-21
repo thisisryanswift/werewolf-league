@@ -350,6 +350,17 @@ describe("Managed Agent harness: usage", () => {
     expect(closed!.usage).toEqual([{ id, model: "gemini-4-hydrogen", usage: U2 }]);
   });
 
+  it("keeps a setup interaction whose usage was not readable at cancel time, and reads it on close", async () => {
+    const s = await seat();
+    const setupId = s.api.latest().id;
+    const started = await s.harness.startTurn(s.ctx, input("BRIEFING-1", "vote", { firstTurn: true }));
+    expect(started.usage).toBeUndefined();
+    s.ctx.chain = started.chain;
+    s.api.bill(setupId, { input: 900, cached: 0, thought: 10, output: 0 });
+    const closed = await s.harness.close!(s.ctx);
+    expect(closed!.usage).toContainEqual({ id: setupId, model: "gemini-4-hydrogen", usage: { input: 900, cached: 0, thought: 10, output: 0 } });
+  });
+
   it("reports the setup interaction's usage when the first turn cancels it", async () => {
     const s = await seat();
     const setupId = s.api.latest().id;

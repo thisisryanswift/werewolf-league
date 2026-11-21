@@ -64,7 +64,11 @@ interface Chain {
   note?: string;
   /** Setup interaction from provision(), cancelled when the first turn starts. */
   setupInteraction?: string;
+  /** Settled interactions whose usage could not be read yet (billed all the same); close() reads them. */
+  unread?: string[];
 }
+
+const withUnread = (chain: Chain, id: string): Chain => ({ ...chain, unread: [...new Set([...(chain.unread ?? []), id])] });
 
 export const PREAMBLE = [
   "You are an Agent playing one seat in a Match of a game league.",
@@ -155,7 +159,9 @@ export function managedAgentHarness(opts: ManagedAgentOptions): Harness {
       it = (await cancelAndRead(f.id)) ?? it;
       cancelled = true;
     }
-    return { chain: settle(ctx, chain, f, it, cancelled), usage: usageOf(ctx, it) };
+    const usage = usageOf(ctx, it);
+    const settled = settle(ctx, chain, f, it, cancelled);
+    return { chain: usage.length ? settled : withUnread(settled, f.id), usage };
   }
 
   /** Fold a settled in-flight interaction's outcome into the chain. */
@@ -238,9 +244,12 @@ export function managedAgentHarness(opts: ManagedAgentOptions): Harness {
       const usage: UsageReading[] = [];
       if (chain.setupInteraction) {
         // Best effort and bounded: the setup interaction is never continued. It ran the model, so it is billed.
-        const setup = await cancelAndRead(chain.setupInteraction, SETUP_CANCEL_TIMEOUT_MS);
-        if (setup) usage.push(...usageOf(ctx, setup));
+        const id = chain.setupInteraction;
+        const setup = await cancelAndRead(id, SETUP_CANCEL_TIMEOUT_MS);
+        const read = setup ? usageOf(ctx, setup) : [];
+        usage.push(...read);
         chain = { ...chain, setupInteraction: undefined };
+        if (!read.length) chain = withUnread(chain, id);
       }
       const settled = await reconcile(ctx, chain);
       chain = settled.chain;
@@ -313,21 +322,24 @@ export function managedAgentHarness(opts: ManagedAgentOptions): Harness {
 
     async close(ctx) {
       const chain = ctx.chain as unknown as Chain;
-      if (!chain.setupInteraction && !chain.inFlight) return;
+      // The setup interaction (a seat that never took a turn), any settled interaction whose
+      // usage could not be read, and the seat's last interaction: read each one's final usage.
+      const ids = [
+        ...new Set([chain.setupInteraction, ...(chain.unread ?? []), chain.inFlight?.id].filter((x): x is string => !!x)),
+      ];
+      if (!ids.length) return;
       const usage: UsageReading[] = [];
-      // A seat that never took a turn: its setup interaction was never cancelled or read.
-      if (chain.setupInteraction) {
-        const setup = await cancelAndRead(chain.setupInteraction, SETUP_CANCEL_TIMEOUT_MS);
-        if (setup) usage.push(...usageOf(ctx, setup));
-      }
-      // The seat's last interaction (e.g. a cancel whose read timed out): read its final usage once more.
-      if (chain.inFlight) {
-        let it = await api.get(chain.inFlight.id, CANCEL_READ_TIMEOUT_MS).catch(() => null);
-        if (it && ACTIVE.has(it.status)) it = (await cancelAndRead(it.id, SETUP_CANCEL_TIMEOUT_MS)) ?? it;
-        if (it) usage.push(...usageOf(ctx, it));
+      for (const id of ids) {
+        // Throws if the API can't be read, so the caller retries the close.
+        let it = await api.get(id, CANCEL_READ_TIMEOUT_MS);
+        if (ACTIVE.has(it.status)) {
+          await api.cancel(id, SETUP_CANCEL_TIMEOUT_MS);
+          it = await api.get(id, CANCEL_READ_TIMEOUT_MS);
+        }
+        usage.push(...usageOf(ctx, it));
       }
       return {
-        chain: { ...chain, setupInteraction: undefined } as unknown as Record<string, unknown>,
+        chain: { ...chain, setupInteraction: undefined, unread: [] } as unknown as Record<string, unknown>,
         ...(usage.length ? { usage } : {}),
       };
     },
