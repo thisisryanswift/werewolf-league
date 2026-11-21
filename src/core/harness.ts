@@ -23,6 +23,11 @@ export interface PlayerContext {
   seat: number;
   agent: AgentConfig;
   tools: ToolSpec[];
+  /**
+   * The seat's Agent Instructions, assembled by the Match from the Ruleset-named
+   * sections. Harnesses deliver them at provisioning (managed-agent: /.agents/AGENTS.md).
+   */
+  instructions?: string;
   /** Opaque Harness-owned state (environment ID, last interaction ID, ...). */
   chain: Record<string, unknown>;
 }

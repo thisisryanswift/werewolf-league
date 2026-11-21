@@ -6,7 +6,7 @@ const tile = (matchId: string, speech: string | null = null): MatchTile => ({
   matchId,
   seed: "s",
   status: "running",
-  seats: [{ seat: 1, agentId: "a", label: "A" }],
+  seats: [{ seat: 1, agentId: "a", label: "A", displayName: "Mara" }],
   summary: {
     phase: "Day",
     round: 1,

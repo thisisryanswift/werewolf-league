@@ -5,6 +5,8 @@
 import { DEFAULT_RULESET_ID } from "../rulesets";
 import type { DeadlineConfig } from "./deadlines";
 import type { AgentConfig } from "./harness";
+import type { NarratorConfig } from "./narrator";
+import { narratorConfigError } from "../narrator";
 
 /** The League every Match reports to (one League for the demo). */
 export const LEAGUE_NAME = "default";
@@ -20,6 +22,8 @@ export interface LeagueConfig {
   rulesetConfig: Record<string, unknown>;
   /** Turn deadlines for new Matches; missing values use the defaults (60 s, first turn 90 s). */
   deadlines?: Partial<DeadlineConfig>;
+  /** The Narrator for new Matches (e.g. { id: "decisions" }); absent or null means none. */
+  narrator?: NarratorConfig | null;
   /** Agents the League draws from. Copies may share a Match. */
   roster: AgentConfig[];
   /** At most this many new Matches start in any `startWindowMs` window. */
@@ -115,6 +119,11 @@ export function patchConfig(
       Object.entries(d).every(([k, v]) => keys.includes(k) && typeof v === "number" && Number.isFinite(v) && v > 0);
     if (!valid) return { ok: false, error: "deadlines must be { turnMs?, firstTurnMs?, graceMs? } with positive numbers" };
     next.deadlines = d as Partial<DeadlineConfig>;
+  }
+  if (patch.narrator !== undefined) {
+    const error = patch.narrator === null ? null : narratorConfigError(patch.narrator);
+    if (error) return { ok: false, error };
+    next.narrator = patch.narrator as NarratorConfig | null;
   }
   if (patch.seeds !== undefined) {
     if (!Array.isArray(patch.seeds) || !patch.seeds.every((x) => typeof x === "string" && x.length > 0 && x.length <= 128)) {

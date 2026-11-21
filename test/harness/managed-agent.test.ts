@@ -18,8 +18,10 @@ const AGENT: AgentConfig = {
   name: "Hydrogen",
   harness: "managed-agent",
   model: "gemini-4-hydrogen",
-  instructions: "Play to win. Trust nobody.",
 };
+
+/** The seat's Agent Instructions, as assembled by the Match. */
+const INSTRUCTIONS = "# How to play\n\nPlay to win. Trust nobody.";
 
 const request = (actionKind: string, prompt: string): TurnRequest => ({ seat: 3, actionKind, legalTargets: [1, 2], prompt });
 const input = (text: string, actionKind = "vote", extra: Partial<TurnInput> = {}): TurnInput => ({
@@ -34,7 +36,7 @@ async function seat(opts: { hangCancels?: boolean } = {}) {
   const api = new StubInteractionsApi();
   api.hangCancels = !!opts.hangCancels;
   const harness: Harness = managedAgentHarness({ apiKey: "test-key", fetch: api.fetch });
-  const ctx: PlayerContext = { matchId: "m1", seat: 3, agent: AGENT, tools: TOOLS, chain: {} };
+  const ctx: PlayerContext = { matchId: "m1", seat: 3, agent: AGENT, tools: TOOLS, instructions: INSTRUCTIONS, chain: {} };
   ctx.chain = await harness.provision(ctx);
   const s = {
     api,
@@ -66,7 +68,7 @@ describe("Managed Agent harness: provisioning and the first turn", () => {
     // Even if every cancel hangs, provisioning returns the setup interaction and environment IDs.
     const { api, ctx } = await seat({ hangCancels: true });
     const [setup] = api.creates();
-    expect(setup.environment).toBe("remote");
+    expect(setup.environment).toMatchObject({ type: "remote" });
     expect(setup.tools.map((t: any) => t.name)).toEqual(["speak", "vote"]);
     expect(api.requests.some((r) => r.path.endsWith("/cancel"))).toBe(false);
     expect(api.requests.every((r) => r.apiKey === "test-key")).toBe(true);
@@ -88,7 +90,23 @@ describe("Managed Agent harness: provisioning and the first turn", () => {
     expect(s.api.requests.filter((r) => r.path === `/${setupId}/cancel`)).toHaveLength(1);
   });
 
-  it("sends rules, Agent Instructions and the seat's fixed tools on the first turn, on the provisioned environment", async () => {
+  it("mounts the seat's Agent Instructions as /.agents/AGENTS.md in the new environment", async () => {
+    const { api } = await seat();
+    const [setup] = api.creates();
+    expect(setup.environment).toEqual({
+      type: "remote",
+      sources: [{ type: "inline", target: "/.agents/AGENTS.md", content: INSTRUCTIONS }],
+    });
+  });
+
+  it("provisions a plain environment when the seat has no Agent Instructions", async () => {
+    const api = new StubInteractionsApi();
+    const harness = managedAgentHarness({ apiKey: "test-key", fetch: api.fetch });
+    await harness.provision({ matchId: "m1", seat: 3, agent: AGENT, tools: TOOLS, chain: {} });
+    expect(api.creates()[0].environment).toBe("remote");
+  });
+
+  it("sends the rules and the seat's fixed tools on the first turn, on the provisioned environment, but not the mounted instructions", async () => {
     const s = await seat();
     await s.start(input("RULES. You are seat 3. Seats: 1, 2, 3.\n\nNight 1: call vote.", "vote", { firstTurn: true }));
     const body = s.api.creates().at(-1);
@@ -101,7 +119,7 @@ describe("Managed Agent harness: provisioning and the first turn", () => {
     });
     expect(body.previous_interaction_id).toBeUndefined();
     expect(body.tools).toEqual(TOOLS.map((t) => ({ type: "function", ...t })));
-    expect(body.input).toContain("Play to win. Trust nobody.");
+    expect(body.input).not.toContain("Play to win. Trust nobody.");
     expect(body.input).toContain("RULES. You are seat 3.");
   });
 
@@ -203,7 +221,7 @@ describe("Managed Agent harness: timeout recovery", () => {
     const body = s.api.creates().at(-1);
     expect(body.previous_interaction_id).toBeUndefined();
     expect(body.environment).toBe("env-1");
-    expect(body.input).toContain("Play to win. Trust nobody.");
+    expect(body.input).not.toContain("Play to win. Trust nobody.");
     expect(body.input).toContain("BRIEFING-1: rules, role, seats. Night 1 events.");
     expect(body.input).toContain("NEW: Day 1 events.");
     expect(body.input.split("BRIEFING-1").length - 1).toBe(1);

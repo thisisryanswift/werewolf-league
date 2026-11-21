@@ -93,7 +93,7 @@ export const decisions = (events: MatchEvent[]) => events.map(({ kind, audience,
 
 /** Wolf seats the Werewolf Ruleset deals for a 7-seat table of distinct Agents with this seed. */
 export function dealtWolves(seed: string): number[] {
-  const seats = Array.from({ length: 7 }, (_, i) => ({ seat: i + 1, agentId: `x${i}`, label: "x" }));
+  const seats = Array.from({ length: 7 }, (_, i) => ({ seat: i + 1, agentId: `x${i}`, label: "x", displayName: `N${i + 1}` }));
   const r = werewolf.setup({}, seed, seats);
   if (!r.ok) throw new Error(r.error);
   return r.events.find((e) => e.kind === "wolf_team")!.data.wolves as number[];

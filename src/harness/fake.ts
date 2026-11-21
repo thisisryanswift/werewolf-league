@@ -78,7 +78,8 @@ export const fakeHarness: Harness = {
       provisionRefused.add(key);
       throw Object.assign(new Error("fake 429: quota exhausted"), { status: 429 });
     }
-    return { ...ctx.chain, environment: `fake-env-${ctx.matchId}-${ctx.seat}`, turns: 0 };
+    // Records the Agent Instructions it was given, so tests can check what each seat got.
+    return { ...ctx.chain, environment: `fake-env-${ctx.matchId}-${ctx.seat}`, turns: 0, instructions: ctx.instructions };
   },
   async startTurn(ctx, input) {
     const opts = (ctx.agent.options ?? {}) as FakeOptions;

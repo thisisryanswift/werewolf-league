@@ -154,7 +154,7 @@ body:has(.leaderboard) {
 @media (min-width: 64rem) {
   .leaderboard {
     float: right;
-    width: 34rem;
+    width: 39rem;
     margin: 0 0 1rem 1.5rem;
   }
 }
@@ -189,4 +189,38 @@ body:has(.leaderboard) {
 .leaderboard thead button:hover,
 .leaderboard thead button:focus-visible {
   text-decoration: underline;
+}
+/* Table Suspicion meter (God View only) */
+.table-suspicion ul {
+  list-style: none;
+  padding: 0;
+}
+.table-suspicion li {
+  display: grid;
+  grid-template-columns: 14rem 6rem 1fr 3.5rem;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.15rem 0;
+}
+.table-suspicion li.dead {
+  opacity: 0.5;
+}
+.table-suspicion .ts-bar {
+  height: 0.7rem;
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  border-radius: 0.35rem;
+  overflow: hidden;
+}
+.table-suspicion .ts-bar > span {
+  display: block;
+  height: 100%;
+  background: #c55;
+}
+.table-suspicion .ts-value {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.table-suspicion .role-werewolf {
+  color: #c33;
+  font-weight: 600;
 }

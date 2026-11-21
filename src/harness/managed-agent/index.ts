@@ -2,10 +2,12 @@
 //
 // - provision(): creates the seat's environment at Match start with a setup interaction on
 //   "remote" and returns its IDs at once, so they are persisted before anything else. The
-//   setup interaction is cancelled when the first turn starts (M1: environment_id is on the
-//   create() response and survives the cancel).
+//   seat's Agent Instructions are mounted as /.agents/AGENTS.md through an `inline` source
+//   (wl-cizy probe: a function-only agent follows it, on fresh chains and continuations).
+//   The setup interaction is cancelled when the first turn starts (M1: environment_id is
+//   on the create() response and survives the cancel).
 // - startTurn(): a first turn (`input.firstTurn`) starts a chain on the seat's environment
-//   with the Agent Instructions and the Match's text (briefing + observation); later turns
+//   with the Match's text (briefing + observation); later turns
 //   chain with previous_interaction_id + environment and put the observation inside the
 //   previous call's function_result. Tools are the seat's fixed list, resent identically
 //   every turn (ADR-0002).
@@ -102,6 +104,19 @@ function base(ctx: PlayerContext) {
   return { agent: AGENT, agent_config: agentConfig(ctx.agent), tools: toApiTools(ctx.tools), background: true, store: true };
 }
 
+/** Where the seat's Agent Instructions are mounted; the agent reads it when each interaction starts. */
+export const AGENTS_MD = "/.agents/AGENTS.md";
+
+/**
+ * A new sandbox, with the seat's Agent Instructions mounted through the documented
+ * `inline` source. The file stays in the environment, so every later chain on it
+ * (continuations, and the fresh chain after a first-turn timeout) keeps it.
+ */
+function environmentConfig(ctx: PlayerContext) {
+  if (!ctx.instructions) return "remote";
+  return { type: "remote", sources: [{ type: "inline", target: AGENTS_MD, content: ctx.instructions }] };
+}
+
 const toolNames = (ctx: PlayerContext) => ctx.tools.map((t) => t.name);
 
 export function managedAgentHarness(opts: ManagedAgentOptions): Harness {
@@ -148,8 +163,8 @@ export function managedAgentHarness(opts: ManagedAgentOptions): Harness {
   }
 
   function freshInput(ctx: PlayerContext, chain: Chain, error: string | undefined): string {
+    // The Agent Instructions are not repeated here: they stay mounted in the environment.
     const parts = [PREAMBLE];
-    if (ctx.agent.instructions) parts.push(`Agent Instructions:\n${ctx.agent.instructions}`);
     const restart = chain.transcript.length > 1;
     if (restart || chain.note) parts.push([chain.note, restart ? NOTE_RESTART : null].filter(Boolean).join(" "));
     parts.push(markEarlier(chain.transcript));
@@ -177,7 +192,7 @@ export function managedAgentHarness(opts: ManagedAgentOptions): Harness {
     async provision(ctx) {
       const setup = await api.create({
         ...base(ctx),
-        environment: "remote",
+        environment: environmentConfig(ctx),
         input: `${PREAMBLE}\n\nSetup only: your sandbox is being prepared. Do nothing; the Match starts soon.`,
       });
       const environment = setup.environment_id ?? (await api.get(setup.id)).environment_id;

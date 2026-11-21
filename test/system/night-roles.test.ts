@@ -4,7 +4,7 @@ import { fakeAgent, finished, startMatch } from "./helpers";
 
 /** The deal the Ruleset makes for a 7-seat table of distinct Agents with this seed. */
 function dealFor(seed: string) {
-  const seats = Array.from({ length: 7 }, (_, i) => ({ seat: i + 1, agentId: `x${i}`, label: "x" }));
+  const seats = Array.from({ length: 7 }, (_, i) => ({ seat: i + 1, agentId: `x${i}`, label: "x", displayName: `N${i + 1}` }));
   const r = werewolf.setup({}, seed, seats);
   if (!r.ok) throw new Error(r.error);
   const seatOf = (role: string) => r.state.players.find((p) => p.role === role)!.seat;

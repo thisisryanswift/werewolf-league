@@ -36,9 +36,11 @@ export function mergeEvents(existing: MatchEvent[], incoming: MatchEvent[]): Mat
 // ---- League feed ------------------------------------------------------
 
 /**
- * A ruleset-agnostic, public summary of a live Match for its grid tile.
- * The Ruleset supplies it. Everything is public except `godView`, which
- * (like the Match feed's private events) is hidden client-side when God View is off.
+ * A ruleset-agnostic summary of a live Match for its grid tile. The Ruleset
+ * supplies the public fields (and `godView`); the Match runner adds the Narrator's
+ * Drama fields. `godView` and secret Drama Flags are sent to every Spectator and
+ * hidden client-side when God View is off (see `visibleDramaFlags`), like private
+ * Match events.
  */
 export interface MatchSummary {
   /** Display name of the current phase, e.g. "Day" or "Night"; "Over" once finished. */
@@ -56,12 +58,15 @@ export interface MatchSummary {
    * Match feed, it is sent to every Spectator and hidden client-side when God View is off.
    */
   godView?: { roles: Record<number, string>; step?: string | null };
+  /** Narrator Drama Score from 0 (calm) to 1 (explosive); absent before the first narration. */
+  dramaScore?: number;
+  /** Active Drama Flags of the latest narration; absent before the first narration. */
+  dramaFlags?: TileDramaFlag[];
 }
 
 /**
  * Everything a grid tile shows: the Ruleset's summary plus counts the Match
- * runner derives from its own events. (Drama Score and Drama Flags are the
- * Narrator's optional MatchSummary fields, wl-pbkx.)
+ * runner derives from its own events (the Drama fields are on MatchSummary).
  */
 export interface TileSummary extends MatchSummary {
   /** Players whose turn is in flight (a count only, so it never says who). */
@@ -70,11 +75,28 @@ export interface TileSummary extends MatchSummary {
   timeouts: number;
 }
 
+/** Public-safe Drama Flags are shown to everyone; secret ones only in God View. */
+export type DramaFlagVisibility = "public-safe" | "secret";
+
+/** An active Drama Flag on a tile (set by the Narrator). */
+export interface TileDramaFlag {
+  id: string;
+  visibility: DramaFlagVisibility;
+}
+
+/** The Drama Flags a Spectator may see: all of them in God View, else only public-safe ones. */
+export function visibleDramaFlags<F extends { visibility: DramaFlagVisibility }>(flags: F[], godView: boolean): F[] {
+  return godView ? flags : flags.filter((f) => f.visibility === "public-safe");
+}
+
 /** One seat of a Match as shown on a tile. */
 export interface TileSeat {
   seat: number;
   agentId: string;
+  /** Agent and copy label, e.g. "Hydrogen #2". */
   label: string;
+  /** The seat's Display Name, e.g. "Mara". */
+  displayName: string;
 }
 
 /** A live Match on the League grid. */
@@ -176,7 +198,8 @@ export interface AgentStanding {
   wins: Record<string, number>;
   /** Turns that missed their deadline, summed from each Match result's per-Agent counts. */
   timeouts: number;
-  // wl-bfo1: Calibration (Brier) belongs here, e.g. `calibration: number | null`.
+  /** Calibration: Brier score over the Agent's village-side beliefs (lower is better); null before any are scored. */
+  calibration: number | null;
 }
 
 /** The leaderboard: every current roster Agent plus every Agent with a rated Match. */

@@ -3,6 +3,7 @@
 // A Ruleset is pure: all randomness comes from the match seed.
 
 import type { EventAudience, MatchSummary, RulesetEvent } from "../shared/protocol";
+import type { NarrationQuestions } from "./narrator";
 
 export type { MatchSummary };
 
@@ -12,8 +13,10 @@ export type Seat = number; // 1-based seat number
 export interface SeatAgent {
   seat: Seat;
   agentId: string;
-  /** Display label, e.g. "Hydrogen #2". */
+  /** The Agent and copy label, e.g. "Hydrogen #2". For Spectators only: never show it to a Player. */
   label: string;
+  /** The Display Name this seat goes by inside the Match, e.g. "Mara". All a Player ever sees of another seat. */
+  displayName: string;
 }
 
 /** A tool the Agent can call (ADR-0002: fixed per seat for the whole Match). */
@@ -51,6 +54,8 @@ export interface MatchResult {
   sides: Record<Seat, string>;
   /** Normalized belief ballots, for Rulesets that collect them (Calibration, Table Suspicion). */
   ballots?: BeliefBallot[];
+  /** The Side the ballots guess at. Ballots from Players on other Sides are scored for Calibration. */
+  beliefSide?: string;
 }
 
 /**
@@ -99,6 +104,15 @@ export interface Ruleset<S = unknown> {
   applyActions(state: S, actions: Record<Seat, ToolCall | null>): { state: S; events: RulesetEvent[] };
   /** Filter events to those a viewer may see. */
   view<E extends { audience: EventAudience }>(events: E[], viewer: Viewer): E[];
+  /**
+   * Agent Instructions (optional). `source` is the default sectioned text (see
+   * core/agent-instructions.ts), used when an Agent has no instructions of its own;
+   * `sections` names the section keys a seat receives, in order.
+   */
+  instructions?: {
+    source: string;
+    sections(state: S, seat: Seat): string[];
+  };
   /** The rules text given to a Player on its first turn. */
   briefing(state: S, seat: Seat): string;
   /** Render a frozen observation: new events since the Player's last turn plus its turn request. */
@@ -110,6 +124,15 @@ export interface Ruleset<S = unknown> {
    * log filtered to the "all" audience (for the latest speech line).
    */
   summary(state: S, publicEvents: RulesetEvent[]): MatchSummary;
+  /**
+   * Optional: what the Narrator asks about this Ruleset's Matches. Without it a
+   * Match is never narrated. `log` renders the God View log (every audience,
+   * secrets included) as text.
+   */
+  narration?: {
+    questions: NarrationQuestions;
+    log(state: S, events: RulesetEvent[]): string;
+  };
 }
 
 /** Default `view` for rulesets that use the shared audience field. */

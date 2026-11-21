@@ -7,8 +7,8 @@ const tile = (matchId: string, over: Partial<MatchTile> = {}): MatchTile => ({
   seed: `seed-${matchId}`,
   status: "running",
   seats: [
-    { seat: 1, agentId: "a", label: "A" },
-    { seat: 2, agentId: "b", label: "B" },
+    { seat: 1, agentId: "a", label: "A", displayName: "Mara" },
+    { seat: 2, agentId: "b", label: "B", displayName: "Tobin" },
   ],
   summary: {
     phase: "Day",

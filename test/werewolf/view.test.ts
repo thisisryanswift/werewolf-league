@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { werewolf } from "../../src/rulesets/werewolf";
-import { nightKill, seatsOf } from "./helpers";
+import { act, actors, day1Vote, nightKill, seatsOf, vote } from "./helpers";
+
+/** Seat n's Display Name in seatsOf(). */
+const nameOf = (seat: number) => `Name${seat}`;
 
 function table() {
   const r = werewolf.setup({}, "view", seatsOf(7));
@@ -25,9 +28,41 @@ describe("Werewolf view and observations", () => {
     const { state, wolves } = table();
     const text = werewolf.briefing(state, wolves[0]!);
     expect(text).toMatch(/Werewolf/);
-    expect(text).toContain(`You are seat ${wolves[0]}`);
-    expect(text).toContain(`partner is seat ${wolves[1]}`);
-    expect(text).toContain("Agent 7");
+    expect(text).toContain(`You are ${nameOf(wolves[0]!)} (seat ${wolves[0]})`);
+    expect(text).toContain(`partner is ${nameOf(wolves[1]!)} (seat ${wolves[1]})`);
+    expect(text).toContain(`- Seat 7: ${nameOf(7)}`);
+  });
+
+  it("never shows a Player another seat's Agent or copy label", () => {
+    const { state, wolves } = table();
+    for (const p of state.players) {
+      const text = werewolf.briefing(state, p.seat);
+      expect(text).not.toMatch(/Agent \d/);
+      expect(text).not.toContain("agent-");
+    }
+    // Wolf Chat names the speaker by Display Name.
+    const chat = act(state, () => ({ name: "wolf_chat", args: { text: "hi" } }));
+    const seat = wolves[1]!;
+    const obs = werewolf.renderObservation(chat.state, seat, werewolf.view(chat.events, { seat }), {
+      seat,
+      actionKind: "wolf_chat",
+      legalTargets: [],
+      prompt: "go",
+    });
+    expect(obs).toContain(`${nameOf(wolves[0]!)} (seat ${wolves[0]}): hi`);
+    expect(obs).not.toMatch(/Agent \d/);
+  });
+
+  it("reveals votes and deaths by Display Name", () => {
+    const { state } = day1Vote("view");
+    const r = werewolf.applyActions(state, Object.fromEntries(actors(state).map((s) => [s, vote(s === 1 ? 2 : 1)])));
+    const seat = 3;
+    const turn = { seat, actionKind: "x", legalTargets: [], prompt: "go" };
+    const text = werewolf.renderObservation(r.state, seat, werewolf.view(r.events, { seat }), turn);
+    expect(text).toContain(`${nameOf(1)} (seat 1) → ${nameOf(2)} (seat 2)`);
+    expect(text).toContain(`${nameOf(2)} (seat 2) → ${nameOf(1)} (seat 1)`);
+    expect(text).toContain(`${nameOf(1)} (seat 1) was eliminated by vote`);
+    expect(text).not.toMatch(/Agent \d/);
   });
 
   it("briefs the Seer and Doctor with their role and the Night rules", () => {
@@ -48,8 +83,7 @@ describe("Werewolf view and observations", () => {
     if (next.type !== "turns") throw new Error();
     const me = next.turns[0]!;
     const text = werewolf.renderObservation(s2, me.seat, werewolf.view(events, { seat: me.seat }), me);
-    expect(text).toContain(`Seat ${villager}`);
-    expect(text).toContain("was killed in the Night");
+    expect(text).toContain(`${nameOf(villager)} (seat ${villager}) was killed in the Night`);
     expect(text).toContain(me.prompt);
   });
 });

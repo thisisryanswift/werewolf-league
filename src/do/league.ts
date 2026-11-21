@@ -9,7 +9,7 @@ import { drawTable } from "../core/draw";
 import type { MatchInit, MatchReport } from "../core/match";
 import { FeedCoalescer } from "../core/league-feed";
 import { defaultLeagueConfig, patchConfig, type LeagueConfig } from "../core/roster";
-import { applyMatch, rankStandings, ratePlayers, snapshotOf, standing, type AgentRecord, type RatingSnapshot } from "../core/ratings";
+import { applyMatch, calibrationByAgent, rankStandings, ratePlayers, snapshotOf, standing, type AgentRecord, type RatingSnapshot } from "../core/ratings";
 import { buildMatchInit } from "../core/start-match";
 import { backoffUntil, recentStarts, startBudget } from "../core/start-pacer";
 import { getRuleset } from "../rulesets";
@@ -360,6 +360,7 @@ export class LeagueDO extends DurableObject<Env> {
       sideOrder: getRuleset(entry.init.rulesetId).sides,
       names,
       timeoutsByAgent: s.result.timeouts?.byAgent ?? {},
+      calibrationByAgent: calibrationByAgent(seats, s.result),
     });
     this.agents = applied.records;
     return { ...s, ratings: applied.changes };
@@ -436,6 +437,7 @@ export class LeagueDO extends DurableObject<Env> {
         rulesetId: config.rulesetId,
         config: config.rulesetConfig,
         deadlines: config.deadlines,
+        narrator: config.narrator,
         agents: draw.agents,
       });
       live[init.matchId] = {

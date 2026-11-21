@@ -26,12 +26,26 @@ import {
   type SubmitResult,
   type TurnAssignment,
 } from "../core/match";
+import { assembleInstructions } from "../core/agent-instructions";
+import type { AgentConfig } from "../core/harness";
+import { isNarrationEvent, latestDrama, LatestOnly, narrateMatch } from "../core/narrator";
 import { LEAGUE_NAME } from "../core/roster";
 import type { Ruleset, Seat, ToolCall, ToolSpec, TurnRequest } from "../core/ruleset";
+import { narratorFor } from "../narrator";
 import { getRuleset } from "../rulesets";
 import type { MatchEvent, RulesetEvent, ServerMessage, TileSummary } from "../shared/protocol";
 import { ratingsSettledEvent, thinkingSeats } from "../shared/turn-events";
 import type { SettleAck } from "./league";
+
+/**
+ * A seat's Agent Instructions: the Ruleset-named sections of the Agent's own
+ * instructions, or of the Ruleset's default text when the Agent has none.
+ */
+function seatInstructions(ruleset: Ruleset<unknown>, state: unknown, seat: Seat, agent: AgentConfig): string | undefined {
+  const source = agent.instructions ?? ruleset.instructions?.source;
+  if (!source) return undefined;
+  return assembleInstructions(source, ruleset.instructions?.sections(state, seat) ?? []) || undefined;
+}
 
 /** How soon the Match retries sending a turn to a Player DO that failed to accept it. */
 const DISPATCH_RETRY_MS = 1000;
@@ -160,6 +174,7 @@ export class MatchDO extends DurableObject<Env> {
           seat: s.seat,
           agent: init.agents[s.seat]!,
           tools: setup.tools[s.seat]!,
+          instructions: seatInstructions(ruleset, setup.state, s.seat, init.agents[s.seat]!),
         }),
       ),
     );
@@ -257,6 +272,7 @@ export class MatchDO extends DurableObject<Env> {
         return;
       }
       this.resolve(meta, ruleset, pending);
+      this.narrate();
     }
 
     const current = this.meta!;
@@ -315,11 +331,12 @@ export class MatchDO extends DurableObject<Env> {
   private pushSummary(ruleset: Ruleset<unknown>): void {
     const meta = this.meta;
     if (!meta) return;
-    // Runner events (turn markers, step_resolved) are not game events.
+    // Runner events (turn markers, step_resolved) and narrations are not game events.
     const events = this.events();
-    const publicEvents = events.filter((e) => e.audience === "all" && !isRunnerEvent(e));
+    const publicEvents = events.filter((e) => e.audience === "all" && !isRunnerEvent(e) && !isNarrationEvent(e));
     const summary: TileSummary = {
       ...ruleset.summary(this.rulesetState, publicEvents),
+      ...latestDrama(events),
       // Counts only: the runner's turn events are seat-private, so naming seats could reveal roles.
       thinking: thinkingSeats(events).length,
       timeouts: events.filter((e) => e.kind === "turn_timed_out").length,
@@ -330,11 +347,42 @@ export class MatchDO extends DurableObject<Env> {
     this.ctx.waitUntil(update);
   }
 
+  // ---- Narrator (never affects play) -------------------------------
+
+  /** At most one narration in flight; a newer step supersedes any queued behind it. In memory only. */
+  private narration: LatestOnly | null = null;
+
+  /** Narrate the Match after a published step. Never awaited: it cannot delay or block a step. */
+  private narrate(): void {
+    const meta = this.meta;
+    if (!meta?.narrator || !this.ruleset(meta).narration) return;
+    this.narration ??= new LatestOnly(() => this.narrateOnce());
+    const run = this.narration.kick();
+    if (run) this.ctx.waitUntil(run);
+  }
+
+  /** One narration of the current log. A failure or timeout is dropped; the tile keeps its last value. */
+  private async narrateOnce(): Promise<void> {
+    const meta = this.meta!;
+    const ruleset = this.ruleset(meta);
+    const events = await narrateMatch({
+      matchId: meta.matchId,
+      config: meta.narrator!,
+      narrator: narratorFor(meta.narrator!, this.env),
+      hook: ruleset.narration!,
+      state: this.rulesetState,
+      events: this.events().filter((e) => !isRunnerEvent(e) && !isNarrationEvent(e)),
+      throughSeq: this.lastSeq(),
+    });
+    this.commit(events);
+    this.pushSummary(ruleset);
+  }
+
   /** Start a step: freeze each Player's observation and hand the turns to the Player DOs. */
   private async dispatch(meta: MatchMeta, ruleset: Ruleset<unknown>, turns: TurnRequest[]) {
     const state = this.rulesetState;
-    // Runner events (turn markers, timeouts) are for Spectators, never for Agents.
-    const all = this.events().filter((e) => !isRunnerEvent(e));
+    // Runner events (turn markers, timeouts) and narrations are for Spectators, never for Agents.
+    const all = this.events().filter((e) => !isRunnerEvent(e) && !isNarrationEvent(e));
     const head = this.lastSeq();
     const stepNo = meta.stepCount + 1;
     const startedAt = Date.now();
