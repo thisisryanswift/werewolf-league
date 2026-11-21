@@ -305,7 +305,14 @@ export class LeagueDO extends DurableObject<Env> {
     const names: Record<string, string> = Object.fromEntries(Object.entries(this.agents).map(([id, r]) => [id, r.name]));
     for (const a of this.config.roster) names[a.id] = a.name;
     const settlements = [...this.ctx.storage.kv.list<Settlement>({ prefix: "settled:" })].map(([, s]) => s);
-    return ratingsHistory({ settlements, sides: getRuleset(this.config.rulesetId).sides, names });
+    const h = ratingsHistory({ settlements, sides: getRuleset(this.config.rulesetId).sides, names });
+    // Hidden Agents are off the leaderboard, so off its chart too.
+    const hidden = new Set(this.config.hiddenAgents ?? []);
+    if (!hidden.size) return h;
+    return {
+      agents: h.agents.filter((a) => !hidden.has(a.agentId)),
+      points: h.points.map((p) => ({ ...p, overall: Object.fromEntries(Object.entries(p.overall).filter(([id]) => !hidden.has(id))) })),
+    };
   }
 
   /** Push the leaderboard after a rated Match settles, as its own feed message. */
