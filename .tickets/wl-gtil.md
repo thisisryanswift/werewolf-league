@@ -1,6 +1,6 @@
 ---
 id: wl-gtil
-status: open
+status: in_progress
 deps: [wl-qpvr, wl-kh5w, wl-lvtw, wl-d5wn]
 links: []
 created: 2026-11-21T16:34:58Z
@@ -52,3 +52,7 @@ Human decision 2026-11-21: the human wants to be involved in the final design pa
 **2026-11-21T17:01:52Z**
 
 From wl-pbkx: tile dramaFlags include secret flags tagged visibility:'secret'. The grid MUST filter them through visibleDramaFlags(flags, godView) so they are hidden when God View is off. dramaScore/dramaFlags are optional MatchSummary fields.
+
+**2026-11-21T17:17:25Z**
+
+Orchestrator: started at 12:17, based on impl/wl-d5wn (84c36a0, feed protocol final; P1 fixes in progress) merged with integration. Night thinking-count decision: show it only in God View at Night, because it reveals roles. Per the human, stop for their design pass before merge.
