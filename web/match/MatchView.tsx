@@ -17,6 +17,7 @@ import { formatRating, sideName } from "../components/Leaderboard";
 import { describeEvent } from "../events";
 import { useMatchFeed, type FeedStatus } from "../useMatchFeed";
 import "./match-view.css";
+import { notesVersion } from "./notes";
 import { buildMatchView, panelsFor, playerLabel, type EndScreen, type FeedGroup, type MatchView as View, type SeatView, type VoteTally } from "./model";
 import { NarratorViewContext, MATCH_PANELS, SEAT_SLOTS, useNarratorView, type MatchPanelProps } from "./panels";
 import { formatUsd } from "../cost";
@@ -450,6 +451,21 @@ function FeedLine({ event: e, narratorViewOnly, view, log }: { event: MatchEvent
     );
   }
   const text = describeEvent(e, log);
+  const notes = narratorViewOnly ? notesVersion(e) : null;
+  if (notes) {
+    // wl-jz95: collapsed by default; expands to the notes as written at this moment.
+    return (
+      <li className="mv-row narrator" data-narrator-view-only="true" data-kind={e.kind}>
+        <details className="mv-feed-notes" data-testid="feed-notes">
+          <summary>
+            <span className="mv-nv">NARRATOR'S VIEW</span> {text}
+            {notes.truncated ? " (truncated)" : ""}
+          </summary>
+          <pre>{notes.text}</pre>
+        </details>
+      </li>
+    );
+  }
   if (narratorViewOnly) {
     return (
       <li className={`mv-row narrator ${e.kind === "turn_timed_out" ? "timeout" : ""}`} data-narrator-view-only="true" data-kind={e.kind}>

@@ -304,6 +304,19 @@ body:has(.mv-page) {
   overflow-wrap: anywhere;
   font: inherit;
 }
+/* Notes feed item (wl-jz95): expands to that version of the notes. */
+.mv-feed-notes summary {
+  cursor: pointer;
+}
+.mv-feed-notes pre {
+  margin: 4px 0 2px;
+  padding: 4px 6px;
+  border: 1px dashed currentColor;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+}
 .mv-truth {
   margin-left: 6px;
   padding: 0 4px;

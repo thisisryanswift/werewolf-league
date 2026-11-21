@@ -1,7 +1,8 @@
 // Agent notes in the Match view (wl-rhpr): each seat's latest notes and when they were written.
 import { describe, expect, it } from "vitest";
 import type { MatchEvent, RulesetEvent } from "../../src/shared/protocol";
-import { latestNotes } from "../../web/match/notes";
+import { buildMatchView } from "../../web/match/model";
+import { latestNotes, notesVersion } from "../../web/match/notes";
 
 function logOf(events: RulesetEvent[]): MatchEvent[] {
   return events.map((e, i) => ({ ...e, seq: i + 1, ts: 1000 + i }));
@@ -27,5 +28,32 @@ describe("Agent notes in the Match view", () => {
 
   it("hides notes when Narrator's View is off", () => {
     expect(latestNotes(LOG, false).size).toBe(0);
+  });
+});
+
+// wl-jz95: each notes feed item expands to that version's full text.
+const feedNotes = (log: MatchEvent[], narratorView: boolean) =>
+  buildMatchView(log, { narratorView })
+    .feed.flatMap((g) => g.items)
+    .map((i) => notesVersion(i.event))
+    .filter((v) => v !== null);
+
+describe("Agent notes in the Match feed", () => {
+  it("gives every notes feed item the text written at that moment, not the latest", () => {
+    expect(feedNotes(LOG, true)).toEqual([
+      { text: "first draft", truncated: false },
+      { text: "seat two", truncated: false },
+      { text: "P2 claimed Seer", truncated: false },
+    ]);
+  });
+
+  it("marks truncated versions", () => {
+    const cut: RulesetEvent = { kind: "notes_updated", audience: [], data: { seat: 1, text: "xxxx", truncated: true } };
+    const setup = pub("match_setup", { ruleset: "werewolf", seats: [] });
+    expect(feedNotes(logOf([setup, cut]), true)).toEqual([{ text: "xxxx", truncated: true }]);
+  });
+
+  it("has no notes feed items when Narrator's View is off", () => {
+    expect(feedNotes(LOG, false)).toEqual([]);
   });
 });
