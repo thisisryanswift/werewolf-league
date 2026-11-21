@@ -1,6 +1,6 @@
 ---
 id: wl-2lfo
-status: open
+status: in_progress
 deps: [wl-gtil, wl-d5wn, wl-64dn, wl-ks6l]
 links: []
 created: 2026-11-21T18:22:17Z

@@ -18,7 +18,8 @@ export interface MatchEvent extends RulesetEvent {
 
 /** Messages sent from the Match WebSocket to a Spectator. */
 export type ServerMessage =
-  | { type: "log"; matchId: string; events: MatchEvent[] }
+  /** `matchNumber` is the Match's Match Number, absent if its League didn't number it. */
+  | { type: "log"; matchId: string; matchNumber?: number; events: MatchEvent[] }
   | { type: "event"; event: MatchEvent };
 
 /**
@@ -104,6 +105,8 @@ export interface TileSeat {
 /** A live Match on the League grid. */
 export interface MatchTile {
   matchId: string;
+  /** Match Number: the League numbers the Matches it starts 1, 2, 3, ... Absent on older Matches. */
+  matchNumber?: number;
   seed: string;
   /** "starting" until its Match DO has started. */
   status: "starting" | "running";
@@ -154,6 +157,8 @@ export interface RateLimitEvent {
 /** A recently settled Match. */
 export interface SettledMatch {
   matchId: string;
+  /** Match Number, absent on older Matches. */
+  matchNumber?: number;
   winner: string;
   settledAt: number;
 }

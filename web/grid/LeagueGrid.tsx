@@ -2,6 +2,7 @@
 // the leaderboard strip and the Narrator's View toggle; sort and filter chips; then the
 // three promoted large tiles and the rest. Each tile links to #match=<id>.
 import { memo, useMemo, useRef, useState } from "react";
+import { matchLabel } from "../../src/shared/match-label";
 import type { LeagueSnapshot, MatchTile } from "../../src/shared/protocol";
 import { FeaturedMatchLink } from "../components/FinishedMatches";
 import { landedFeatures } from "../help/features";
@@ -20,8 +21,6 @@ const FILTER_LABELS: Record<GridFilter, string> = { all: "All", flagged: "⚑ Fl
 const STRIP_AGENTS = 5;
 /** Narrator's View pip letters for living seats; Villagers stay blank. */
 const ROLE_MARK: Record<string, string> = { werewolf: "W", seer: "S", doctor: "D" };
-
-export const matchLabel = (matchId: string) => `Match ${matchId.slice(0, 8)}`;
 
 export interface LeagueGridProps {
   league: LeagueSnapshot;
@@ -123,14 +122,14 @@ const Tile = memo(function Tile({ tile, narratorView, big }: { tile: MatchTile; 
     .filter(Boolean)
     .join(" ");
   return (
-    <a className={cls} href={matchHash(tile.matchId)} data-testid="match-tile" data-match-id={tile.matchId} aria-label={`Open ${matchLabel(tile.matchId)}`}>
+    <a className={cls} href={matchHash(tile.matchId)} data-testid="match-tile" data-match-id={tile.matchId} aria-label={`Open ${matchLabel(tile)}`}>
       {v.flags.length > 0 && !big && (
         <span className="lg-sticker" title={v.flags.join(" · ")}>
           ⚑ {v.flags.length}
         </span>
       )}
       <span className="t-top">
-        <span className="t-id">{tile.matchId.slice(0, 8)}</span>
+        <span className="t-id">{matchLabel(tile)}</span>
         <span className="t-phase">
           {v.night ? "☾ " : v.phase.startsWith("Day") ? "☀ " : ""}
           {v.phase}

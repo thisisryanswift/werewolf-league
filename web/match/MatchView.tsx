@@ -11,6 +11,7 @@
 // - onClose, when given, adds a Close button; Esc/backdrop/back belong to the modal.
 // - titleId is put on the heading, for the dialog's aria-labelledby.
 import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { matchLabel } from "../../src/shared/match-label";
 import type { MatchEvent } from "../../src/shared/protocol";
 import { formatRating, sideName } from "../components/Leaderboard";
 import { describeEvent } from "../events";
@@ -37,7 +38,8 @@ export function MatchView(props: MatchViewProps) {
 }
 
 function MatchViewForMatch({ matchId, narratorView: controlled, onNarratorViewChange, onClose, titleId }: MatchViewProps) {
-  const { events, status } = useMatchFeed(matchId);
+  const { events, status, matchNumber } = useMatchFeed(matchId);
+  const label = matchLabel({ matchId, ...(matchNumber !== undefined ? { matchNumber } : {}) });
   const [own, setOwn] = useState(true);
   const narratorView = controlled ?? own;
   const setNarratorView = (on: boolean) => (onNarratorViewChange ? onNarratorViewChange(on) : setOwn(on));
@@ -50,7 +52,7 @@ function MatchViewForMatch({ matchId, narratorView: controlled, onNarratorViewCh
       <div className={`mv${narratorView ? " mv-narrator" : ""}`} data-testid="match-view" data-narrator-view={narratorView}>
         <header className="mv-head">
           <h2 id={titleId} className="mv-title">
-            Match {matchId.slice(0, 8)}
+            {label}
           </h2>
           <PhaseChip status={view.status} />
           <span className="mv-chip" data-testid="alive">
@@ -85,7 +87,7 @@ function MatchViewForMatch({ matchId, narratorView: controlled, onNarratorViewCh
           </section>
           <section className="mv-right" aria-label="Match log">
             {view.end && showEnd ? (
-              <End end={view.end} onHide={() => setShowEnd(false)} />
+              <End end={view.end} label={label} onHide={() => setShowEnd(false)} />
             ) : (
               <>
                 <Panels placement="feed" narratorView={narratorView} panelProps={panelProps} />
@@ -494,10 +496,11 @@ const REASONS: Record<string, string> = {
 };
 const signed = (n: number) => `${n >= 0 ? "+" : "−"}${Math.abs(Math.round(n))}`;
 
-function End({ end, onHide }: { end: EndScreen; onHide: () => void }) {
+function End({ end, label, onHide }: { end: EndScreen; label: string; onHide: () => void }) {
   return (
     <div className="mv-end mv-box" data-testid="end-screen" data-winner={end.winner}>
       <div className="mv-end-head">
+        <span className="mv-end-match" data-testid="end-match">{label}</span>
         <h3 className={`mv-winner ${end.winner}`}>{end.winner === "wolf" ? "🐺 Werewolves win" : end.winner === "village" ? "⌂ Village wins" : `${sideName(end.winner)} wins`}</h3>
         <span className="mv-end-reason">{REASONS[end.reason] ?? end.reason}</span>
         <button type="button" className="mv-btn" onClick={onHide}>
