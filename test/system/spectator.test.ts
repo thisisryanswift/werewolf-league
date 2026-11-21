@@ -20,7 +20,7 @@ describe("Spectator WebSocket", () => {
     });
     const spectator = await connect(matchId);
     const done = await finished(matchId);
-    await waitFor(async () => liveOf(spectator.messages).at(-1)?.kind === "match_over");
+    await waitFor(async () => liveOf(spectator.messages).at(-1)?.kind === "match_cost");
     spectator.close();
 
     const [first, ...rest] = spectator.messages;
@@ -48,7 +48,7 @@ describe("Spectator WebSocket", () => {
 
     const second = await connect(matchId);
     const done = await finished(matchId);
-    await waitFor(async () => liveOf(second.messages).at(-1)?.kind === "match_over");
+    await waitFor(async () => liveOf(second.messages).at(-1)?.kind === "match_cost");
     second.close();
 
     expect(logOf(second.messages)).toHaveLength(1);

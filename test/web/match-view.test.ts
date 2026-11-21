@@ -148,10 +148,43 @@ describe("Match view", () => {
       { agentId: "a3", name: "Agent3", side: "village", before: 1200, delta: -16, after: 1184 },
     ]);
     expect(buildMatchView(logOf(night1), { narratorView: true }).end).toBeNull();
+    expect(settled.cost).toBeNull();
     // Once over, seats show every role and judge every Claim, Narrator's View or not.
     const seats = buildMatchView(logOf(over), { narratorView: false }).seats;
     expect(seats.map((s) => s.role)).toEqual(["werewolf", "werewolf", "seer", "doctor", "villager"]);
     expect(seats.find((s) => s.seat === 3)!.claim?.truth).toBe("true");
+  });
+
+  it("the end screen shows the Match's final measured cost and each Agent's share, from the latest match_cost event", () => {
+    // Seats 1 and 2 are copies of one Agent; the Narrator's cost is in the total but no Agent's.
+    const seats = [
+      { seat: 1, label: "Hydrogen #1", agentId: "h" },
+      { seat: 2, label: "Hydrogen #2", agentId: "h" },
+      { seat: 3, label: "Lite #1", agentId: "l" },
+    ];
+    const cost = (narrator: number) =>
+      pub("match_cost", {
+        total: 0.35 + narrator,
+        bySeat: { 1: 0.1, 2: 0.2, 3: 0.05 },
+        narrator,
+        tokens: { input: 90_000, cached: 30_000, thought: 4_000, output: 1_000 },
+        unpriced: [],
+      });
+    const log = logOf([
+      pub("match_setup", { ruleset: "werewolf", seats }),
+      pub("match_over", { winner: "village", reason: "all_werewolves_dead", roles: { 1: "werewolf", 2: "villager", 3: "seer" } }),
+      cost(0.01),
+      cost(0.02), // a late narration updated it
+    ]);
+    const view = buildMatchView(log, { narratorView: false });
+    expect(view.end!.cost!.total).toBeCloseTo(0.37, 10);
+    expect(view.end!.cost!.narrator).toBeCloseTo(0.02, 10);
+    expect(view.end!.cost!.agents.map((a) => [a.agentId, a.name, Number(a.cost.toFixed(10))])).toEqual([
+      ["h", "Hydrogen", 0.3],
+      ["l", "Lite", 0.05],
+    ]);
+    // The cost is not a feed line.
+    expect(view.feed.flatMap((g) => g.items.map((i) => i.event.kind))).not.toContain("match_cost");
   });
 
   it("shows each seat's latest Claim, judged true or a lie only when the role is known", () => {

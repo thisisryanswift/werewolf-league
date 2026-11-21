@@ -18,6 +18,8 @@ import type {
   Leaderboard,
   LeagueMessage,
   LeagueSnapshot,
+  LeagueSpend,
+  MatchCost,
   MatchTile,
   RateLimitEvent,
   RatingChanges,
@@ -25,6 +27,18 @@ import type {
   TileSeat,
   TileSummary,
 } from "../shared/protocol";
+
+/** Stored spend: settled Matches only. Live Matches add their tiles' cost so far. */
+interface SpendRecord {
+  settled: number;
+  /** Settled League Matches only. */
+  byAgent: Record<string, number>;
+  /** Costed League Matches per Agent (the cost-per-Match denominator; older uncosted Matches are excluded). */
+  matchesByAgent?: Record<string, number>;
+  resumedAt: number | null;
+  /** Total spend when the League was last resumed. */
+  totalAtResume: number;
+}
 
 /** A live League Match: its tile plus what is needed to (re)start it. */
 interface LiveMatch extends MatchTile {
@@ -64,6 +78,7 @@ export interface SettleAck {
 }
 
 const MAX_START_FAILURES = 3;
+const SPEND_CAP_BLOCKED = "League spend has reached the spend cap; raise or clear spendCap to resume";
 
 /** `{ matchNumber }` if there is one, else nothing (older Matches have none). */
 const numbered = (n: number | undefined) => (n === undefined ? {} : { matchNumber: n });
@@ -147,6 +162,56 @@ export class LeagueDO extends DurableObject<Env> {
     else this.ctx.storage.kv.delete("blocked");
   }
 
+  private get spendRecord(): SpendRecord {
+    return this.ctx.storage.kv.get<SpendRecord>("spend") ?? { settled: 0, byAgent: {}, resumedAt: null, totalAtResume: 0 };
+  }
+  private set spendRecord(s: SpendRecord) {
+    this.ctx.storage.kv.put("spend", s);
+  }
+
+  /** Measured spend: settled Matches plus the cost so far of every live one. */
+  private get spend(): LeagueSpend {
+    const r = this.spendRecord;
+    const live = Object.values(this.live).reduce((a, m) => a + (m.summary?.cost ?? 0), 0);
+    const total = r.settled + live;
+    return { total, sinceResume: Math.max(0, total - r.totalAtResume), byAgent: r.byAgent, resumedAt: r.resumedAt };
+  }
+
+  /** Add a settled Match's cost (or a later correction to it) to the stored spend. */
+  private addSpend(previous: MatchCost | undefined, cost: MatchCost | undefined, leagueMatch: boolean): void {
+    if (!cost) return;
+    const r = this.spendRecord;
+    const byAgent = { ...r.byAgent };
+    const matchesByAgent = { ...r.matchesByAgent };
+    if (leagueMatch) {
+      for (const [id, usd] of Object.entries(cost.byAgent)) {
+        byAgent[id] = (byAgent[id] ?? 0) + usd - (previous?.byAgent[id] ?? 0);
+        if (!previous) matchesByAgent[id] = (matchesByAgent[id] ?? 0) + 1;
+      }
+    }
+    this.spendRecord = { ...r, settled: r.settled + cost.total - (previous?.total ?? 0), byAgent, matchesByAgent };
+  }
+
+  private get capReached(): boolean {
+    const cap = this.config.spendCap;
+    return cap != null && this.spend.total >= cap;
+  }
+
+  /** The operator's spend cap: once total spend reaches it, the League pauses (running Matches finish). */
+  private enforceSpendCap(): void {
+    const c = this.config;
+    if (c.paused || !this.capReached) return;
+    this.config = { ...c, paused: true };
+    this.blocked = SPEND_CAP_BLOCKED;
+    // Drop reserved Matches not yet launching: starting them would spend past the cap.
+    const live = this.live;
+    const unlaunched = Object.values(live).filter((m) => m.status === "starting" && !this.launching.has(m.matchId));
+    if (unlaunched.length) {
+      for (const m of unlaunched) delete live[m.matchId];
+      this.live = live;
+    }
+  }
+
   /** Pacer start times (League clock) still inside the start window. */
   private get starts(): number[] {
     return this.ctx.storage.kv.get<number[]>("starts") ?? [];
@@ -175,6 +240,7 @@ export class LeagueDO extends DurableObject<Env> {
         paused: c.paused,
         seats: c.seats,
         rulesetId: c.rulesetId,
+        spendCap: c.spendCap ?? null,
         startsPerWindow: c.startsPerWindow,
         startWindowMs: c.startWindowMs,
         backoffMs: c.backoffMs,
@@ -196,6 +262,7 @@ export class LeagueDO extends DurableObject<Env> {
       featured: this.featured,
       stats: this.stats,
       blocked: this.blocked,
+      spend: this.spend,
       rateLimit: this.rateLimitView(),
       leaderboard: this.leaderboard(),
     };
@@ -213,7 +280,12 @@ export class LeagueDO extends DurableObject<Env> {
     const records = this.agents;
     const names = new Map<string, string>(Object.entries(records).map(([id, r]) => [id, r.name]));
     for (const a of c.roster) names.set(a.id, a.name);
-    return { sides, rows: rankStandings([...names].map(([id, name]) => standing(id, name, records[id], sides))) };
+    const { byAgent: spent, matchesByAgent: costed = {} } = this.spendRecord;
+    const rows = rankStandings([...names].map(([id, name]) => standing(id, name, records[id], sides))).map((r) => {
+      const n = costed[r.agentId] ?? 0;
+      return { ...r, costPerMatch: n > 0 ? (spent[r.agentId] ?? 0) / n : null };
+    });
+    return { sides, rows };
   }
 
   /** Push the leaderboard after a rated Match settles, as its own feed message. */
@@ -272,6 +344,14 @@ export class LeagueDO extends DurableObject<Env> {
   }
 
   async resume(): Promise<LeagueSnapshot> {
+    // Over the cap, stay paused: resuming would start Matches the budget can't cover.
+    if (this.capReached) {
+      this.blocked = SPEND_CAP_BLOCKED;
+      this.broadcast();
+      return this.snapshot();
+    }
+    if (this.blocked === SPEND_CAP_BLOCKED) this.blocked = null;
+    if (this.config.paused) this.spendRecord = { ...this.spendRecord, resumedAt: Date.now(), totalAtResume: this.spend.total };
     this.config = { ...this.config, paused: false };
     await this.schedule();
     return this.snapshot();
@@ -283,6 +363,7 @@ export class LeagueDO extends DurableObject<Env> {
     if (!r.ok) return r;
     this.config = r.config;
     this.blocked = null;
+    this.enforceSpendCap(); // a new cap at or below current spend pauses before anything is scheduled
     this.releaseUnwanted();
     await this.schedule();
     return { ok: true, league: this.snapshot() };
@@ -314,6 +395,7 @@ export class LeagueDO extends DurableObject<Env> {
     if (!m || seq < m.summarySeq) return;
     live[matchId] = { ...m, status: "running", summary, summarySeq: seq };
     this.live = live;
+    this.enforceSpendCap();
     this.broadcast();
   }
 
@@ -349,6 +431,7 @@ export class LeagueDO extends DurableObject<Env> {
     const matchNumber = numbered(entry?.init.matchNumber);
     const settlement = this.settle({ matchId, ...matchNumber, result, seats: entry?.seats ?? null, settledAt: Date.now(), ratings: null }, entry);
     this.ctx.storage.kv.put(`settled:${matchId}`, settlement);
+    this.addSpend(undefined, result.cost, !!entry);
     if (settlement.ratings) this.broadcastLeaderboard(matchId);
     if (entry) {
       delete live[matchId];
@@ -357,8 +440,19 @@ export class LeagueDO extends DurableObject<Env> {
       const recent = [{ matchId, ...matchNumber, winner: result.winner, settledAt: settlement.settledAt }, ...this.recent].slice(0, RECENT);
       this.ctx.storage.kv.put("recent", recent);
     }
+    this.enforceSpendCap();
     await this.schedule();
     return { ok: true, duplicate: false, settlement };
+  }
+
+  /** A settled Match's cost changed (usage arrived after its result). Ignored before settlement: the result carries it. */
+  async updateMatchCost(matchId: string, cost: MatchCost): Promise<void> {
+    const s = this.ctx.storage.kv.get<Settlement>(`settled:${matchId}`);
+    if (!s || JSON.stringify(s.result.cost) === JSON.stringify(cost)) return;
+    this.ctx.storage.kv.put(`settled:${matchId}`, { ...s, result: { ...s.result, cost } });
+    this.addSpend(s.result.cost, cost, s.seats !== null);
+    this.enforceSpendCap();
+    this.broadcast();
   }
 
   /**

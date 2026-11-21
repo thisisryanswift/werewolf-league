@@ -17,9 +17,12 @@ interface StubInteraction {
   environment_id: string;
   steps: any[];
   body: any;
+  /** REST usage object (total_input_tokens, ...); absent until billed. */
+  usage?: Record<string, number>;
 }
 
 let callSeq = 0;
+let interactionSeq = 0;
 
 export class StubInteractionsApi {
   requests: StubRequest[] = [];
@@ -33,6 +36,11 @@ export class StubInteractionsApi {
    * leaves them in requires_action with this call (the late-result race).
    */
   landOnCancel = new Map<string, { name: string; args: Record<string, unknown> }>();
+  /**
+   * Usage billed when a cancel lands, visible only to a later GET (the cancel
+   * response itself carries none), like tokens still being counted at cancel time.
+   */
+  billOnCancel = new Map<string, Record<string, number>>();
   private n = 0;
 
   fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
@@ -79,7 +87,8 @@ export class StubInteractionsApi {
       }
     }
     this.n += 1;
-    const id = `int-${this.n}`;
+    // Unique across stub instances, like real IDs: a late read from an earlier test's Match never hits this stub's interactions.
+    const id = `int-${++interactionSeq}`;
     // "remote" or a config object ({ type: "remote", sources }) creates a new environment; a string ID reuses one.
     const fresh = body.environment === "remote" || typeof body.environment === "object";
     const environment_id = fresh ? `env-${this.n}` : body.environment;
@@ -94,6 +103,12 @@ export class StubInteractionsApi {
     const landing = this.landOnCancel.get(id);
     if (landing && it.status === "in_progress") this.callTool(id, landing.name, landing.args);
     if (it.status === "in_progress") it.status = "cancelled";
+    const late = this.billOnCancel.get(id);
+    if (late) {
+      const response = view(it);
+      it.usage = late;
+      return json(response);
+    }
     return json(view(it));
   }
 
@@ -125,6 +140,11 @@ export class StubInteractionsApi {
     return callId;
   }
 
+  /** The API reports this usage for the interaction (REST field names). */
+  bill(id: string, u: { input: number; cached: number; thought: number; output: number }): void {
+    this.interactions.get(id)!.usage = restUsage(u);
+  }
+
   /** The Agent ends its turn without calling a tool. */
   complete(id: string): void {
     const it = this.interactions.get(id)!;
@@ -138,8 +158,18 @@ function pendingCalls(it: StubInteraction): any[] {
   return it.steps.filter((s) => s.type === "function_call" && !answered.has(s.id));
 }
 
+export function restUsage(u: { input: number; cached: number; thought: number; output: number }): Record<string, number> {
+  return {
+    total_input_tokens: u.input,
+    total_cached_tokens: u.cached,
+    total_thought_tokens: u.thought,
+    total_output_tokens: u.output,
+    total_tokens: u.input + u.thought + u.output,
+  };
+}
+
 function view(it: StubInteraction) {
-  return { id: it.id, status: it.status, environment_id: it.environment_id, steps: it.steps };
+  return { id: it.id, status: it.status, environment_id: it.environment_id, steps: it.steps, ...(it.usage ? { usage: { ...it.usage } } : {}) };
 }
 
 function json(data: unknown, status = 200): Response {

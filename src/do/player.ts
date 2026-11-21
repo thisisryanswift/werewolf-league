@@ -4,10 +4,11 @@
 
 import { DurableObject } from "cloudflare:workers";
 import { nextPollDelay } from "../core/deadlines";
-import { isRateLimited, type AgentConfig, type PlayerContext, type TurnHandle } from "../core/harness";
+import { isRateLimited, type AgentConfig, type PlayerContext, type TurnHandle, type UsageReading } from "../core/harness";
 import type { TurnAssignment } from "../core/match";
 import { LEAGUE_NAME } from "../core/roster";
 import type { Seat, ToolCall, ToolSpec } from "../core/ruleset";
+import { ledgerUsage, recordReadings, type ModelUsage, type UsageLedger } from "../core/usage";
 import { harnessFor } from "../harness";
 
 interface Seating {
@@ -41,6 +42,20 @@ export class PlayerDO extends DurableObject<Env> {
 
   private context(seating: Seating): PlayerContext {
     return { ...seating, chain: this.ctx.storage.kv.get<Record<string, unknown>>("chain") ?? {} };
+  }
+
+  /**
+   * Record usage readings in the seat's ledger (by call ID, so a call read twice
+   * counts once). Synchronous, and done before anything else is awaited.
+   */
+  private collect(readings: UsageReading[] | undefined): void {
+    if (!readings?.length) return;
+    this.ctx.storage.kv.put("usage", recordReadings(this.ctx.storage.kv.get<UsageLedger>("usage") ?? {}, readings));
+  }
+
+  /** Every token this seat has been billed so far, per model. Sent with each report. */
+  private get usage(): ModelUsage {
+    return ledgerUsage(this.ctx.storage.kv.get<UsageLedger>("usage") ?? {});
   }
 
   private get turn(): CurrentTurn | undefined {
@@ -86,7 +101,23 @@ export class PlayerDO extends DurableObject<Env> {
     if (current?.turnId === assignment.turnId) return;
     this.ctx.storage.kv.put<CurrentTurn>("turn", { ...assignment, handle: null, attempts: 0 });
     await this.ctx.storage.setAlarm(Date.now());
-    if (current?.handle) await this.cancel(current.handle);
+    if (current?.handle) await this.cancelAndReport(current.matchId, current.handle);
+  }
+
+  /**
+   * Called by the Match when it is over: let the Harness settle anything still billed
+   * (e.g. the setup interaction of a seat that never acted) and report the seat's usage.
+   */
+  async close(): Promise<void> {
+    const seating = this.ctx.storage.kv.get<Seating>("seating");
+    if (!seating || this.ctx.storage.kv.get<boolean>("closed")) return;
+    const harness = harnessFor(seating.agent, this.env);
+    const r = await harness.close?.(this.context(seating));
+    this.collect(r?.usage);
+    if (r?.chain) this.ctx.storage.kv.put("chain", r.chain);
+    // Report before marking closed, so a failed report makes the Match retry the close.
+    if (r?.usage?.length) await this.env.MATCH.getByName(seating.matchId).recordUsage(seating.seat, this.usage);
+    this.ctx.storage.kv.put("closed", true);
   }
 
   async alarm(): Promise<void> {
@@ -103,6 +134,7 @@ export class PlayerDO extends DurableObject<Env> {
         if (isRateLimited(err)) this.reportRateLimit(seating, "startTurn");
         throw err;
       });
+      this.collect(started.usage);
       this.ctx.storage.kv.put("chain", started.chain);
       if (!this.updateTurn(turn.turnId, { ...turn, handle: started.handle, attempts: turn.attempts + 1 })) {
         return this.superseded(started.handle);
@@ -111,6 +143,7 @@ export class PlayerDO extends DurableObject<Env> {
     }
 
     const polled = await harness.poll(ctx, turn.handle);
+    if (polled.status !== "pending") this.collect(polled.usage);
     if (polled.status === "pending") {
       if (polled.rateLimited) this.reportRateLimit(seating, "poll");
       if (!this.updateTurn(turn.turnId, { ...turn, handle: polled.handle })) return this.superseded();
@@ -148,7 +181,19 @@ export class PlayerDO extends DurableObject<Env> {
   /** A newer turn arrived while we awaited the Harness: drop this work and run the new turn. */
   private async superseded(handle?: TurnHandle): Promise<void> {
     await this.ctx.storage.setAlarm(Date.now());
-    if (handle) await this.cancel(handle);
+    const seating = this.ctx.storage.kv.get<Seating>("seating");
+    if (handle && seating) await this.cancelAndReport(seating.matchId, handle);
+  }
+
+  /** Cancel a turn that no report will follow, then send the Match the seat's usage including it. */
+  private async cancelAndReport(matchId: string, handle: TurnHandle): Promise<void> {
+    await this.cancel(handle);
+    const seat = this.ctx.storage.kv.get<Seating>("seating")?.seat;
+    if (seat === undefined) return;
+    // Best effort: the seat's next report carries the same cumulative total.
+    await this.env.MATCH.getByName(matchId)
+      .recordUsage(seat, this.usage)
+      .catch(() => {});
   }
 
   private async cancel(handle: TurnHandle): Promise<void> {
@@ -157,7 +202,10 @@ export class PlayerDO extends DurableObject<Env> {
     try {
       const ctx = this.context(seating);
       const before = JSON.stringify(ctx.chain);
-      const chain = await harnessFor(seating.agent, this.env).cancel?.(ctx, handle);
+      const r = await harnessFor(seating.agent, this.env).cancel?.(ctx, handle);
+      // A cancelled call was still billed: always keep its usage.
+      this.collect(r?.usage);
+      const chain = r?.chain;
       // Persist the Harness's cancelled marker, unless a newer turn changed the chain meanwhile.
       if (chain && JSON.stringify(this.ctx.storage.kv.get("chain") ?? {}) === before) {
         this.ctx.storage.kv.put("chain", chain);
@@ -170,12 +218,12 @@ export class PlayerDO extends DurableObject<Env> {
   /** Cancel the Harness turn and report the missed deadline. */
   private async timeOut(turn: CurrentTurn): Promise<void> {
     if (turn.handle) await this.cancel(turn.handle);
-    await this.env.MATCH.getByName(turn.matchId).reportTimeout(turn.turnId, turn.seat);
+    await this.env.MATCH.getByName(turn.matchId).reportTimeout(turn.turnId, turn.seat, this.usage);
     this.updateTurn(turn.turnId, null);
   }
 
   private async report(turn: CurrentTurn, call: ToolCall | null): Promise<void> {
-    const res = await this.env.MATCH.getByName(turn.matchId).submitAction(turn.turnId, turn.seat, call);
+    const res = await this.env.MATCH.getByName(turn.matchId).submitAction(turn.turnId, turn.seat, call, this.usage);
     if (res.status === "invalid") {
       // Retry the same frozen observation with the error; the Agent corrects itself before the deadline.
       if (this.updateTurn(turn.turnId, { ...turn, handle: null, input: { ...turn.input, error: res.error } })) {

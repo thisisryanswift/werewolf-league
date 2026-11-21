@@ -47,12 +47,19 @@ export function decisionsNarrator(opts: { apiKey: string; fetch?: Fetch }): Narr
         signal,
       });
       if (!res.ok) throw new Error(`Decisions API ${res.status}: ${(await res.text()).slice(0, 300)}`);
-      const body = (await res.json()) as { answers?: Record<string, Answer> };
+      const body = (await res.json()) as { id?: string; answers?: Record<string, Answer>; usage?: { total_input_tokens?: number } };
       const answers = body.answers ?? {};
       const top = input.questions.drama.levels.length - 1;
       const score = answers[DRAMA_KEY]?.score;
       if (typeof score !== "number") throw new Error("Decisions API: no drama score in the answer");
+      // Decisions bills input tokens only (FINDINGS section 8: total_output_tokens is always 0).
+      const tokens = body.usage?.total_input_tokens;
+      const usage =
+        typeof tokens === "number"
+          ? [{ id: body.id ?? crypto.randomUUID(), model: DECISION_MODEL, usage: { input: tokens, cached: 0, thought: 0, output: 0 } }]
+          : undefined;
       return {
+        ...(usage ? { usage } : {}),
         dramaScore: Math.min(1, Math.max(0, score / top)),
         flags: input.questions.flags.map((f) => {
           const v = answers[flagKey(f.id)]?.noul;

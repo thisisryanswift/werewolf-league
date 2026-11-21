@@ -82,7 +82,7 @@ describe("the Match backstop", () => {
     expect(started.length).toBeGreaterThan(0);
     expect(timedOut.map((e) => [e.data.seat, e.data.by])).toEqual(started.map(() => [seat, "backstop"]));
     expect(done.stats.timeouts.bySeat[seat]).toBe(started.length);
-    expect(done.events.at(-1)?.kind).toBe("match_over");
+    expect(done.events.filter((e) => e.kind !== "match_cost").at(-1)?.kind).toBe("match_over");
   });
 });
 

@@ -6,6 +6,7 @@
 // (src/narrator/decisions.ts).
 
 import type { DramaFlagVisibility, RulesetEvent } from "../shared/protocol";
+import type { UsageReading } from "./usage";
 
 export type { DramaFlagVisibility };
 
@@ -48,6 +49,8 @@ export interface Narration {
   /** 0 (calm) to 1 (explosive). */
   dramaScore: number;
   flags: NarratedFlag[];
+  /** The call's billed usage, if the Narrator's API reports it. */
+  usage?: UsageReading[];
 }
 
 export interface Narrator {
@@ -165,7 +168,7 @@ export function withDeadline<T>(timeoutMs: number, call: (signal: AbortSignal) =
 
 /**
  * One narration of a Match: render its Narrator's View log through the Ruleset's hook,
- * ask the Narrator under the deadline and return the events to commit. Rejects
+ * ask the Narrator under the deadline and return the events to commit, with the call's usage. Rejects
  * on failure or timeout (the caller drops it and the tile keeps its last value).
  * `events` must already exclude runner and narration events.
  */
@@ -177,9 +180,9 @@ export async function narrateMatch(args: {
   state: unknown;
   events: RulesetEvent[];
   throughSeq: number;
-}): Promise<RulesetEvent[]> {
+}): Promise<{ events: RulesetEvent[]; usage: UsageReading[] }> {
   const input: NarrationInput = { matchId: args.matchId, log: args.hook.log(args.state, args.events), questions: args.hook.questions };
   const timeoutMs = args.config.timeoutMs ?? DEFAULT_NARRATOR_TIMEOUT_MS;
   const n = await withDeadline(timeoutMs, (signal) => args.narrator.narrate(input, signal));
-  return narrationEvents(n, args.config.threshold ?? DEFAULT_DRAMA_THRESHOLD, args.throughSeq);
+  return { events: narrationEvents(n, args.config.threshold ?? DEFAULT_DRAMA_THRESHOLD, args.throughSeq), usage: n.usage ?? [] };
 }

@@ -5,6 +5,7 @@ import type { DeadlineConfig, TimeoutCounts, TimeoutSource } from "./deadlines";
 import type { AgentConfig, TurnInput } from "./harness";
 import type { NarratorConfig } from "./narrator";
 import type { MatchResult, Seat, SeatAgent, ToolCall, TurnRequest } from "./ruleset";
+import type { MatchCost } from "../shared/protocol";
 
 /** Everything needed to start a Match. */
 export interface MatchInit {
@@ -40,11 +41,15 @@ export interface MatchSnapshot {
 /** Live Match statistics kept by the runner. */
 export interface MatchStats {
   timeouts: TimeoutCounts;
+  /** Measured USD spent so far (the per-Player breakdown is only published once the Match is over). */
+  cost: number;
 }
 
 /** The Ruleset's result plus the runner's per-Player and per-Agent timeout counts. Sent to the League. */
 export interface MatchReport extends MatchResult {
   timeouts: TimeoutCounts;
+  /** Measured cost; absent on results reported before cost tracking. */
+  cost?: MatchCost;
 }
 
 /** One Player's turn within a step. The observation is frozen when the step starts. */

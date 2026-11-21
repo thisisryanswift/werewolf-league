@@ -31,10 +31,12 @@ import type { AgentConfig } from "../core/harness";
 import { isNarrationEvent, latestDrama, LatestOnly, narrateMatch } from "../core/narrator";
 import { LEAGUE_NAME } from "../core/roster";
 import type { Ruleset, Seat, ToolCall, ToolSpec, TurnRequest } from "../core/ruleset";
+import { matchCost, type MatchUsage } from "../core/pricing";
+import { atLeast, ledgerUsage, mergeModelUsage, recordReadings, type ModelUsage } from "../core/usage";
 import { narratorFor } from "../narrator";
 import { getRuleset } from "../rulesets";
-import type { MatchEvent, RulesetEvent, ServerMessage, TileSummary } from "../shared/protocol";
-import { ratingsSettledEvent, thinkingSeats } from "../shared/turn-events";
+import type { MatchCost, MatchEvent, RulesetEvent, ServerMessage, TileSummary } from "../shared/protocol";
+import { matchCostEvent, ratingsSettledEvent, thinkingSeats } from "../shared/turn-events";
 import type { SettleAck } from "./league";
 
 /**
@@ -46,6 +48,9 @@ function seatInstructions(ruleset: Ruleset<unknown>, state: unknown, seat: Seat,
   if (!source) return undefined;
   return assembleInstructions(source, ruleset.instructions?.sections(state, seat) ?? []) || undefined;
 }
+
+/** Rounds of Player closes after the result before leftover usage is given up on. */
+const MAX_CLOSE_ATTEMPTS = 5;
 
 /** How soon the Match retries sending a turn to a Player DO that failed to accept it. */
 const DISPATCH_RETRY_MS = 1000;
@@ -62,6 +67,12 @@ interface MatchMeta extends Omit<MatchInit, "deadlines"> {
   assigned?: Seat[];
   /** True once the League has acknowledged the result. */
   resultAcked?: boolean;
+  /** Seats not yet closed after the Match finished (their leftover usage is still unread). */
+  closePending?: Seat[];
+  /** True while the League's settled cost is older than the result's (late usage); retried on the alarm. */
+  costDirty?: boolean;
+  /** Close rounds tried so far; closes still failing after MAX_CLOSE_ATTEMPTS are given up. */
+  closeAttempts?: number;
 }
 
 type EventRow = { seq: number; ts: number; kind: string; audience: string; data: string };
@@ -100,6 +111,77 @@ export class MatchDO extends DurableObject<Env> {
   private set step(s: PendingStep | undefined) {
     if (s) this.ctx.storage.kv.put("step", s);
     else this.ctx.storage.kv.delete("step");
+  }
+
+  /** Tokens billed so far: each seat's latest cumulative report, plus the Narrator's calls. */
+  private get usage(): MatchUsage {
+    return this.ctx.storage.kv.get<MatchUsage>("usage") ?? { bySeat: {}, narrator: {} };
+  }
+  private set usage(u: MatchUsage) {
+    this.ctx.storage.kv.put("usage", u);
+  }
+
+  private cost(meta: MatchMeta): MatchCost {
+    return matchCost(this.usage, meta.seats);
+  }
+
+  /** Keep a seat's cumulative usage report unless an earlier one already counted more. Returns true if it changed. */
+  private recordSeatUsage(seat: Seat, reported: ModelUsage | undefined): boolean {
+    if (!reported) return false;
+    const u = this.usage;
+    const current = u.bySeat[seat];
+    if (current && (!atLeast(reported, current) || JSON.stringify(current) === JSON.stringify(reported))) return false;
+    this.usage = { ...u, bySeat: { ...u.bySeat, [seat]: reported } };
+    return true;
+  }
+
+  /**
+   * Usage that arrives after the Match finished (a late cancel or the last narration):
+   * update the result, publish the new cost, and tell the League once it has settled.
+   */
+  private lateCost(): void {
+    const meta = this.meta;
+    if (!meta || meta.status !== "finished" || !meta.result) return;
+    const cost = this.cost(meta);
+    this.meta = { ...meta, result: { ...meta.result, cost } };
+    this.commit([matchCostEvent(cost)]);
+    if (meta.resultAcked) {
+      this.meta = { ...this.meta!, costDirty: true };
+      this.ctx.waitUntil(this.ctx.storage.setAlarm(Date.now()));
+    }
+  }
+
+  /**
+   * After the result: close every Player (so leftovers such as an unused setup
+   * interaction are read and reported) and bring the League's settled cost up to
+   * date. Each is retried on the alarm (closes at most MAX_CLOSE_ATTEMPTS times).
+   */
+  private async finishChores(): Promise<void> {
+    const meta = this.meta!;
+    const closing = meta.closePending ?? [];
+    const dirty = !!meta.costDirty && !!meta.resultAcked;
+    if (!closing.length && !dirty) return;
+    await this.ctx.storage.setAlarm(Date.now() + Number(this.env.LEAGUE_RETRY_MS ?? 2000));
+    const closed = await Promise.allSettled(closing.map((seat) => this.env.PLAYER.getByName(`${meta.matchId}:${seat}`).close()));
+    const attempts = (meta.closeAttempts ?? 0) + 1;
+    let failed = closing.filter((_, i) => closed[i]!.status === "rejected");
+    if (failed.length && attempts >= MAX_CLOSE_ATTEMPTS) {
+      console.warn(`Match ${meta.matchId}: gave up closing seats ${failed.join(", ")}; their leftover usage is not counted`);
+      failed = [];
+    }
+    this.meta = { ...this.meta!, closePending: failed, closeAttempts: attempts };
+    const latest = this.meta!;
+    if (latest.costDirty && latest.resultAcked && latest.result?.cost) {
+      const cost = latest.result.cost;
+      const sent = await this.env.LEAGUE.getByName(latest.league ?? LEAGUE_NAME)
+        .updateMatchCost(latest.matchId, cost)
+        .then(() => true)
+        .catch(() => false);
+      // Clear only if no newer usage arrived while the update was in flight.
+      if (sent && JSON.stringify(this.meta!.result?.cost) === JSON.stringify(cost)) this.meta = { ...this.meta!, costDirty: false };
+    }
+    const after = this.meta!;
+    if (!after.closePending?.length && !(after.costDirty && after.resultAcked) && after.resultAcked) await this.ctx.storage.deleteAlarm();
   }
 
   private ruleset(meta: MatchMeta): Ruleset<unknown> {
@@ -206,13 +288,17 @@ export class MatchDO extends DurableObject<Env> {
       status: meta.status,
       seats: meta.seats,
       result: meta.result,
-      stats: { timeouts: countTimeouts(events, meta.seats) },
+      stats: { timeouts: countTimeouts(events, meta.seats), cost: this.cost(meta).total },
       events,
     };
   }
 
-  /** A Player reports its turn's action (`null` = no valid action, use the default). */
-  async submitAction(turnId: string, seat: Seat, call: ToolCall | null): Promise<SubmitResult> {
+  /**
+   * A Player reports its turn's action (`null` = no valid action, use the default),
+   * with its cumulative usage, which counts even if the action is stale or invalid.
+   */
+  async submitAction(turnId: string, seat: Seat, call: ToolCall | null, usage?: ModelUsage): Promise<SubmitResult> {
+    if (this.recordSeatUsage(seat, usage)) this.lateCost();
     const meta = this.meta;
     const step = this.step;
     const turn = step?.turns.find((t) => t.turnId === turnId && t.seat === seat);
@@ -237,7 +323,8 @@ export class MatchDO extends DurableObject<Env> {
   }
 
   /** A Player reports that its turn missed the deadline; the Ruleset's default applies. */
-  async reportTimeout(turnId: string, seat: Seat): Promise<SubmitResult> {
+  async reportTimeout(turnId: string, seat: Seat, usage?: ModelUsage): Promise<SubmitResult> {
+    if (this.recordSeatUsage(seat, usage)) this.lateCost();
     const meta = this.meta;
     const step = this.step;
     const turn = step?.turns.find((t) => t.turnId === turnId && t.seat === seat);
@@ -247,6 +334,11 @@ export class MatchDO extends DurableObject<Env> {
     this.step = step;
     await this.armAlarm(meta, step);
     return { status: "accepted" };
+  }
+
+  /** A Player reports its cumulative usage outside a turn report (e.g. after cancelling a superseded turn). */
+  async recordUsage(seat: Seat, usage: ModelUsage): Promise<void> {
+    if (this.recordSeatUsage(seat, usage)) this.lateCost();
   }
 
   /** Wake when the step can resolve, a dispatch needs retrying, or the backstop is due. */
@@ -261,6 +353,7 @@ export class MatchDO extends DurableObject<Env> {
     if (!meta) return;
     if (meta.status === "finished") {
       if (!meta.resultAcked) await this.deliverResult(meta);
+      await this.finishChores();
       return;
     }
     const ruleset = this.ruleset(meta);
@@ -280,11 +373,15 @@ export class MatchDO extends DurableObject<Env> {
     const current = this.meta!;
     const next = ruleset.nextStep(this.rulesetState);
     if (next.type === "finished") {
-      const result: MatchReport = { ...next.result, timeouts: countTimeouts(this.events(), current.seats) };
-      const done: MatchMeta = { ...current, status: "finished", result };
+      const cost = this.cost(current);
+      if (cost.unpriced.length) console.warn(`Match ${current.matchId}: no price for ${cost.unpriced.join(", ")}; counted at $0`);
+      const result: MatchReport = { ...next.result, timeouts: countTimeouts(this.events(), current.seats), cost };
+      const done: MatchMeta = { ...current, status: "finished", result, closePending: current.seats.map((s) => s.seat) };
       this.meta = done;
+      this.commit([matchCostEvent(cost)]);
       this.pushSummary(ruleset);
       await this.deliverResult(done);
+      await this.finishChores();
       return;
     }
     await this.dispatch(current, ruleset, next.turns);
@@ -326,7 +423,10 @@ export class MatchDO extends DurableObject<Env> {
     const settled = ratingsSettledEvent(ack.settlement.ratings);
     if (settled) this.commit([settled]);
     this.meta = { ...current, resultAcked: true };
-    await this.ctx.storage.deleteAlarm();
+    // Usage that arrived while the result was in flight: the League settled the older cost.
+    const cost = current.result?.cost;
+    if (cost && JSON.stringify(cost) !== JSON.stringify(ack.settlement.result.cost)) this.meta = { ...this.meta!, costDirty: true };
+    await this.ctx.storage.deleteAlarm(); // finishChores re-arms it if anything is left
   }
 
   /** Push the public tile summary to the League. Best effort: never holds up the Match. */
@@ -342,6 +442,8 @@ export class MatchDO extends DurableObject<Env> {
       // Counts only: the runner's turn events are seat-private, so naming seats could reveal roles.
       thinking: thinkingSeats(events).length,
       timeouts: events.filter((e) => e.kind === "turn_timed_out").length,
+      // Measured USD so far (Players and Narrator); only the total, so it never hints at roles.
+      cost: this.cost(meta).total,
     };
     const update = this.env.LEAGUE.getByName(meta.league ?? LEAGUE_NAME)
       .updateTile(meta.matchId, summary, this.lastSeq())
@@ -367,7 +469,7 @@ export class MatchDO extends DurableObject<Env> {
   private async narrateOnce(): Promise<void> {
     const meta = this.meta!;
     const ruleset = this.ruleset(meta);
-    const events = await narrateMatch({
+    const { events, usage } = await narrateMatch({
       matchId: meta.matchId,
       config: meta.narrator!,
       narrator: narratorFor(meta.narrator!, this.env),
@@ -376,7 +478,13 @@ export class MatchDO extends DurableObject<Env> {
       events: this.events().filter((e) => !isRunnerEvent(e) && !isNarrationEvent(e)),
       throughSeq: this.lastSeq(),
     });
+    if (usage.length) {
+      // Each Narrator call is billed once; its usage is never re-read.
+      const u = this.usage;
+      this.usage = { ...u, narrator: mergeModelUsage(u.narrator, ledgerUsage(recordReadings({}, usage))) };
+    }
     this.commit(events);
+    if (usage.length) this.lateCost();
     this.pushSummary(ruleset);
   }
 
