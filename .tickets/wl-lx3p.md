@@ -1,7 +1,7 @@
 ---
 id: wl-lx3p
 status: open
-deps: [wl-fuy2]
+deps: []
 links: []
 created: 2026-11-21T20:09:09Z
 type: task
