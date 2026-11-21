@@ -12,7 +12,8 @@ export const wolfSeats = (s: WerewolfState): Seat[] => s.players.filter((p) => p
  */
 export function who(s: WerewolfState, seat: unknown): string {
   const p = player(s, Number(seat));
-  return p ? `${p.displayName} (seat ${p.seat})` : `seat ${String(seat)}`;
+  // Matches started before Display Names existed have none: fall back to the bare seat.
+  return p?.displayName ? `${p.displayName} (seat ${p.seat})` : `seat ${String(seat)}`;
 }
 
 /** Copy of state with one Player dead. */

@@ -38,7 +38,7 @@ ${DAY_RULES}
 
 export function briefing(s: WerewolfState, seat: Seat): string {
   const me = player(s, seat)!;
-  const lines = [RULES, "", "Seats:", ...s.players.map((p) => `- Seat ${p.seat}: ${p.displayName}`), ""];
+  const lines = [RULES, "", "Seats:", ...s.players.map((p) => `- Seat ${p.seat}${p.displayName ? `: ${p.displayName}` : ""}`), ""];
   lines.push(`You are ${who(s, seat)}. Your secret role: ${ROLE_NAMES[me.role]}.`);
   if (me.role === "werewolf") {
     const partner = wolfSeats(s).filter((w) => w !== seat);
