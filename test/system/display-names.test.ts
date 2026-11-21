@@ -7,7 +7,7 @@ import type { AgentConfig } from "../../src/core/harness";
 import { API_BASE } from "../../src/harness/managed-agent/api";
 import { StubInteractionsApi } from "../harness/stub-interactions-api";
 import { fakeAgent, finished, snapshot, startMatch } from "./helpers";
-import { expectNoAgentIdentity, playerTexts } from "./player-text";
+import { expectNoAgentIdentity, mountedInstructions, playerTexts } from "./player-text";
 
 const REQUIRED = /Required action: (\w+) with target one of ([^.]+)\./;
 
@@ -40,7 +40,7 @@ const agent = (id: string, name: string, model: string): AgentConfig => ({
   name,
   harness: "managed-agent",
   model,
-  instructions: "Play well.",
+  // No instructions of its own: every seat gets the Ruleset's default Agent Instructions mounted.
 });
 
 // Copies of the same Agent share the table, so copy labels like "Hydrogen #2" exist.
@@ -88,6 +88,10 @@ describe("Display Names through a whole Match", () => {
     expect(all).toContain("Wolf Chat (Night 1)");
     expect(all).toMatch(/votes: /);
     expect(all).toMatch(/is not allowed now/);
+    // The scan covered every seat's mounted AGENTS.md (from the provision requests).
+    const mounted = mountedInstructions(api);
+    expect(mounted.length).toBeGreaterThanOrEqual(7);
+    expect(mounted.every((m) => m.length > 100)).toBe(true);
     expect(snap.events.some((e) => e.kind === "speech" && !e.data.skipped)).toBe(true);
   });
 });

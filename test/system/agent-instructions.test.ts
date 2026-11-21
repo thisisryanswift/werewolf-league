@@ -26,7 +26,7 @@ const EXPECTED: Record<string, Key[]> = {
 };
 
 function rolesFor(seed: string): Record<number, string> {
-  const seats = Array.from({ length: 7 }, (_, i) => ({ seat: i + 1, agentId: `x${i}`, label: "x" }));
+  const seats = Array.from({ length: 7 }, (_, i) => ({ seat: i + 1, agentId: `x${i}`, label: "x", displayName: `N${i + 1}` }));
   const r = werewolf.setup({}, seed, seats);
   if (!r.ok) throw new Error(r.error);
   return Object.fromEntries(r.state.players.map((p) => [p.seat, p.role]));

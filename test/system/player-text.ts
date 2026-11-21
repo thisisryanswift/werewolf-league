@@ -7,14 +7,26 @@ import type { StubInteractionsApi } from "../harness/stub-interactions-api";
 
 /**
  * Every text an Agent saw, one entry per create() request: its `input` (the string
- * prompt, or its function_results with errors, notes and observations) and its tools.
- * `agent_config` is left out: it carries the model id to the API, not to the Agent.
+ * prompt, or its function_results with errors, notes and observations), its tools,
+ * and its environment config (the provision request mounts the Agent Instructions as
+ * /.agents/AGENTS.md through an inline source). `agent_config` is left out: it carries
+ * the model id to the API, not to the Agent.
  */
 export function playerTexts(api: StubInteractionsApi): string[] {
   return api.creates().map((b) => {
     const input = typeof b.input === "string" ? b.input : JSON.stringify(b.input);
-    return `${input}\n${JSON.stringify(b.tools ?? [])}`;
+    const environment = typeof b.environment === "object" ? JSON.stringify(b.environment) : "";
+    return `${input}\n${JSON.stringify(b.tools ?? [])}\n${environment}`;
   });
+}
+
+/** The mounted AGENTS.md contents found in the scanned requests. */
+export function mountedInstructions(api: StubInteractionsApi): string[] {
+  return api
+    .creates()
+    .flatMap((b) => (typeof b.environment === "object" ? (b.environment.sources ?? []) : []))
+    .filter((s: any) => s.target === "/.agents/AGENTS.md")
+    .map((s: any) => String(s.content));
 }
 
 /** Strings that would reveal an Agent: its name (and so every copy label), id and model id. */
