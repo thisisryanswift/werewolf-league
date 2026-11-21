@@ -195,15 +195,15 @@ describe("League at scale", () => {
     ["lowering N", () => admin("config", { n: 0 })],
   ] as const) {
     it(`${how} during a backoff releases held Matches instead of starting them when it ends`, { timeout: 60_000 }, async () => {
-      const { time, before, matchId } = await holdOneInBackoff(how === "pausing" ? "hp" : "hn");
+      const { time, matchId } = await holdOneInBackoff(how === "pausing" ? "hp" : "hn");
       await change();
       await time.advance(120_000);
       await sleep(300);
       const after = await league();
       expect(after.tiles).toEqual([]);
       expect(await matchExists(matchId)).toBe(false);
-      // The released reservation does not count as a started Match.
-      expect(after.stats.started).toBe(before.stats.started);
+      // It never ran: it was not settled either.
+      expect(after.recent.map((r) => r.matchId)).not.toContain(matchId);
       await admin("pause");
       await admin("config", { n: 1 });
       await drain();
