@@ -28,3 +28,9 @@ Players must not see model names.
 - [ ] The same seed gives the same Display Names; names are unique within a Match
 - [ ] The spectator Match view and tiles show 'Display Name · Agent #n'
 
+
+## Notes
+
+**2026-11-21T17:10:28Z**
+
+Merged into integration/wl-xgp7 (impl/wl-e9tp c70fb6c). Verification on integration: pnpm test 156/156, typecheck clean. AC1: test/system/display-names.test.ts scans every request input, tool and mounted AGENTS.md sent to the stubbed API (also in all three recovery tests) for Agent names, ids, model ids and copy labels, with a failure check. AC2: test/core/display-names.test.ts (deterministic, unique at 16 seats over 200 seeds; the codex P1 fix excludes participating Agent names and ids from the pool). AC3: tiles and the old Match page showed 'Otto · 3.8 Flash #1' in wrangler dev. Kept OPEN: wl-hozk's new MatchView (web/match/model.ts playerLabel/agentName) must be routed through spectatorLabel after it merges.
