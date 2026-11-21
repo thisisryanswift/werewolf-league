@@ -2,6 +2,7 @@
 // Behaviour comes from the Agent's `options` (all JSON, so it survives DO hops):
 //   script: "first-legal" (default) — call the required tool with the first legal target
 //           "passive"               — vote Abstain, otherwise end the turn with no call (default action)
+//           "no-call"               — end every turn with no call (every action is the default)
 //           "silent"                — never finish a turn
 //   prefer: seat[]      — for targeted actions, pick the first preferred seat that is legal
 //   invalidFirst: bool  — answer every turn with an illegal call first, then a legal one on retry
@@ -11,7 +12,7 @@ import type { Harness, PollResult, TurnInput } from "../core/harness";
 import type { ToolCall } from "../core/ruleset";
 
 interface FakeOptions {
-  script?: "first-legal" | "passive" | "silent";
+  script?: "first-legal" | "passive" | "no-call" | "silent";
   prefer?: number[];
   invalidFirst?: boolean;
   delayPolls?: number;
@@ -20,6 +21,7 @@ interface FakeOptions {
 function decide(opts: FakeOptions, input: TurnInput): ToolCall | null | "never" {
   const { turn } = input;
   if (opts.script === "silent") return "never";
+  if (opts.script === "no-call") return null;
   if (opts.invalidFirst && !input.error) return { name: turn.actionKind, args: { target: "not-a-seat" } };
   const preferred = opts.prefer?.find((s) => turn.legalTargets.includes(s));
   const extra = turn.actionKind === "vote" ? { beliefs: {}, reason: "scripted" } : {};

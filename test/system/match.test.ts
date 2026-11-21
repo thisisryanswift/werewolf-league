@@ -42,29 +42,40 @@ describe("a fake Match end to end", () => {
     expect(snap.events.at(-1)?.kind).toBe("match_over");
   });
 
-  it("runs to a Werewolf win at parity when the wolves kill every Night", async () => {
-    // Everyone picks the first legal target: wolves kill the lowest villager,
-    // and every voter votes for the lowest other seat.
-    const agents = Array.from({ length: 7 }, (_, i) => fakeAgent(`a${i + 1}`, { script: "first-legal" }));
-    const matchId = await startMatch({ seed: "wolves-kill", agents });
-    const snap = await finished(matchId);
-    const over = snap.events.find((e) => e.kind === "match_over")!;
-    const roles = over.data.roles as Record<string, string>;
-    const dead = new Set(snap.events.filter((e) => e.kind === "player_died").map((e) => String(e.data.seat)));
-    const living = Object.keys(roles).filter((s) => !dead.has(s));
-    const livingWolves = living.filter((s) => roles[s] === "werewolf").length;
-    // Independent check of the outcome against the log.
-    if (snap.result?.winner === "village") expect(livingWolves).toBe(0);
-    else expect(livingWolves).toBeGreaterThanOrEqual(living.length - livingWolves);
+  it("runs to a Werewolf win at parity when the wolves kill and vote out villagers", async () => {
+    const seed = "wolves-win";
+    const wolves = wolvesFor(seed);
+    const villagers = [1, 2, 3, 4, 5, 6, 7].filter((s) => !wolves.includes(s));
+    // Wolves target villagers in seat order; villagers abstain.
+    const agents = Array.from({ length: 7 }, (_, i) =>
+      wolves.includes(i + 1) ? fakeAgent(`wolf-${i + 1}`, { prefer: villagers }) : fakeAgent(`vil-${i + 1}`, { script: "passive" }),
+    );
+    const snap = await finished(await startMatch({ seed, agents }));
+    expect(snap.result?.winner).toBe("wolf");
+    expect(snap.events.find((e) => e.kind === "match_over")?.data.reason).toBe("parity");
+    // 2 wolves v 5 villagers -> Night 1 kill, Day 1 vote-out, Night 2 kill -> 2 v 2.
+    expect(snap.events.filter((e) => e.kind === "player_died").map((e) => e.data)).toEqual([
+      { seat: villagers[0], role: "villager", cause: "night_kill", cycle: 1 },
+      { seat: villagers[1], role: "villager", cause: "vote", cycle: 1 },
+      { seat: villagers[2], role: "villager", cause: "night_kill", cycle: 2 },
+    ]);
   });
 
   it("terminates via the 6-cycle cap when every Agent returns only defaults", async () => {
-    const agents = Array.from({ length: 7 }, (_, i) => fakeAgent(`p${i + 1}`, { script: "passive" }));
+    // "no-call": every turn ends without a custom function call, so every action is the default.
+    const agents = Array.from({ length: 7 }, (_, i) => fakeAgent(`p${i + 1}`, { script: "no-call" }));
     const matchId = await startMatch({ seed: "all-defaults", agents });
     const snap = await finished(matchId);
     expect(snap.result?.winner).toBe("wolf");
     expect(snap.events.find((e) => e.kind === "match_over")?.data.reason).toBe("cycle_cap");
-    expect(snap.events.filter((e) => e.kind === "votes_revealed")).toHaveLength(6);
+    const ballots = snap.events.filter((e) => e.kind === "votes_revealed");
+    expect(ballots).toHaveLength(6);
+    for (const b of ballots) {
+      for (const v of b.data.votes as { target: unknown; timedOut: boolean }[]) {
+        expect(v).toMatchObject({ target: "abstain", timedOut: true });
+      }
+    }
+    expect(snap.events.some((e) => e.kind === "player_died")).toBe(false);
   });
 
   it("gives committed events strictly increasing sequence numbers", async () => {
