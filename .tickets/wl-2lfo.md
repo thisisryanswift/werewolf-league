@@ -1,7 +1,7 @@
 ---
 id: wl-2lfo
 status: open
-deps: [wl-gtil, wl-d5wn, wl-64dn]
+deps: [wl-gtil, wl-d5wn, wl-64dn, wl-ks6l]
 links: []
 created: 2026-11-21T18:22:17Z
 type: task
