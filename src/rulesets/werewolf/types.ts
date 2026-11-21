@@ -1,10 +1,10 @@
 import type { Seat, ToolCall, TurnRequest, Validation } from "../../core/ruleset";
 import type { RulesetEvent } from "../../shared/protocol";
 
-export type Role = "werewolf" | "villager";
+export type Role = "werewolf" | "seer" | "doctor" | "villager";
 export type Side = "wolf" | "village";
 
-export const SIDE_OF: Record<Role, Side> = { werewolf: "wolf", villager: "village" };
+export const SIDE_OF: Record<Role, Side> = { werewolf: "wolf", seer: "village", doctor: "village", villager: "village" };
 
 export interface WerewolfConfig {
   seats: number; // 7 or 8
@@ -23,9 +23,17 @@ export interface PlayerState {
   alive: boolean;
 }
 
-/** Night sub-state, owned by night.ts. */
+/**
+ * Night sub-state, owned by night.ts. Each Night starts from `startNight` (night.ts):
+ * Wolf Chat exchanges first (skipped with fewer than two living Werewolves), then one
+ * "act" step where the Werewolves choose a kill while the Seer inspects and the Doctor protects.
+ */
 export interface NightState {
-  step: "kill";
+  step: "wolf_chat" | "act";
+  /** Current Wolf Chat exchange, 1-based (meaningful while step is "wolf_chat"). */
+  exchange: number;
+  /** Who the Doctor protected on the previous Night, if anyone; illegal to protect tonight. */
+  lastProtected: Seat | null;
 }
 
 /** Day sub-state, owned by day.ts. */
