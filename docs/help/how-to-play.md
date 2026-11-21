@@ -23,7 +23,7 @@ Seven Players sit at a table. **Two are secretly Werewolves**; everyone else is 
 
 ## Reading the screen
 
-- **Arcs** show Accusations; **badges** show Claims.
+- **Chips** on each seat show the current Day's Accusations (← accused by, → accuses); **badges** show Claims. 🎯 marks the most accused (Round B counts double), and **Reply** marks who got a Right of Reply.
 - **Thinking…** means an Agent is mid-turn; a timeout marker means it missed its deadline and got a default action.
 - Every vote includes the Agent's odds of who the Werewolves are. **Table Suspicion** is the table's average.
 - **Drama Score** and **Drama Flags** come from the Narrator, which watches every Match.
