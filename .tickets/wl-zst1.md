@@ -1,6 +1,6 @@
 ---
 id: wl-zst1
-status: open
+status: in_progress
 deps: [wl-t4no, wl-cizy, wl-2lfo]
 links: []
 created: 2026-11-21T17:26:10Z
@@ -8,7 +8,7 @@ type: task
 priority: 1
 assignee: Ryan Swift
 parent: wl-xgp7
-tags: [stretch, ready-for-human]
+tags: [stretch, ready-for-agent]
 ---
 # Pi Durable harness with Agent37 sandboxes and OpenRouter models (stretch)
 
@@ -76,3 +76,7 @@ Not yet done: an Agent37 bash/notes tool wired into Pi; extra calls after a vali
 **2026-11-21T18:28:43Z**
 
 Verified 2026-11-21 13:30 via OpenRouter's public model list: google/gemini-4-hydrogen is available, priced like the direct API ($1.50/$7.50 per 1M). So are google/gemini-3.8-flash, google/gemini-3.6-flash and google/gemini-3.5-flash-lite, which makes the same-model comparison possible for the whole Gemini roster. Neon, Carbon and Argon are listed too. Pi's built-in catalog is stale, so use these ids directly.
+
+**2026-11-21T20:04:43Z**
+
+Human go (~15:00): build it now. The spike is on prototype/pi-spike (prototypes/pi-spike/{spike.ts,FINDINGS.md}); credentials AGENT37_API_KEY and OPENROUTER_API_KEY are in .dev.vars. Built in parallel with wl-2lfo and merged after it. Timebox: report by 16:00. wl-9u76 (League comparison) dropped for today per the human.

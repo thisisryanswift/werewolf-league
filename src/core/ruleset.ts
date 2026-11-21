@@ -133,6 +133,22 @@ export interface Ruleset<S = unknown> {
     questions: NarrationQuestions;
     log(state: S, events: RulesetEvent[]): string;
   };
+  /**
+   * Optional: what the post-Match Analyst (core/analyst.ts) reads. Without it a Match
+   * is never analysed. `instructions` names the sections of a sectioned source mounted
+   * as the Analyst's Agent Instructions; `input` renders the finished Match (Narrator's
+   * View log, final roles, result and per-Player stats) as text.
+   */
+  analysis?: {
+    instructions: { source: string; sections: string[] };
+    input(state: S, events: RulesetEvent[], stats: AnalysisStats): string;
+  };
+}
+
+/** Runner statistics the Analyst's input includes alongside the Ruleset's own. */
+export interface AnalysisStats {
+  /** Timed-out turns per seat. */
+  timeouts: Record<Seat, number>;
 }
 
 /** Default `view` for rulesets that use the shared audience field. */

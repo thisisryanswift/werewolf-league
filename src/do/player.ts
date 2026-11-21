@@ -18,6 +18,8 @@ interface Seating {
   tools: ToolSpec[];
   /** Assembled Agent Instructions for this seat (see PlayerContext). */
   instructions?: string;
+  /** See PlayerContext.preamble. */
+  preamble?: string;
   /** The League id the Match reports to (429s go there too); absent means the default League. */
   league?: string;
 }
@@ -102,6 +104,17 @@ export class PlayerDO extends DurableObject<Env> {
     this.ctx.storage.kv.put<CurrentTurn>("turn", { ...assignment, handle: null, attempts: 0 });
     await this.ctx.storage.setAlarm(Date.now());
     if (current?.handle) await this.cancelAndReport(current.matchId, current.handle);
+  }
+
+  /**
+   * Called by the Match when it gives up on the current turn without a successor (the
+   * Analyst's backstop): drop the turn and cancel it if it is in flight. Idempotent.
+   */
+  async abandon(): Promise<void> {
+    const turn = this.turn;
+    if (!turn) return;
+    this.ctx.storage.kv.delete("turn");
+    if (turn.handle) await this.cancelAndReport(turn.matchId, turn.handle);
   }
 
   /**

@@ -4,6 +4,7 @@
 import type { DeadlineConfig, TimeoutCounts, TimeoutSource } from "./deadlines";
 import type { AgentConfig, TurnInput } from "./harness";
 import type { NarratorConfig } from "./narrator";
+import type { AnalystConfig } from "./analyst";
 import type { MatchResult, Seat, SeatAgent, ToolCall, TurnRequest } from "./ruleset";
 import type { MatchCost } from "../shared/protocol";
 
@@ -20,6 +21,8 @@ export interface MatchInit {
   deadlines?: Partial<DeadlineConfig>;
   /** The Narrator for this Match; absent or null means no narration. */
   narrator?: NarratorConfig | null;
+  /** The post-Match Analyst; absent or null means no analysis. */
+  analyst?: AnalystConfig | null;
   /** The League (by id) the Match belongs and reports to; absent means the default League. */
   league?: string;
   /** Match Number given by the League that started it; absent for a one-off Match. */

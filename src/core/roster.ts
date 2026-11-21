@@ -7,6 +7,7 @@ import type { DeadlineConfig } from "./deadlines";
 import type { AgentConfig } from "./harness";
 import type { NarratorConfig } from "./narrator";
 import { narratorConfigError } from "../narrator";
+import { analystConfigError, type AnalystConfig } from "./analyst";
 
 export interface LeagueConfig {
   /** Matches kept live at once. */
@@ -21,6 +22,10 @@ export interface LeagueConfig {
   deadlines?: Partial<DeadlineConfig>;
   /** The Narrator for new Matches (e.g. { id: "decisions" }); absent or null means none. */
   narrator?: NarratorConfig | null;
+  /** The post-Match Analyst for new Matches (e.g. { harness: "managed-agent", model: "gemini-4-neon" }); absent or null means none. */
+  analyst?: AnalystConfig | null;
+  /** At most this many Analyst runs are in flight at once in this League; more wait. Default 4. */
+  analystConcurrency?: number;
   /** Agents the League draws from. Copies may share a Match. */
   roster: AgentConfig[];
   /** At most this many new Matches start in any `startWindowMs` window. */
@@ -126,6 +131,16 @@ export function patchConfig(
     const error = patch.narrator === null ? null : narratorConfigError(patch.narrator);
     if (error) return { ok: false, error };
     next.narrator = patch.narrator as NarratorConfig | null;
+  }
+  if (patch.analyst !== undefined) {
+    const error = patch.analyst === null ? null : analystConfigError(patch.analyst);
+    if (error) return { ok: false, error };
+    next.analyst = patch.analyst as AnalystConfig | null;
+  }
+  if (patch.analystConcurrency !== undefined) {
+    const v = patch.analystConcurrency;
+    if (!Number.isInteger(v) || (v as number) < 1) return { ok: false, error: "analystConcurrency must be an integer of at least 1" };
+    next.analystConcurrency = v as number;
   }
   if (patch.seeds !== undefined) {
     if (!Array.isArray(patch.seeds) || !patch.seeds.every((x) => typeof x === "string" && x.length > 0 && x.length <= 128)) {

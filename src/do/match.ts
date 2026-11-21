@@ -27,6 +27,20 @@ import {
   type TurnAssignment,
 } from "../core/match";
 import { assembleInstructions } from "../core/agent-instructions";
+import {
+  ANALYST_PREAMBLE,
+  ANALYST_SEAT,
+  analysisEvent,
+  analystAgent,
+  DEFAULT_ANALYST_DEADLINE_MS,
+  DEFAULT_ANALYST_MAX_WAIT_MS,
+  REPORT_TOOL,
+  reportOf,
+  validateReport,
+  type AnalysisEventData,
+  type AnalysisFailure,
+  type AnalysisReport,
+} from "../core/analyst";
 import type { AgentConfig } from "../core/harness";
 import { isNarrationEvent, latestDrama, LatestOnly, narrateMatch } from "../core/narrator";
 import { leagueIdOf, leagueStub } from "../core/leagues";
@@ -73,7 +87,29 @@ interface MatchMeta extends Omit<MatchInit, "deadlines"> {
   costDirty?: boolean;
   /** Close rounds tried so far; closes still failing after MAX_CLOSE_ATTEMPTS are given up. */
   closeAttempts?: number;
+  /** The post-Match Analyst's run, if this Match is analysed (see core/analyst.ts). */
+  analysis?: AnalysisState;
 }
+
+/**
+ * waiting: the result is final; waiting for the League's ack and an Analyst slot.
+ * running: the Analyst's Player DO has the run. done: the analysis event is committed;
+ * `released` once the League slot is freed, `closed` once the Analyst's leftovers are read.
+ */
+interface AnalysisState {
+  status: "waiting" | "running" | "done";
+  queuedAt: number;
+  startedAt?: number;
+  deadlineAt?: number;
+  released?: boolean;
+  closed?: boolean;
+  /** True once the Analyst's Player DO has dropped (and cancelled) any turn still in flight. */
+  abandoned?: boolean;
+  abandonAttempts?: number;
+}
+
+/** The Analyst's single turn ID per Match. */
+const analysisTurnId = (matchId: string) => `${matchId}:analysis`;
 
 type EventRow = { seq: number; ts: number; kind: string; audience: string; data: string };
 
@@ -125,13 +161,16 @@ export class MatchDO extends DurableObject<Env> {
     return matchCost(this.usage, meta.seats);
   }
 
-  /** Keep a seat's cumulative usage report unless an earlier one already counted more. Returns true if it changed. */
+  /**
+   * Keep a seat's cumulative usage report unless an earlier one already counted more.
+   * The Analyst's Player DO reports as ANALYST_SEAT. Returns true if it changed.
+   */
   private recordSeatUsage(seat: Seat, reported: ModelUsage | undefined): boolean {
     if (!reported) return false;
     const u = this.usage;
-    const current = u.bySeat[seat];
+    const current = seat === ANALYST_SEAT ? u.analyst : u.bySeat[seat];
     if (current && (!atLeast(reported, current) || JSON.stringify(current) === JSON.stringify(reported))) return false;
-    this.usage = { ...u, bySeat: { ...u.bySeat, [seat]: reported } };
+    this.usage = seat === ANALYST_SEAT ? { ...u, analyst: reported } : { ...u, bySeat: { ...u.bySeat, [seat]: reported } };
     return true;
   }
 
@@ -300,6 +339,7 @@ export class MatchDO extends DurableObject<Env> {
    */
   async submitAction(turnId: string, seat: Seat, call: ToolCall | null, usage?: ModelUsage): Promise<SubmitResult> {
     if (this.recordSeatUsage(seat, usage)) this.lateCost();
+    if (seat === ANALYST_SEAT) return this.analysisReported(turnId, call);
     const meta = this.meta;
     const step = this.step;
     const turn = step?.turns.find((t) => t.turnId === turnId && t.seat === seat);
@@ -326,6 +366,11 @@ export class MatchDO extends DurableObject<Env> {
   /** A Player reports that its turn missed the deadline; the Ruleset's default applies. */
   async reportTimeout(turnId: string, seat: Seat, usage?: ModelUsage): Promise<SubmitResult> {
     if (this.recordSeatUsage(seat, usage)) this.lateCost();
+    if (seat === ANALYST_SEAT) {
+      if (!this.analysisRunning(turnId)) return { status: "stale" };
+      await this.finishAnalysis({ status: "failed", reason: "timeout" });
+      return { status: "accepted" };
+    }
     const meta = this.meta;
     const step = this.step;
     const turn = step?.turns.find((t) => t.turnId === turnId && t.seat === seat);
@@ -355,6 +400,7 @@ export class MatchDO extends DurableObject<Env> {
     if (meta.status === "finished") {
       if (!meta.resultAcked) await this.deliverResult(meta);
       await this.finishChores();
+      await this.analysisChores();
       return;
     }
     const ruleset = this.ruleset(meta);
@@ -377,12 +423,20 @@ export class MatchDO extends DurableObject<Env> {
       const cost = this.cost(current);
       if (cost.unpriced.length) console.warn(`Match ${current.matchId}: no price for ${cost.unpriced.join(", ")}; counted at $0`);
       const result: MatchReport = { ...next.result, timeouts: countTimeouts(this.events(), current.seats), cost };
-      const done: MatchMeta = { ...current, status: "finished", result, closePending: current.seats.map((s) => s.seat) };
+      const analysed = !!current.analyst && !!ruleset.analysis;
+      const done: MatchMeta = {
+        ...current,
+        status: "finished",
+        result,
+        closePending: current.seats.map((s) => s.seat),
+        ...(analysed ? { analysis: { status: "waiting", queuedAt: Date.now() } } : {}),
+      };
       this.meta = done;
       this.commit([matchCostEvent(cost)]);
       this.pushSummary(ruleset);
       await this.deliverResult(done);
       await this.finishChores();
+      await this.analysisChores();
       return;
     }
     await this.dispatch(current, ruleset, next.turns);
@@ -559,6 +613,169 @@ export class MatchDO extends DurableObject<Env> {
     });
     this.step = latest;
     await this.armAlarm(meta, latest);
+  }
+
+  // ---- Analyst (after the result; never affects play or ratings) ----------
+
+  private get analystDeadlineMs(): number {
+    return this.meta?.analyst?.deadlineMs ?? DEFAULT_ANALYST_DEADLINE_MS;
+  }
+
+  /** A League slot's lease: the run's deadline and grace plus a margin (renewed once the run starts). */
+  private get analystLeaseMs(): number {
+    return this.analystDeadlineMs + (this.meta?.deadlines.graceMs ?? 0) + 60_000;
+  }
+
+  /** Arm the alarm for `at` unless it is already due sooner. */
+  private async wakeBy(at: number): Promise<void> {
+    const current = await this.ctx.storage.getAlarm();
+    if (current === null || at < current) await this.ctx.storage.setAlarm(at);
+  }
+
+  /**
+   * Drive the Analyst's run on the finished Match's alarm (always after the result's
+   * own chores, so their alarm handling can't drop its wake): take a League slot,
+   * start the run, enforce its backstop, then free the slot and read leftover usage.
+   */
+  private async analysisChores(): Promise<void> {
+    const meta = this.meta!;
+    const a = meta.analysis;
+    if (!a || !meta.resultAcked) return;
+    const retryMs = Number(this.env.LEAGUE_RETRY_MS ?? 2000);
+    const now = Date.now();
+    const graceMs = meta.deadlines.graceMs;
+    if (a.status === "waiting") {
+      if (now - a.queuedAt > (meta.analyst?.maxWaitMs ?? DEFAULT_ANALYST_MAX_WAIT_MS)) {
+        return this.finishAnalysis({ status: "failed", reason: "no_slot", detail: "waited too long for an Analyst slot" });
+      }
+      const lease = this.analystLeaseMs;
+      const slot = await leagueStub(this.env, meta.league)
+        .acquireAnalystSlot(meta.matchId, lease)
+        .catch(() => "wait" as const);
+      if (this.meta!.analysis?.status !== "waiting") return;
+      if (slot === "spend_cap") return this.finishAnalysis({ status: "failed", reason: "spend_cap", detail: "the League reached its spend cap" });
+      if (slot === "wait") return this.wakeBy(Date.now() + retryMs * 5);
+      return this.startAnalysis();
+    }
+    if (a.status === "running") {
+      // Backstop: the Analyst's Player DO never reported by deadline + grace.
+      if (now >= a.deadlineAt! + graceMs) return this.finishAnalysis({ status: "failed", reason: "timeout", detail: "backstop" });
+      return this.wakeBy(a.deadlineAt! + graceMs);
+    }
+    if (!a.abandoned && (a.abandonAttempts ?? 0) < MAX_CLOSE_ATTEMPTS) {
+      // Stop a run still in flight (e.g. after the backstop) before its slot is freed, so the cap holds.
+      const stopped = await this.env.PLAYER.getByName(`${meta.matchId}:${ANALYST_SEAT}`)
+        .abandon()
+        .then(() => true)
+        .catch(() => false);
+      const cur = this.meta!.analysis!;
+      this.meta = { ...this.meta!, analysis: { ...cur, abandoned: stopped, abandonAttempts: (cur.abandonAttempts ?? 0) + 1 } };
+      if (!stopped) return this.wakeBy(Date.now() + retryMs);
+    }
+    if (!this.meta!.analysis!.released) {
+      const freed = await leagueStub(this.env, meta.league)
+        .releaseAnalystSlot(meta.matchId)
+        .then(() => true)
+        .catch(() => false);
+      // A slot never freed expires with its lease.
+      if (freed) this.meta = { ...this.meta!, analysis: { ...this.meta!.analysis!, released: true } };
+      else return this.wakeBy(Date.now() + retryMs);
+    }
+    if (!this.meta!.analysis!.closed) {
+      // Once, best effort: read usage still unread (e.g. a cancelled run's); it reports through recordUsage.
+      this.meta = { ...this.meta!, analysis: { ...this.meta!.analysis!, closed: true } };
+      await this.env.PLAYER.getByName(`${meta.matchId}:${ANALYST_SEAT}`)
+        .close()
+        .catch(() => {});
+    }
+  }
+
+  /** Hand the run to the Analyst's Player DO: its Agent Instructions mounted, the whole Match as input. */
+  private async startAnalysis(): Promise<void> {
+    const meta = this.meta!;
+    const ruleset = this.ruleset(meta);
+    const hook = ruleset.analysis!;
+    const events = this.events().filter((e) => !isRunnerEvent(e) && !isNarrationEvent(e));
+    const input = hook.input(this.rulesetState, events, { timeouts: countTimeouts(this.events(), meta.seats).bySeat });
+    const agent = analystAgent(meta.analyst!);
+    const player = this.env.PLAYER.getByName(`${meta.matchId}:${ANALYST_SEAT}`);
+    try {
+      await player.provision({
+        matchId: meta.matchId,
+        seat: ANALYST_SEAT,
+        agent,
+        tools: [REPORT_TOOL],
+        instructions: assembleInstructions(hook.instructions.source, hook.instructions.sections),
+        preamble: ANALYST_PREAMBLE,
+        ...(meta.league ? { league: meta.league } : {}),
+      });
+    } catch (err) {
+      return this.finishAnalysis({ status: "failed", reason: "provision_failed", detail: String(err).slice(0, 300) });
+    }
+    const startedAt = Date.now();
+    const deadlineAt = startedAt + this.analystDeadlineMs;
+    // Persisted before the turn is handed over, so a fast report finds the run.
+    this.meta = { ...this.meta!, analysis: { ...this.meta!.analysis!, status: "running", startedAt, deadlineAt } };
+    await this.wakeBy(deadlineAt + meta.deadlines.graceMs);
+    // Renew the lease from now, so slow provisioning never lets it lapse mid-run (best effort).
+    await leagueStub(this.env, meta.league)
+      .acquireAnalystSlot(meta.matchId, this.analystLeaseMs)
+      .catch(() => {});
+    try {
+      await player.takeTurn({
+        matchId: meta.matchId,
+        turnId: analysisTurnId(meta.matchId),
+        seat: ANALYST_SEAT,
+        input: {
+          text: input,
+          turn: { seat: ANALYST_SEAT, actionKind: REPORT_TOOL.name, legalTargets: [], prompt: "Call submit_report exactly once with your analysis." },
+          firstTurn: true,
+        },
+        deadlineAt,
+      });
+    } catch (err) {
+      await this.finishAnalysis({ status: "failed", reason: "provision_failed", detail: String(err).slice(0, 300) });
+    }
+  }
+
+  private analysisRunning(turnId: string): boolean {
+    const meta = this.meta;
+    return meta?.analysis?.status === "running" && turnId === analysisTurnId(meta.matchId);
+  }
+
+  /** The Analyst's Player DO reports its call (null: the run ended without one). */
+  private async analysisReported(turnId: string, call: ToolCall | null): Promise<SubmitResult> {
+    const meta = this.meta;
+    if (!meta || !this.analysisRunning(turnId)) return { status: "stale" };
+    if (Date.now() >= meta.analysis!.deadlineAt!) {
+      await this.finishAnalysis({ status: "failed", reason: "timeout", detail: "report arrived after the deadline" });
+      return { status: "stale" };
+    }
+    if (!call) {
+      await this.finishAnalysis({ status: "failed", reason: "no_report" });
+      return { status: "accepted" };
+    }
+    const v = validateReport(call, meta.seats.map((s) => s.seat));
+    if (!v.ok) return { status: "invalid", error: v.error };
+    await this.finishAnalysis({ status: "ok", report: reportOf(call.args) });
+    return { status: "accepted" };
+  }
+
+  /** Commit the one analysis event (a report or a recorded failure), then free the slot on the alarm. */
+  private async finishAnalysis(
+    outcome: { status: "ok"; report: AnalysisReport } | { status: "failed"; reason: AnalysisFailure; detail?: string },
+  ): Promise<void> {
+    const meta = this.meta!;
+    const a = meta.analysis;
+    if (!a || a.status === "done") return;
+    const base = { model: analystAgent(meta.analyst!).model!, finishedAt: Date.now() };
+    const data: AnalysisEventData =
+      outcome.status === "ok"
+        ? { ...base, status: "ok", startedAt: a.startedAt!, report: outcome.report }
+        : { ...base, status: "failed", startedAt: a.startedAt ?? null, reason: outcome.reason, ...(outcome.detail ? { detail: outcome.detail } : {}) };
+    this.meta = { ...meta, analysis: { ...a, status: "done" } };
+    this.commit([analysisEvent(data)]);
+    await this.wakeBy(Date.now());
   }
 
   // ---- Spectator WebSocket --------------------------------------------

@@ -7,6 +7,7 @@ import { drawDisplayNames } from "./display-names";
 import type { AgentConfig } from "./harness";
 import type { MatchInit } from "./match";
 import type { NarratorConfig } from "./narrator";
+import type { AnalystConfig } from "./analyst";
 import type { SeatAgent } from "./ruleset";
 
 /**
@@ -41,6 +42,8 @@ export interface MatchOptions {
   narrator?: NarratorConfig | null;
   /** The League (by id) the Match reports to; absent means the default League. */
   league?: string;
+  /** The Analyst for the Match; absent or null means none. */
+  analyst?: AnalystConfig | null;
   agents: AgentConfig[];
 }
 
@@ -57,6 +60,7 @@ export function buildMatchInit(opts: MatchOptions): MatchInit {
     ...(opts.deadlines ? { deadlines: opts.deadlines } : {}),
     ...(opts.narrator ? { narrator: opts.narrator } : {}),
     ...(opts.league ? { league: opts.league } : {}),
+    ...(opts.analyst ? { analyst: opts.analyst } : {}),
     seats,
     agents: Object.fromEntries(opts.agents.map((a, i) => [i + 1, a])),
   };

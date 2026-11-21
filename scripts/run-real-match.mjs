@@ -6,6 +6,8 @@
 //
 // Usage: node scripts/run-real-match.mjs [baseUrl]   (MODEL=gemini-4-hydrogen by default;
 // MODEL_B gives the second Agent another model). Prints the Match's measured cost at the end.
+// ANALYST=gemini-4-neon (or another model) also runs the post-Match Analyst and waits for its
+// analysis event, printing its latency, status and cost.
 import { readFileSync } from "node:fs";
 
 const base = process.argv[2] ?? "http://127.0.0.1:8787";
@@ -38,7 +40,12 @@ const secs = () => ((Date.now() - t0) / 1000).toFixed(1);
 const res = await fetch(`${base}/api/admin/matches`, {
   method: "POST",
   headers: { "x-admin-secret": secret, "content-type": "application/json", "user-agent": UA },
-  body: JSON.stringify({ matchId: process.env.MATCH_ID, seed: process.env.SEED ?? `real-${Date.now()}`, agents }),
+  body: JSON.stringify({
+    matchId: process.env.MATCH_ID,
+    seed: process.env.SEED ?? `real-${Date.now()}`,
+    agents,
+    ...(process.env.ANALYST ? { analyst: { harness: "managed-agent", model: process.env.ANALYST } } : {}),
+  }),
 });
 if (res.status !== 201) throw new Error(`start failed: ${res.status} ${await res.text()}`);
 const { matchId } = await res.json();
@@ -62,7 +69,23 @@ for (;;) {
     console.log(`[${secs()}s] RESULT winner=${snap.result.winner} first_action_s=${firstAction} result_s=${secs()}`);
     // A late reading (e.g. the last narration) may update the cost: report the latest match_cost event.
     await new Promise((r) => setTimeout(r, 5000));
-    const final = await (await fetch(`${base}/api/matches/${matchId}`, { headers: { "user-agent": UA } })).json();
+    let final = await (await fetch(`${base}/api/matches/${matchId}`, { headers: { "user-agent": UA } })).json();
+    if (process.env.ANALYST) {
+      const finishedAt = Date.now();
+      while (!final.events.some((e) => e.kind === "analysis")) {
+        if (Date.now() - finishedAt > 10 * 60_000) throw new Error("no analysis after 10 min");
+        await new Promise((r) => setTimeout(r, 5000));
+        final = await (await fetch(`${base}/api/matches/${matchId}`, { headers: { "user-agent": UA } })).json();
+      }
+      // Usage read on close may land a little later.
+      await new Promise((r) => setTimeout(r, 8000));
+      final = await (await fetch(`${base}/api/matches/${matchId}`, { headers: { "user-agent": UA } })).json();
+      const a = final.events.find((e) => e.kind === "analysis").data;
+      const latency = a.startedAt ? ((a.finishedAt - a.startedAt) / 1000).toFixed(1) : "n/a";
+      console.log(`[${secs()}s] ANALYSIS status=${a.status} model=${a.model} run_s=${latency} reason=${a.reason ?? ""} ${a.detail ?? ""}`);
+      console.log(`ANALYSIS ${JSON.stringify(a.report ?? a, null, 2)}`);
+      console.log(`COST analyst=$${(final.result.cost.analyst ?? 0).toFixed(4)}`);
+    }
     const cost = final.result.cost;
     if (cost) {
       console.log(`COST total=$${cost.total.toFixed(4)} narrator=$${cost.narrator.toFixed(4)} unpriced=${JSON.stringify(cost.unpriced)}`);

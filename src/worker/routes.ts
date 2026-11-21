@@ -18,6 +18,7 @@ import type { AgentConfig } from "../core/harness";
 import { isLeagueId, leagueStub } from "../core/leagues";
 import type { NarratorConfig } from "../core/narrator";
 import { fakeRoster } from "../core/roster";
+import { analystConfigError, type AnalystConfig } from "../core/analyst";
 import { startMatch } from "../core/start-match";
 import { narratorConfigError } from "../narrator";
 import { DEFAULT_LEAGUE_ID, LEAGUES } from "../shared/leagues";
@@ -89,6 +90,8 @@ export async function handleApi(request: Request, env: Env, url: URL): Promise<R
       narrator?: NarratorConfig | null;
       /** The League the Match reports to (its cost counts there; it is unrated). Default gemini-managed. */
       league?: string;
+      /** Analyst for this Match, e.g. { harness: "managed-agent", model: "gemini-4-neon" }; default none. */
+      analyst?: AnalystConfig | null;
     };
     const agents = body.agents?.length ? body.agents : fakeRoster();
     const narratorError = body.narrator == null ? null : narratorConfigError(body.narrator);
@@ -96,6 +99,8 @@ export async function handleApi(request: Request, env: Env, url: URL): Promise<R
     if (body.league !== undefined && (typeof body.league !== "string" || !isLeagueId(body.league))) {
       return Response.json({ error: `league must be one of ${LEAGUES.map((l) => l.id).join(", ")}` }, { status: 400 });
     }
+    const analystError = body.analyst == null ? null : analystConfigError(body.analyst);
+    if (analystError) return Response.json({ error: analystError }, { status: 400 });
     if (body.matchId !== undefined && !/^[\w-]{1,64}$/.test(body.matchId)) {
       return Response.json({ error: "matchId must be 1-64 word characters or dashes" }, { status: 400 });
     }
@@ -104,6 +109,7 @@ export async function handleApi(request: Request, env: Env, url: URL): Promise<R
         deadlines: body.deadlines,
         narrator: body.narrator,
         league: body.league,
+        analyst: body.analyst,
         agents,
       });
       return Response.json({ matchId: init.matchId, seed: init.seed }, { status: 201 });

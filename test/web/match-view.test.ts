@@ -187,6 +187,39 @@ describe("Match view", () => {
     expect(view.feed.flatMap((g) => g.items.map((i) => i.event.kind))).not.toContain("match_cost");
   });
 
+  it("the end screen shows the Analyst's report only in Narrator's View, and the Analyst's cost", () => {
+    const report = {
+      summary: "Wolves won.",
+      turning_points: [
+        { when: "Night 1", what: "A kill." },
+        { when: "Day 1 vote", what: "A miss." },
+      ],
+      mistakes: [{ seat: 3, agent: "Agent3", what: "Voted wrong.", evidence: "Day 1 vote: 'trust me'." }],
+      best_play: { seat: 1, why: "A good lie." },
+      why_winner_won: "Village mistakes.",
+    };
+    const log = logOf([
+      ...night1,
+      ...day1,
+      pub("match_over", { winner: "wolf", reason: "parity", roles: { 1: "werewolf", 2: "werewolf", 3: "seer", 4: "doctor", 5: "villager" } }),
+      pub("match_cost", { total: 0.2, bySeat: {}, narrator: 0, analyst: 0.15, tokens: { input: 1, cached: 0, thought: 0, output: 0 }, unpriced: [] }),
+      priv("analysis", [], { status: "ok", model: "gemini-4-neon", startedAt: 1, finishedAt: 81_001, report }),
+    ]);
+    const on = buildMatchView(log, { narratorView: true });
+    expect(on.end!.analysis).toEqual({ status: "ok", model: "gemini-4-neon", seconds: 81, report });
+    expect(on.end!.cost!.analyst).toBeCloseTo(0.15, 10);
+    expect(buildMatchView(log, { narratorView: false }).end!.analysis).toBeNull();
+    // Not a feed line.
+    expect(on.feed.flatMap((g) => g.items.map((i) => i.event.kind))).not.toContain("analysis");
+    // A recorded failure.
+    const failed = logOf([
+      ...night1,
+      pub("match_over", { winner: "wolf", reason: "parity", roles: {} }),
+      priv("analysis", [], { status: "failed", model: "gemini-4-neon", startedAt: null, finishedAt: 5, reason: "timeout" }),
+    ]);
+    expect(buildMatchView(failed, { narratorView: true }).end!.analysis).toEqual({ status: "failed", model: "gemini-4-neon", seconds: null, reason: "timeout" });
+  });
+
   it("shows each seat's latest Claim, judged true or a lie only when the role is known", () => {
     const log = logOf([...night1, ...day1]);
     const on = buildMatchView(log, { narratorView: true });
