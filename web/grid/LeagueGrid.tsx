@@ -4,6 +4,8 @@
 import { memo, useMemo, useRef, useState } from "react";
 import type { LeagueSnapshot, MatchTile } from "../../src/shared/protocol";
 import { FeaturedMatchLink } from "../components/FinishedMatches";
+import { landedFeatures } from "../help/features";
+import { HelpButtons } from "../help/HelpButtons";
 import type { FeedStatus } from "../useMatchFeed";
 import { arrangeGrid, tileView, topAgents, type GridFilter, type GridSort, type PromotionHold } from "./model";
 import { matchHash } from "./route";
@@ -39,6 +41,9 @@ export function LeagueGrid({ league, status, activity, godView, onGodViewChange 
     held.current = g.held;
     return g;
   }, [league.tiles, sort, filter, godView, activity]);
+  // Keyed by content so the help dialogs re-render only when a feature lands.
+  const landedKey = [...landedFeatures(league.tiles)].join(",");
+  const landed = useMemo(() => new Set(landedKey.split(",").filter(Boolean)), [landedKey]);
 
   return (
     <div className="lg">
@@ -62,6 +67,7 @@ export function LeagueGrid({ league, status, activity, godView, onGodViewChange 
           <span className={`lg-feed lg-feed-${status}`} data-testid="feed-status" title="Live connection to the League">
             {status === "live" ? "● live" : status}
           </span>
+          <HelpButtons landed={landed} />
           <button type="button" className={`lg-god${godView ? " on" : ""}`} aria-pressed={godView} data-testid="grid-god-view" onClick={() => onGodViewChange(!godView)}>
             {godView ? "◉ God View on" : "○ God View off"}
           </button>
