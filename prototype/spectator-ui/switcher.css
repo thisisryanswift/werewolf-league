@@ -1,0 +1,33 @@
+/* PROTOTYPE switcher chrome — deliberately unlike every variant. */
+html, body { margin: 0; }
+#app:focus { outline: none; }
+
+#proto-bar {
+  position: fixed; left: 50%; bottom: 14px; translate: -50% 0; z-index: 2147483000;
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 10px; border-radius: 999px;
+  background: #111; color: #fff; border: 2px solid #ff0; box-shadow: 0 4px 18px rgb(0 0 0 / .5);
+  font: 600 14px/1.2 system-ui, sans-serif; white-space: nowrap;
+  view-transition-name: proto-bar;
+}
+#proto-bar button {
+  font: inherit; color: #fff; background: #333; border: 1px solid #666; border-radius: 999px;
+  padding: 4px 10px; cursor: pointer;
+}
+#proto-bar button:hover { background: #555; }
+#proto-bar button:focus-visible, #proto-bar input:focus-visible { outline: 2px solid #ff0; outline-offset: 2px; }
+#pb-label { min-width: 15ch; text-align: center; }
+#pb-cursor { width: 220px; accent-color: #ff0; }
+#pb-seq { font-variant-numeric: tabular-nums; min-width: 11ch; }
+.pb-sep { width: 1px; height: 20px; background: #555; }
+.pb-god { display: flex; gap: 4px; align-items: center; cursor: pointer; }
+
+#pb-dump {
+  inset: 20px 20px 80px auto; width: min(560px, 90vw); margin: 0;
+  background: #111; color: #cfc; border: 2px solid #ff0; border-radius: 10px; padding: 0;
+}
+#pb-dump pre { margin: 0; padding: 12px; font: 12px/1.35 ui-monospace, monospace; white-space: pre-wrap; }
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
+}

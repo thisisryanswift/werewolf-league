@@ -1,0 +1,43 @@
+<!doctype html>
+<!--
+  PROTOTYPE — throwaway. Question: "What should the spectator UI look like?"
+  Four radically different variants of (a) the live Match grid and (b) the Match view,
+  switchable via ?variant=A|B|C|D and ?view=grid|match, from a floating bottom bar.
+  All data comes from the hardcoded fake event log in data.js (one 8-seat Match).
+  Run: double-click this file, or `python3 -m http.server -d prototype/spectator-ui 8787`.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PROTOTYPE · Werewolf League spectator UI</title>
+  <link rel="stylesheet" href="switcher.css">
+</head>
+<body>
+  <main id="app" tabindex="-1"></main>
+
+  <div id="proto-bar" role="toolbar" aria-label="Prototype controls (not part of the design)">
+    <button id="pb-prev" type="button" aria-label="Previous variant">◀</button>
+    <span id="pb-label" aria-live="polite"></span>
+    <button id="pb-next" type="button" aria-label="Next variant">▶</button>
+    <span class="pb-sep"></span>
+    <button id="pb-view" type="button"></button>
+    <label class="pb-god"><input id="pb-godview" type="checkbox"> God View</label>
+    <span class="pb-sep"></span>
+    <button id="pb-play" type="button" aria-label="Play event log">▶︎ play</button>
+    <input id="pb-cursor" type="range" min="1" aria-label="Event log cursor">
+    <output id="pb-seq" for="pb-cursor"></output>
+    <span class="pb-sep"></span>
+    <button id="pb-state" type="button" popovertarget="pb-dump">{ } state</button>
+  </div>
+  <div id="pb-dump" popover><pre></pre></div>
+
+  <script src="data.js"></script>
+  <script>window.VARIANTS = [];</script>
+  <script src="variant-a.js"></script>
+  <script src="variant-b.js"></script>
+  <script src="variant-c.js"></script>
+  <script src="variant-d.js"></script>
+  <script src="switcher.js"></script>
+</body>
+</html>
