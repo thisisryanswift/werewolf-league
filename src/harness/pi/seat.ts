@@ -51,17 +51,43 @@ const SANDBOX_SECTION = [
 ].join("\n");
 
 
+/**
+ * Pi's OpenRouter catalog is stale (it lacks e.g. google/gemini-4-hydrogen, so runs end
+ * `no_model`). Add a missing model by cloning a catalog entry from the same vendor (same
+ * wire format), else the first one. Prices come from our PRICES table, not this entry.
+ */
+export function withModel<P extends { getModels(): readonly { id: string }[] }>(provider: P, model: string | undefined): P {
+  if (!model) return provider;
+  const catalog = provider.getModels();
+  if (catalog.some((m) => m.id === model)) return provider;
+  const vendor = model.split("/")[0] + "/";
+  const template = catalog.find((m) => m.id.startsWith(vendor)) ?? catalog[0];
+  if (!template) return provider;
+  const extra = { ...template, id: model, name: model };
+  const models = [...catalog, extra];
+  return new Proxy(provider, {
+    get: (target, prop) => {
+      if (prop === "getModels") return () => models;
+      const all = (target as { getAllModels?: () => readonly unknown[] }).getAllModels;
+      if (prop === "getAllModels" && all) return () => [...all.call(target), extra];
+      const v = Reflect.get(target, prop, target);
+      return typeof v === "function" ? v.bind(target) : v;
+    },
+  });
+}
+
 export class PiSeatDO extends DurableObject<Env> {
   private readonly harness: PiHarness;
   private readonly lifecycle: Lifecycle;
+  private readonly models: ReturnType<typeof createModels>;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
-    const models = createModels({
+    const models = (this.models = createModels({
       authContext: { env: async (name: string) => (env as unknown as Record<string, string | undefined>)[name], fileExists: async () => false },
-    } as Parameters<typeof createModels>[0]);
-    models.setProvider(openrouterProvider());
+    } as Parameters<typeof createModels>[0]));
     const stored = this.config;
+    models.setProvider(withModel(openrouterProvider(), stored?.model));
     this.harness = new PiHarness({
       harness: ({ storage, context, onWake }) => {
         const registry = createRegistry();
@@ -138,6 +164,7 @@ export class PiSeatDO extends DurableObject<Env> {
       this.ctx.storage.kv.put("instance", instance);
     }
     this.ctx.storage.kv.put("config", config);
+    this.models.setProvider(withModel(openrouterProvider(), config.model));
     await this.lifecycle.start();
     await this.harness.session().setModel({ provider: "openrouter", id: config.model });
     return { instance };
