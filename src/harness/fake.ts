@@ -64,7 +64,8 @@ function decide(opts: FakeOptions, input: TurnInput, turnNo: number): ToolCall |
 
 export const fakeHarness: Harness = {
   async provision(ctx) {
-    return { ...ctx.chain, environment: `fake-env-${ctx.matchId}-${ctx.seat}`, turns: 0 };
+    // Records the Agent Instructions it was given, so tests can check what each seat got.
+    return { ...ctx.chain, environment: `fake-env-${ctx.matchId}-${ctx.seat}`, turns: 0, instructions: ctx.instructions };
   },
   async startTurn(ctx, input) {
     const opts = (ctx.agent.options ?? {}) as FakeOptions;
