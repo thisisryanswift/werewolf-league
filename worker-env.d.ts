@@ -1,6 +1,9 @@
 // Bindings for the Worker and its Durable Objects. Kept by hand (instead of
 // `wrangler types`) so it composes with @cloudflare/workers-types.
 declare namespace Cloudflare {
+  interface GlobalProps {
+    mainModule: typeof import("./src/worker/index");
+  }
   interface Env {
     LEAGUE: DurableObjectNamespace<import("./src/do/league").LeagueDO>;
     MATCH: DurableObjectNamespace<import("./src/do/match").MatchDO>;
