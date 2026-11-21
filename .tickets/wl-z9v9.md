@@ -38,3 +38,9 @@ A ~60-second demo video for the hackathon submission, which also serves as the b
 - [ ] No secrets, account IDs, emails or admin controls visible in any frame
 - [ ] The final file is saved outside the repo (or in a gitignored path) and its location noted on this ticket
 
+
+## Notes
+
+**2026-11-21T20:18:27Z**
+
+Human decision 15:18: the human records with OBS and a live voiceover; no HyperFrames/agent polish pass.
