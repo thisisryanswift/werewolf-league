@@ -32,6 +32,18 @@ describe("Display Names", () => {
     expect(seats.map((s) => s.label)).toEqual(["Hydrogen #1", "Hydrogen #2", "3.8 Flash"]);
   });
 
+  it("never gives a seat a Display Name matching a participating Agent's name or id, in any case", () => {
+    const named = [agent("mara", "Mara"), agent("TOBIN-bot", "Assistant"), ...table(14)];
+    for (let i = 0; i < 200; i++) {
+      const names = labelSeats(named, `p${i}`).map((s) => s.displayName.toLowerCase());
+      expect(names).not.toContain("mara");
+      expect(names).not.toContain("tobin");
+      expect(new Set(names).size).toBe(16);
+    }
+    // Still deterministic.
+    expect(labelSeats(named, "p1")).toEqual(labelSeats(named, "p1"));
+  });
+
   it("never gives a Display Name equal to a default roster Agent name", () => {
     const roster = new Set(fakeRoster().map((a) => a.name));
     for (let i = 0; i < 50; i++) {

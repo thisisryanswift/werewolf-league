@@ -13,8 +13,15 @@ export const DISPLAY_NAMES: readonly string[] = [
   "Hazel", "Silas", "Greta", "Leon", "Maeve", "Oscar", "Wren", "Arlo",
 ];
 
-/** `n` distinct Display Names for a Match, the same for the same seed. */
-export function drawDisplayNames(seed: string, n: number): string[] {
-  if (n > DISPLAY_NAMES.length) throw new Error(`At most ${DISPLAY_NAMES.length} seats have Display Names, got ${n}`);
-  return rngFrom(`${seed}:display-names`).shuffle(DISPLAY_NAMES).slice(0, n);
+/**
+ * `n` distinct Display Names for a Match, the same for the same seed and Agents.
+ * `avoid` holds the participating Agents' names and ids: a name that appears in any
+ * of them as a whole word (case-insensitive) is never drawn, so no Display Name can
+ * reveal an Agent.
+ */
+export function drawDisplayNames(seed: string, n: number, avoid: string[] = []): string[] {
+  const taken = (name: string) => avoid.some((a) => new RegExp(`(^|[^a-z])${name.toLowerCase()}([^a-z]|$)`).test(a.toLowerCase()));
+  const pool = DISPLAY_NAMES.filter((name) => !taken(name));
+  if (n > pool.length) throw new Error(`Only ${pool.length} Display Names are available for this table, but it has ${n} seats`);
+  return rngFrom(`${seed}:display-names`).shuffle(pool).slice(0, n);
 }

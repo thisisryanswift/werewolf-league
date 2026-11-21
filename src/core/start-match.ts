@@ -14,7 +14,7 @@ import type { SeatAgent } from "./ruleset";
  * ("Hydrogen #2"), and a Display Name drawn from the match seed.
  */
 export function labelSeats(agents: AgentConfig[], seed: string): SeatAgent[] {
-  const names = drawDisplayNames(seed, agents.length);
+  const names = drawDisplayNames(seed, agents.length, agents.flatMap((a) => [a.name, a.id]));
   const total = new Map<string, number>();
   for (const a of agents) total.set(a.id, (total.get(a.id) ?? 0) + 1);
   const seen = new Map<string, number>();
