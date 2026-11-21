@@ -28,3 +28,9 @@ God View toggle (on by default) revealing roles, Wolf Chat and any God-View-only
 - [ ] The God View toggle hides and shows God-View-only panels generically; this ticket does not compute Table Suspicion
 - [ ] The feed is grouped by Night / Round A / Round B / Right of Reply / Vote, and each vote shows a tally
 - [ ] Renders correctly inside the Match modal, including when opened directly from a #match=<id> link
+
+## Notes
+
+**2026-11-21T17:12:23Z**
+
+Merged into integration/wl-xgp7 (impl/wl-hozk cf03270). The MatchPage conflict was resolved to hozk's MatchView wrapper; the old page's spectatorLabel use moves into the MatchView via the wl-e9tp follow-up. Verification on integration: pnpm test 166/166, typecheck clean. AC evidence: test/web/match-view.test.ts (buildMatchView with God View off drops non-'all' events, grouped feed titles and tallies, end screen waits for ratings_settled, generic panelsFor hiding); headless 1920x1080 checks in /tmp/wl-hozk-verify/ (God View off shows 0 roles, 0 Wolf Chat and 0 private rows; end screen with rating changes; dialog-sized box). Mounting contract for wl-gtil: <MatchView matchId godView? onGodViewChange? onClose? titleId?>, which opens its own WS on mount and fills its container. codex review P2 (handed to the wl-e9tp follow-up): the Claim truth badge checks only the role, so a true Seer role with fabricated inspection results shows TRUE.
