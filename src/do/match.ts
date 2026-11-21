@@ -41,6 +41,8 @@ interface MatchMeta extends Omit<MatchInit, "deadlines"> {
   stepCount: number;
   /** Highest seq each seat has been shown in an observation. */
   lastSeen: Record<Seat, number>;
+  /** Seats that have been assigned a turn before; only a seat's first assignment gets the first-turn deadline. */
+  assigned?: Seat[];
 }
 
 type EventRow = { seq: number; ts: number; kind: string; audience: string; data: string };
@@ -193,6 +195,14 @@ export class MatchDO extends DurableObject<Env> {
     const turn = step?.turns.find((t) => t.turnId === turnId && t.seat === seat);
     // Results are tied to a turn ID: anything for a resolved or old turn is dropped.
     if (!meta || !step || !turn || turn.action !== undefined) return { status: "stale" };
+    if (Date.now() >= turn.deadlineAt) {
+      // Too late, even if the backstop hasn't fired yet: the default applies instead.
+      turn.action = null;
+      turn.timedOut = "late";
+      this.step = step;
+      await this.armAlarm(meta, step);
+      return { status: "stale" };
+    }
     if (call) {
       const v = this.ruleset(meta).validate(this.rulesetState, seat, call);
       if (!v.ok) return { status: "invalid", error: v.error };
@@ -270,6 +280,7 @@ export class MatchDO extends DurableObject<Env> {
     const head = this.lastSeq();
     const stepNo = meta.stepCount + 1;
     const startedAt = Date.now();
+    const assigned = new Set(meta.assigned ?? []);
     const step: PendingStep = {
       stepNo,
       startedAt,
@@ -282,7 +293,8 @@ export class MatchDO extends DurableObject<Env> {
         );
         const observation = ruleset.renderObservation(state, request.seat, fresh, request);
         const text = firstTurn ? `${ruleset.briefing(state, request.seat)}\n\n${observation}` : observation;
-        const deadlineMs = turnDuration(meta.deadlines, firstTurn);
+        // A seat whose first turn timed out is briefed again, but on the normal deadline.
+        const deadlineMs = turnDuration(meta.deadlines, !assigned.has(request.seat));
         return {
           turnId: `${meta.matchId}:${stepNo}:${request.seat}`,
           seat: request.seat,
@@ -294,7 +306,7 @@ export class MatchDO extends DurableObject<Env> {
         };
       }),
     };
-    this.meta = { ...meta, stepCount: stepNo };
+    this.meta = { ...meta, stepCount: stepNo, assigned: [...new Set([...assigned, ...turns.map((t) => t.seat)])] };
     this.step = step;
     this.commit(turnStartedEvents(step));
     await this.sendTurns(meta, stepNo);

@@ -86,6 +86,51 @@ describe("the Match backstop", () => {
   });
 });
 
+describe("a response that arrives after the deadline", () => {
+  it("is not applied even before the backstop fires; the turn gets its default", async () => {
+    const seed = "late-before-backstop";
+    const wolves = dealtWolves(seed);
+    const [late, other] = [wolves[0]!, wolves[1]!];
+    // The other wolf proposes nothing, so a kill on Night 1 could only come from the late call.
+    const agents = Array.from({ length: 7 }, (_, i) =>
+      i + 1 === late
+        ? fakeAgent("late", { script: "silent" })
+        : i + 1 === other
+          ? fakeAgent("idle", { script: "no-call" })
+          : fakeAgent(`a-${i + 1}`),
+    );
+    // A long grace: the backstop must not be what rejects the late call.
+    const matchId = await startMatch({ seed, agents, deadlines: { ...deadlines, graceMs: 5_000 } });
+    const started = await waitFor(async () => {
+      const s = await snapshot(matchId);
+      return s.events.find((e) => e.kind === "turn_started" && e.data.seat === late);
+    });
+    // The seat's Player DO goes quiet, so only the late call below reaches the Match.
+    await runInDurableObject(env.PLAYER.getByName(`${matchId}:${late}`), async (_instance, state) => {
+      await state.storage.deleteAlarm();
+      await state.storage.deleteAll();
+    });
+    await new Promise((r) => setTimeout(r, Number(started.data.deadlineMs) + 100));
+
+    const victim = [1, 2, 3, 4, 5, 6, 7].find((s) => !wolves.includes(s))!;
+    const match = env.MATCH.getByName(matchId);
+    const res = await match.submitAction(`${matchId}:${started.data.step}:${late}`, late, {
+      name: "choose_kill",
+      args: { target: victim },
+    });
+    expect(res).toEqual({ status: "stale" });
+
+    const night1 = await waitFor(async () => {
+      const s = await snapshot(matchId);
+      return s.events.some((e) => e.kind === "night_passed") ? s : null;
+    });
+    expect(night1.events.find((e) => e.kind === "night_passed")?.data.killed).toBeNull();
+    expect(night1.events.filter((e) => e.kind === "turn_timed_out").map((e) => [e.data.seat, e.data.by])).toEqual([
+      [late, "late"],
+    ]);
+  });
+});
+
 describe("an Agent that misses exactly one turn", () => {
   it("has its default recorded once, its late response ignored, and acts normally next turn with what it missed", async () => {
     const seed = "miss-once";
@@ -119,6 +164,10 @@ describe("an Agent that misses exactly one turn", () => {
     expect(await match.reportTimeout(turnId, seat)).toEqual({ status: "stale" });
 
     const done = await finished(matchId);
+    // Only the seat's first assignment gets the longer first-turn deadline, even though
+    // its second turn repeats the briefing.
+    const turnsOfSeat = done.events.filter((e) => e.kind === "turn_started" && e.data.seat === seat);
+    expect(turnsOfSeat.slice(0, 2).map((e) => e.data.deadlineMs)).toEqual([deadlines.firstTurnMs, deadlines.turnMs]);
     const timeouts = done.events.filter((e) => e.kind === "turn_timed_out");
     expect(timeouts.map((e) => e.data)).toEqual([{ step: missed.data.step, seat, actionKind: "vote", by: "player" }]);
     expect(done.stats.timeouts.bySeat[seat]).toBe(1);

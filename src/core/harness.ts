@@ -52,5 +52,5 @@ export interface Harness {
   startTurn(ctx: PlayerContext, input: TurnInput): Promise<{ handle: TurnHandle; chain: Record<string, unknown> }>;
   poll(ctx: PlayerContext, handle: TurnHandle): Promise<PollResult>;
   /** Best-effort cancel of an in-flight turn that missed its deadline. Optional. */
-  cancel?(ctx: PlayerContext, handle: TurnHandle): Promise<void>;
+  cancel?(ctx: PlayerContext, handle: TurnHandle): Promise<Record<string, unknown> | void>;
 }

@@ -11,8 +11,8 @@ export const RUNNER_EVENT_KINDS: ReadonlySet<string> = new Set(["turn_started", 
 
 export const isRunnerEvent = (e: { kind: string }): boolean => RUNNER_EVENT_KINDS.has(e.kind);
 
-/** Who noticed the missed deadline: the Player DO, or the Match's backstop. */
-export type TimeoutSource = "player" | "backstop";
+/** Who noticed the missed deadline: the Player DO, the Match backstop, or the Match on receiving a late answer. */
+export type TimeoutSource = "player" | "backstop" | "late";
 
 export interface TimeoutCounts {
   bySeat: Record<number, number>;
