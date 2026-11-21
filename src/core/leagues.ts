@@ -5,7 +5,9 @@
 import { DEFAULT_LEAGUE_ID, findLeague } from "../shared/leagues";
 
 /** League DO names that differ from the League id. */
-const DO_NAMES: Record<string, string> = { [DEFAULT_LEAGUE_ID]: "default" };
+// pi-open was reset at 16:55 on 2026-11-21 (human decision: equal Match counts with one seat per
+// Agent); its earlier Matches stay in the "pi-open" DO, still viewable by Match id.
+const DO_NAMES: Record<string, string> = { [DEFAULT_LEAGUE_ID]: "default", "pi-open": "pi-open-2" };
 const IDS: Record<string, string> = Object.fromEntries(Object.entries(DO_NAMES).map(([id, name]) => [name, id]));
 
 /**

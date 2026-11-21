@@ -20,6 +20,8 @@ export interface DrawOptions {
   seed: string;
   /** The Ruleset's verdict on a drawn table: null if it can deal it, else its setup error. */
   check: (seats: SeatAgent[]) => string | null;
+  /** Give each Agent at most one seat when the roster covers the table; copies only fill seats beyond the roster. */
+  uniqueAgents?: boolean;
 }
 
 /** Distinct Agents of a roster, by id (first entry wins). */
@@ -34,14 +36,19 @@ export function distinctAgents(roster: AgentConfig[]): AgentConfig[] {
  * least 2 distinct Agents. If the Ruleset rejects the table, redraw with the next
  * attempt number. Refuses rosters of fewer than 2 distinct Agents.
  */
-export function drawTable({ roster, seats, seed, check }: DrawOptions): DrawResult {
+export function drawTable({ roster, seats, seed, check, uniqueAgents }: DrawOptions): DrawResult {
   const pool = distinctAgents(roster);
   if (pool.length < 2) return { ok: false, error: `The roster needs at least 2 Agents, but has ${pool.length}` };
   if (seats < 2) return { ok: false, error: `A table needs at least 2 seats, got ${seats}` };
   let lastError = "";
   for (let attempt = 0; attempt < MAX_DRAW_ATTEMPTS; attempt++) {
     const rng = rngFrom(`${seed}:draw:${attempt}`);
-    const agents = Array.from({ length: seats }, () => pool[rng.int(pool.length)]!);
+    const agents = uniqueAgents
+      ? rng.shuffle([
+          ...rng.shuffle(pool).slice(0, seats),
+          ...Array.from({ length: Math.max(0, seats - pool.length) }, () => pool[rng.int(pool.length)]!),
+        ])
+      : Array.from({ length: seats }, () => pool[rng.int(pool.length)]!);
     if (agents.every((a) => a.id === agents[0]!.id)) {
       // Guarantee 2 distinct Agents: swap one seat to another Agent.
       const others = pool.filter((a) => a.id !== agents[0]!.id);

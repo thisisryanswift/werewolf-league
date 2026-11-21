@@ -590,6 +590,7 @@ export class LeagueDO extends DurableObject<Env> {
         roster: config.roster,
         seats: config.seats,
         seed,
+        uniqueAgents: config.uniqueAgents,
         check: (seats) => {
           const r = ruleset.setup(config.rulesetConfig, seed, seats);
           return r.ok ? null : r.error;

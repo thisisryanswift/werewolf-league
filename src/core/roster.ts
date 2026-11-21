@@ -42,6 +42,8 @@ export interface LeagueConfig {
   seeds?: string[];
   /** Agent ids left off the displayed leaderboard (their ratings and history are kept). */
   hiddenAgents?: string[];
+  /** Draw each Agent at most once per table when the roster covers it (no copies). */
+  uniqueAgents?: boolean;
   /** Total League spend (USD) at which the League pauses itself; absent or null for no cap. */
   spendCap?: number | null;
 }
@@ -157,6 +159,10 @@ export function patchConfig(
       return { ok: false, error: "hiddenAgents must be a list of Agent ids" };
     }
     next.hiddenAgents = patch.hiddenAgents as string[];
+  }
+  if (patch.uniqueAgents !== undefined) {
+    if (typeof patch.uniqueAgents !== "boolean") return { ok: false, error: "uniqueAgents must be true or false" };
+    next.uniqueAgents = patch.uniqueAgents;
   }
   if (patch.spendCap !== undefined) {
     const cap = patch.spendCap;

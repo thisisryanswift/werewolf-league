@@ -10,3 +10,11 @@ describe("hiddenAgents config", () => {
     expect(patchConfig(defaultLeagueConfig(), { hiddenAgents: [""] }).ok).toBe(false);
   });
 });
+
+describe("uniqueAgents config", () => {
+  it("accepts a boolean only", () => {
+    const ok = patchConfig(defaultLeagueConfig(), { uniqueAgents: true });
+    expect(ok.ok && ok.config.uniqueAgents).toBe(true);
+    expect(patchConfig(defaultLeagueConfig(), { uniqueAgents: "yes" }).ok).toBe(false);
+  });
+});
