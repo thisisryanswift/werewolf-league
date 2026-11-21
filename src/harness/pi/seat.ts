@@ -131,7 +131,10 @@ export class PiSeatDO extends DurableObject<Env> {
   async provision(config: PiSeatConfig): Promise<{ instance: string }> {
     let instance = this.instance;
     if (!instance) {
-      instance = await this.agent37().create(instanceName(config.matchId, config.seat));
+      // A create that succeeded before the DO died left a sandbox under this seat's name: adopt it.
+      const name = instanceName(config.matchId, config.seat);
+      const api = this.agent37();
+      instance = (await api.list(name)).find((i) => i.name === name)?.id ?? (await api.create(name));
       this.ctx.storage.kv.put("instance", instance);
     }
     this.ctx.storage.kv.put("config", config);
@@ -154,6 +157,9 @@ export class PiSeatDO extends DurableObject<Env> {
       await this.harness.abort().catch(() => false);
       const until = Date.now() + SETTLE_WAIT_MS;
       while ((await this.harness.pending()).length && Date.now() < until) await new Promise((r) => setTimeout(r, 100));
+      // Game tools read the current turn, so never install it while the old run can still call them.
+      // Throwing makes the Player DO's alarm retry this startTurn.
+      if ((await this.harness.pending()).length) throw new Error("pi seat: the previous run has not settled yet");
     }
     this.turns.put({ opId, turnId, accepted: null });
     await this.harness.submit(text, { operationId: opId });
@@ -212,13 +218,20 @@ export class PiSeatDO extends DurableObject<Env> {
 
   /**
    * Cumulative usage of the seat's session as one reading (a stable ID, so the latest replaces
-   * earlier ones). pi-ai's `input` excludes cache reads and its `output` includes reasoning.
+   * earlier ones). Each transcript entry is counted once into a persisted total, so entries
+   * that later fall out of the transcript window stay counted. pi-ai's `input` excludes cache
+   * reads and its `output` includes reasoning.
    */
   private async usage(): Promise<UsageReading[]> {
     const config = this.config;
     if (!config) return [];
-    const total: Usage = { input: 0, cached: 0, thought: 0, output: 0 };
-    for (const entry of await this.harness.messages()) {
+    const entries = await this.harness.messages();
+    // Synchronous from here on, so concurrent calls never count an entry twice.
+    const counted = new Set(this.ctx.storage.kv.get<string[]>("usageCounted") ?? []);
+    const total: Usage = { ...{ input: 0, cached: 0, thought: 0, output: 0 }, ...this.ctx.storage.kv.get<Usage>("usageTotal") };
+    for (const entry of entries) {
+      if (counted.has(String(entry.id))) continue;
+      counted.add(String(entry.id));
       for (const m of (entry.model ?? []) as unknown as readonly { role?: string; usage?: { input?: number; output?: number; cacheRead?: number; cacheWrite?: number; reasoning?: number } }[]) {
         const u = m.role === "assistant" ? m.usage : undefined;
         if (!u) continue;
@@ -230,6 +243,8 @@ export class PiSeatDO extends DurableObject<Env> {
         total.output += Math.max(0, (u.output ?? 0) - reasoning);
       }
     }
+    this.ctx.storage.kv.put("usageCounted", [...counted]);
+    this.ctx.storage.kv.put("usageTotal", total);
     return [{ id: `pi:${config.matchId}:${config.seat}`, model: config.model, usage: total }];
   }
 }
