@@ -11,7 +11,7 @@ import type { Seat, ToolCall, ToolSpec } from "../core/ruleset";
 import { ledgerUsage, recordReadings, type ModelUsage, type UsageLedger } from "../core/usage";
 import { harnessFor } from "../harness";
 
-interface Seating {
+export interface Seating {
   matchId: string;
   seat: Seat;
   agent: AgentConfig;
@@ -131,6 +131,22 @@ export class PlayerDO extends DurableObject<Env> {
     // Report before marking closed, so a failed report makes the Match retry the close.
     if (r?.usage?.length) await this.env.MATCH.getByName(seating.matchId).recordUsage(seating.seat, this.usage);
     this.ctx.storage.kv.put("closed", true);
+  }
+
+  /**
+   * Called by the Match when its start failed: close the Harness environment this seat
+   * may hold (whether or not its own provision finished), then forget the seat, so a
+   * retried start provisions it afresh. Never throws.
+   */
+  async release(seating: Seating): Promise<void> {
+    // Forget the seat before awaiting, so a retried provision that lands meanwhile is kept.
+    const chain = this.ctx.storage.kv.get<Record<string, unknown>>("chain") ?? {};
+    for (const key of ["seating", "chain", "closed", "turn", "usage"]) this.ctx.storage.kv.delete(key);
+    try {
+      await harnessFor(seating.agent, this.env).close?.({ ...seating, chain });
+    } catch (err) {
+      console.warn(`player ${seating.matchId}:${seating.seat}: release failed: ${String(err)}`);
+    }
   }
 
   async alarm(): Promise<void> {
