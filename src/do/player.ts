@@ -23,9 +23,14 @@ interface CurrentTurn extends TurnAssignment {
   /** Harness handle once the turn has started; persisted before anything else. */
   handle: TurnHandle | null;
   attempts: number;
-  /** True once this turn has reported a 429 to the League (one report per turn). */
-  rateLimitReported?: boolean;
 }
+
+/**
+ * A Player reports 429s to the League at most this often. Every report renews
+ * the League's backoff, so sustained 429s keep it backing off; the throttle only
+ * bounds the RPCs (the backoff is far longer than this).
+ */
+export const RATE_LIMIT_REPORT_MS = 2_000;
 
 export class PlayerDO extends DurableObject<Env> {
   private get pollMs(): number {
@@ -61,8 +66,9 @@ export class PlayerDO extends DurableObject<Env> {
     const existing = this.ctx.storage.kv.get<Seating>("seating");
     if (existing && JSON.stringify(existing) === JSON.stringify(seating)) return;
     const harness = harnessFor(seating.agent, this.env);
-    const chain = await harness.provision({ ...seating, chain: {} }).catch((err: unknown) => {
-      if (isRateLimited(err)) this.reportRateLimit(seating, "provision");
+    const chain = await harness.provision({ ...seating, chain: {} }).catch(async (err: unknown) => {
+      // Reported before the failure reaches the League's start, so the League is already backing off.
+      if (isRateLimited(err)) await this.reportRateLimit(seating, "provision");
       throw err;
     });
     this.ctx.storage.kv.put("chain", chain);
@@ -92,7 +98,7 @@ export class PlayerDO extends DurableObject<Env> {
     if (!turn.handle) {
       const started = await harness.startTurn(ctx, turn.input).catch((err: unknown) => {
         // Rethrown: the alarm retries the same turn.
-        if (isRateLimited(err)) this.rateLimitedTurn(seating, turn, "startTurn");
+        if (isRateLimited(err)) this.reportRateLimit(seating, "startTurn");
         throw err;
       });
       this.ctx.storage.kv.put("chain", started.chain);
@@ -104,8 +110,8 @@ export class PlayerDO extends DurableObject<Env> {
 
     const polled = await harness.poll(ctx, turn.handle);
     if (polled.status === "pending") {
-      const reported = polled.rateLimited ? this.rateLimitedTurn(seating, turn, "poll") : turn.rateLimitReported;
-      if (!this.updateTurn(turn.turnId, { ...turn, handle: polled.handle, rateLimitReported: reported })) return this.superseded();
+      if (polled.rateLimited) this.reportRateLimit(seating, "poll");
+      if (!this.updateTurn(turn.turnId, { ...turn, handle: polled.handle })) return this.superseded();
       return this.sleep(turn, polled.retryAfterMs);
     }
     // An answer that lands after the deadline is too late and counts as a timeout.
@@ -120,21 +126,21 @@ export class PlayerDO extends DurableObject<Env> {
     return this.ctx.storage.setAlarm(now + nextPollDelay(now, Math.max(this.pollMs, retryAfterMs), turn.deadlineAt));
   }
 
-  /** Report a 429 to the League once per turn. Returns the turn's new `rateLimitReported`. */
-  private rateLimitedTurn(seating: Seating, turn: CurrentTurn, source: string): boolean {
-    if (!turn.rateLimitReported) {
-      this.reportRateLimit(seating, source);
-      if (this.turn?.turnId === turn.turnId) this.ctx.storage.kv.put<CurrentTurn>("turn", { ...this.turn, rateLimitReported: true });
-    }
-    return true;
-  }
-
-  /** Tell the League a model API call hit a 429, so it pauses new starts. Best effort: never holds up the turn. */
-  private reportRateLimit(seating: Seating, source: string): void {
+  /**
+   * Tell the League a model API call hit a 429, so it (re)starts its backoff.
+   * At most one report per RATE_LIMIT_REPORT_MS; best effort: turns don't wait for it,
+   * and the returned promise never rejects.
+   */
+  private reportRateLimit(seating: Seating, source: string): Promise<void> {
+    const now = Date.now();
+    const last = this.ctx.storage.kv.get<number>("rateLimitReportedAt") ?? 0;
+    if (now - last < RATE_LIMIT_REPORT_MS) return Promise.resolve();
+    this.ctx.storage.kv.put("rateLimitReportedAt", now);
     const report = this.env.LEAGUE.getByName(LEAGUE_NAME)
       .reportRateLimit({ matchId: seating.matchId, seat: seating.seat, agentId: seating.agent.id, source })
       .catch(() => {});
     this.ctx.waitUntil(report);
+    return report;
   }
 
   /** A newer turn arrived while we awaited the Harness: drop this work and run the new turn. */

@@ -14,6 +14,7 @@
 //   echo: string        — put a digest of the observation into this argument (tests compare observations)
 //   rateLimitTurns: number[] — the first poll of these turns is refused with a 429 (1-based, like silentTurns)
 //   pollEveryMs: number — ask the Player DO to poll no more often than this (keeps big test Leagues cheap)
+//   rateLimitPolls: number — the first this-many polls of every turn are refused with a 429 (sustained 429s)
 //   rateLimitProvision: bool — the seat's first provision attempt throws a 429 (later attempts succeed)
 
 import type { Harness, PollResult, TurnInput } from "../core/harness";
@@ -32,6 +33,7 @@ interface FakeOptions {
   rateLimitTurns?: number[];
   pollEveryMs?: number;
   rateLimitProvision?: boolean;
+  rateLimitPolls?: number;
 }
 
 /** Seats whose one refused provision attempt has happened (per isolate; enough for tests). */
@@ -89,6 +91,7 @@ export const fakeHarness: Harness = {
         decision: decide(opts, input, turns),
         pollsLeft: opts.delayPolls ?? 0,
         rateLimited: opts.rateLimitTurns?.includes(turns) ?? false,
+        rateLimitPollsLeft: opts.rateLimitPolls ?? 0,
         pollEveryMs: opts.pollEveryMs ?? 0,
       },
       chain: { ...ctx.chain, turns },
@@ -98,6 +101,8 @@ export const fakeHarness: Harness = {
     const decision = handle.decision as ToolCall | null | "never";
     const pollsLeft = Number(handle.pollsLeft ?? 0);
     const retryAfterMs = Number(handle.pollEveryMs ?? 0) || undefined;
+    const refusals = Number(handle.rateLimitPollsLeft ?? 0);
+    if (refusals > 0) return { status: "pending", handle: { ...handle, rateLimitPollsLeft: refusals - 1 }, rateLimited: true, retryAfterMs };
     if (handle.rateLimited) return { status: "pending", handle: { ...handle, rateLimited: false }, rateLimited: true, retryAfterMs };
     if (decision === "never") return { status: "pending", handle, retryAfterMs };
     if (pollsLeft > 0) return { status: "pending", handle: { ...handle, pollsLeft: pollsLeft - 1 }, retryAfterMs };

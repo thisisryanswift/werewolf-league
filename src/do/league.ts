@@ -249,6 +249,7 @@ export class LeagueDO extends DurableObject<Env> {
 
   async pause(): Promise<LeagueSnapshot> {
     this.config = { ...this.config, paused: true };
+    this.releaseUnwanted();
     this.broadcast();
     return this.snapshot();
   }
@@ -265,6 +266,7 @@ export class LeagueDO extends DurableObject<Env> {
     if (!r.ok) return r;
     this.config = r.config;
     this.blocked = null;
+    this.releaseUnwanted();
     await this.schedule();
     return { ok: true, league: this.snapshot() };
   }
@@ -462,8 +464,34 @@ export class LeagueDO extends DurableObject<Env> {
     }
   }
 
+  /** Matches whose `start` call is in flight; they may already exist, so they are never released. */
+  private launching = new Set<string>();
+
+  /**
+   * Release reservations the League no longer wants: every not-yet-started
+   * Match while paused, and the newest ones above N. A reserved Match has
+   * persisted nothing until its start succeeds, so releasing it leaves nothing
+   * behind; it no longer counts as started.
+   */
+  private releaseUnwanted(): void {
+    const config = this.config;
+    const live = this.live;
+    const all = Object.values(live);
+    const excess = config.paused ? all.length : all.length - config.n;
+    if (excess <= 0) return;
+    const releasable = all
+      .filter((m) => m.status === "starting" && !this.launching.has(m.matchId))
+      .sort((a, b) => b.startedAt - a.startedAt)
+      .slice(0, excess);
+    if (!releasable.length) return;
+    for (const m of releasable) delete live[m.matchId];
+    this.live = live;
+    this.stats = { ...this.stats, started: this.stats.started - releasable.length };
+  }
+
   /** Start reserved Matches. A start that fails is retried; after repeated failures its slot is freed. */
   async alarm(): Promise<void> {
+    this.releaseUnwanted(); // paused or N lowered since they were reserved
     this.reserve(); // refill freed slots as pacing allows
     if (this.now() < this.rateLimit.until) {
       // Backing off after a 429: hold reserved Matches until it ends.
@@ -471,12 +499,14 @@ export class LeagueDO extends DurableObject<Env> {
       return this.armWake();
     }
     const starting = Object.values(this.live).filter((m) => m.status === "starting");
+    for (const m of starting) this.launching.add(m.matchId);
     const outcomes = await Promise.all(
       starting.map((m) =>
         this.env.MATCH.getByName(m.matchId)
           .start(m.init)
           .then(() => null)
-          .catch((err: unknown) => String(err)),
+          .catch((err: unknown) => String(err))
+          .finally(() => this.launching.delete(m.matchId)),
       ),
     );
     const live = this.live;

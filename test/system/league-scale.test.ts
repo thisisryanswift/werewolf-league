@@ -42,7 +42,7 @@ let restoreClock = () => {};
 /** Latest fake time used so far: each fake clock starts after it, so an earlier test's backoff is over. */
 let lastFake = 0;
 async function fakeClock() {
-  const clock = { t: Math.max(Date.now() - 30 * 60_000, lastFake + 5 * 60_000) };
+  const clock = { t: Math.max(Date.now() - 6 * 60 * 60_000, lastFake + 5 * 60_000) };
   lastFake = clock.t;
   await runInDurableObject(stub(), (instance: LeagueDO) => {
     const proto = Object.getPrototypeOf(instance) as LeagueDO;
@@ -168,6 +168,66 @@ describe("League at scale", () => {
 
     await time.advance(60_001);
     await waitFor(async () => (await league()).tiles.find((t) => t.matchId === held.tiles[0]!.matchId && t.status === "running"));
+    await drain();
+  });
+
+  /** Reserve one Match and hold it in "starting" with a provisioning 429. */
+  async function holdOneInBackoff(prefix: string) {
+    const time = await fakeClock();
+    const roster = [fakeAgent(`${prefix}-429`, { rateLimitProvision: true }), ...slowRoster(prefix)];
+    await admin("config", { ...UNPACED, ...SHORT, n: 1, backoffMs: 60_000, roster });
+    const before = await league();
+    await admin("resume");
+    const held = await waitFor(async () => {
+      const s = await league();
+      return s.rateLimit.count > before.rateLimit.count && s.tiles[0]?.status === "starting" ? s : null;
+    });
+    return { time, before, matchId: held.tiles[0]!.matchId };
+  }
+
+  const matchExists = async (matchId: string) => (await exports.default.fetch(`http://test/api/matches/${matchId}`)).status !== 404;
+
+  for (const [how, change] of [
+    ["pausing", () => admin("pause")],
+    ["lowering N", () => admin("config", { n: 0 })],
+  ] as const) {
+    it(`${how} during a backoff releases held Matches instead of starting them when it ends`, { timeout: 60_000 }, async () => {
+      const { time, before, matchId } = await holdOneInBackoff(how === "pausing" ? "hp" : "hn");
+      await change();
+      await time.advance(120_000);
+      await sleep(300);
+      const after = await league();
+      expect(after.tiles).toEqual([]);
+      expect(await matchExists(matchId)).toBe(false);
+      // The released reservation does not count as a started Match.
+      expect(after.stats.started).toBe(before.stats.started);
+      await admin("config", { n: 1 });
+      await drain();
+    });
+  }
+
+  it("sustained 429s keep renewing the backoff until they stop", { timeout: 90_000 }, async () => {
+    const time = await fakeClock();
+    // Seat polls are refused with a 429 for many polls in a row (several seconds).
+    const roster = [fakeAgent("sus-429", { delayPolls: 1, pollEveryMs: 200, rateLimitPolls: 100 }), ...slowRoster("sus")];
+    await admin("config", { ...UNPACED, ...SHORT, n: 1, backoffMs: 60_000, deadlines: { firstTurnMs: 25_000 }, roster });
+    const before = await league();
+    await admin("resume");
+    const first = await waitFor(async () => {
+      const s = await league();
+      return s.rateLimit.count > before.rateLimit.count ? s : null;
+    });
+    const firstReport = first.rateLimit.recent[0]!;
+    await admin("config", { n: 3 });
+    // 50 s on the League clock pass; the same seat's turn is still refused, and reports again.
+    await time.advance(50_000);
+    await waitFor(async () => {
+      const s = await league();
+      return s.rateLimit.recent.some((e) => e.matchId === firstReport.matchId && e.seat === firstReport.seat && e.at > firstReport.at);
+    }, 10_000);
+    // 80 s after the first 429: past its backoff, but a later 429 renewed it.
+    await time.advance(30_000);
+    expect((await league()).stats.started).toBe(first.stats.started);
     await drain();
   });
 
