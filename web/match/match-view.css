@@ -629,3 +629,28 @@ body:has(.mv-page) {
 .mv-analysis p {
   margin: 0.2em 0;
 }
+
+/* Scrollbars: chunky, on-brand, and outside the content (human design pass). */
+.mv,
+.mv * {
+  scrollbar-width: auto;
+  scrollbar-color: var(--mv-ink) var(--mv-yellow);
+}
+.mv * {
+  scrollbar-gutter: stable;
+}
+.mv ::-webkit-scrollbar {
+  width: 14px;
+  height: 14px;
+}
+.mv ::-webkit-scrollbar-track {
+  background: var(--mv-yellow);
+  border-left: 3px solid var(--mv-ink);
+}
+.mv ::-webkit-scrollbar-thumb {
+  background: var(--mv-ink);
+  border: 3px solid var(--mv-yellow);
+}
+.mv ::-webkit-scrollbar-thumb:hover {
+  background: var(--mv-red);
+}
