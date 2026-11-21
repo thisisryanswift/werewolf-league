@@ -15,9 +15,9 @@ describe("Werewolf tile summary", () => {
       alive: [1, 2, 3, 4, 5, 6, 7],
       latestSpeech: null,
     });
-    expect(s.godView?.step).toBe("Wolf Chat");
-    expect(Object.keys(s.godView!.roles).map(Number)).toEqual([1, 2, 3, 4, 5, 6, 7]);
-    for (const w of wolves) expect(s.godView!.roles[w]).toBe("werewolf");
+    expect(s.narratorView?.step).toBe("Wolf Chat");
+    expect(Object.keys(s.narratorView!.roles).map(Number)).toEqual([1, 2, 3, 4, 5, 6, 7]);
+    for (const w of wolves) expect(s.narratorView!.roles[w]).toBe("werewolf");
   });
 
   it("tags each Day step: Speech Rounds by letter, Right of Reply, and the vote", () => {

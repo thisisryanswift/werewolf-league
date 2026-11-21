@@ -1,10 +1,10 @@
 // The Match view: seats with Claim badges and turn markers, Accusation arcs, a
 // feed grouped by Night / Speech Round / Right of Reply / Vote with a tally per
-// vote, God View panels, and the end-of-Match screen.
+// vote, Narrator's View panels, and the end-of-Match screen.
 //
 // Mounting contract (the /matches/:id page now, wl-gtil's Match modal later):
-//   <MatchView matchId={id} />                        God View on, managed inside
-//   <MatchView matchId={id} godView={on} onGodViewChange={setOn} onClose={close} titleId="m-title" />
+//   <MatchView matchId={id} />                        Narrator's View on, managed inside
+//   <MatchView matchId={id} narratorView={on} onNarratorViewChange={setOn} onClose={close} titleId="m-title" />
 // - It opens its own Match WebSocket on mount (full log first, then live
 //   events) and closes it on unmount; a new matchId starts from an empty log.
 // - It fills its container (width and height 100%); the container sets the size.
@@ -17,13 +17,13 @@ import { describeEvent } from "../events";
 import { useMatchFeed, type FeedStatus } from "../useMatchFeed";
 import "./match-view.css";
 import { buildMatchView, panelsFor, playerLabel, type EndScreen, type FeedGroup, type MatchView as View, type SeatView, type VoteTally } from "./model";
-import { GodViewContext, MATCH_PANELS, SEAT_SLOTS, useGodView, type MatchPanelProps } from "./panels";
+import { NarratorViewContext, MATCH_PANELS, SEAT_SLOTS, useNarratorView, type MatchPanelProps } from "./panels";
 
 export interface MatchViewProps {
   matchId: string;
-  /** Controlled God View; omit to let the view manage it (on by default). */
-  godView?: boolean;
-  onGodViewChange?: (on: boolean) => void;
+  /** Controlled Narrator's View; omit to let the view manage it (on by default). */
+  narratorView?: boolean;
+  onNarratorViewChange?: (on: boolean) => void;
   /** Shows a Close button that calls this. */
   onClose?: () => void;
   /** id for the heading, e.g. for a dialog's aria-labelledby. */
@@ -35,18 +35,18 @@ export function MatchView(props: MatchViewProps) {
   return <MatchViewForMatch key={props.matchId} {...props} />;
 }
 
-function MatchViewForMatch({ matchId, godView: controlled, onGodViewChange, onClose, titleId }: MatchViewProps) {
+function MatchViewForMatch({ matchId, narratorView: controlled, onNarratorViewChange, onClose, titleId }: MatchViewProps) {
   const { events, status } = useMatchFeed(matchId);
   const [own, setOwn] = useState(true);
-  const godView = controlled ?? own;
-  const setGodView = (on: boolean) => (onGodViewChange ? onGodViewChange(on) : setOwn(on));
-  const view = useMemo(() => buildMatchView(events, { godView }), [events, godView]);
+  const narratorView = controlled ?? own;
+  const setNarratorView = (on: boolean) => (onNarratorViewChange ? onNarratorViewChange(on) : setOwn(on));
+  const view = useMemo(() => buildMatchView(events, { narratorView }), [events, narratorView]);
   const [showEnd, setShowEnd] = useState(true);
   const panelProps: MatchPanelProps = { events, view };
 
   return (
-    <GodViewContext.Provider value={godView}>
-      <div className={`mv${godView ? " mv-god" : ""}`} data-testid="match-view" data-god-view={godView}>
+    <NarratorViewContext.Provider value={narratorView}>
+      <div className={`mv${narratorView ? " mv-narrator" : ""}`} data-testid="match-view" data-narrator-view={narratorView}>
         <header className="mv-head">
           <h2 id={titleId} className="mv-title">
             Match {matchId.slice(0, 8)}
@@ -64,11 +64,11 @@ function MatchViewForMatch({ matchId, godView: controlled, onGodViewChange, onCl
           <button
             type="button"
             className="mv-btn mv-toggle"
-            aria-pressed={godView}
-            data-testid="god-view-toggle"
-            onClick={() => setGodView(!godView)}
+            aria-pressed={narratorView}
+            data-testid="narrator-view-toggle"
+            onClick={() => setNarratorView(!narratorView)}
           >
-            God View: {godView ? "on" : "off"}
+            Narrator's View: {narratorView ? "on" : "off"}
           </button>
           {onClose && (
             <button type="button" className="mv-btn mv-close" onClick={onClose}>
@@ -79,15 +79,15 @@ function MatchViewForMatch({ matchId, godView: controlled, onGodViewChange, onCl
         <div className="mv-body">
           <section className="mv-left" aria-label="Players">
             <Seats view={view} panelProps={panelProps} />
-            <Panels placement="seats" godView={godView} panelProps={panelProps} />
-            {!godView &&<p className="mv-note">God View off: living Players' roles, Wolf Chat, Night choices and turn markers are hidden.</p>}
+            <Panels placement="seats" narratorView={narratorView} panelProps={panelProps} />
+            {!narratorView &&<p className="mv-note">Narrator's View off: living Players' roles, Wolf Chat, Night choices and turn markers are hidden.</p>}
           </section>
           <section className="mv-right" aria-label="Match log">
             {view.end && showEnd ? (
               <End end={view.end} onHide={() => setShowEnd(false)} />
             ) : (
               <>
-                <Panels placement="feed" godView={godView} panelProps={panelProps} />
+                <Panels placement="feed" narratorView={narratorView} panelProps={panelProps} />
                 <LatestTally view={view} />
                 <Feed view={view} log={events} />
               </>
@@ -95,17 +95,17 @@ function MatchViewForMatch({ matchId, godView: controlled, onGodViewChange, onCl
           </section>
         </div>
       </div>
-    </GodViewContext.Provider>
+    </NarratorViewContext.Provider>
   );
 }
 
-function Panels({ placement, godView, panelProps }: { placement: "seats" | "feed"; godView: boolean; panelProps: MatchPanelProps }) {
+function Panels({ placement, narratorView, panelProps }: { placement: "seats" | "feed"; narratorView: boolean; panelProps: MatchPanelProps }) {
   return (
     <>
-      {panelsFor(MATCH_PANELS, godView)
+      {panelsFor(MATCH_PANELS, narratorView)
         .filter((p) => (p.placement ?? "seats") === placement)
         .map((p) => (
-          <div key={p.id} className={`mv-box mv-panel mv-panel-${placement}`} data-panel={p.id} data-god-view-only={p.godViewOnly || undefined}>
+          <div key={p.id} className={`mv-box mv-panel mv-panel-${placement}`} data-panel={p.id} data-narrator-view-only={p.narratorViewOnly || undefined}>
             {p.title && <h3>{p.title}</h3>}
             <p.Component {...panelProps} />
           </div>
@@ -189,7 +189,7 @@ function Seats({ view, panelProps }: { view: View; panelProps: MatchPanelProps }
 }
 
 function Seat({ seat: s, panelProps }: { seat: SeatView; panelProps: MatchPanelProps }) {
-  const godView = useGodView();
+  const narratorView = useNarratorView();
   return (
     <li
       className={["mv-seat", s.alive ? "" : "dead", s.role === "werewolf" ? "wolf" : ""].join(" ").trim()}
@@ -221,7 +221,7 @@ function Seat({ seat: s, panelProps }: { seat: SeatView; panelProps: MatchPanelP
             {s.claim.truth && <b className={`mv-truth ${s.claim.truth}`}>{s.claim.truth === "true" ? "TRUE" : "LIE"}</b>}
           </span>
         )}
-        {panelsFor(SEAT_SLOTS, godView).map((slot) => (
+        {panelsFor(SEAT_SLOTS, narratorView).map((slot) => (
           <slot.Component key={slot.id} {...panelProps} seat={s} />
         ))}
       </span>
@@ -381,7 +381,7 @@ function FeedGroupView({ group, view, log }: { group: FeedGroup; view: View; log
       {group.items
         .filter((i) => !QUIET_KINDS.has(i.event.kind))
         .map((i) => (
-          <FeedLine key={i.event.seq} event={i.event} godViewOnly={i.godViewOnly} view={view} log={log} />
+          <FeedLine key={i.event.seq} event={i.event} narratorViewOnly={i.narratorViewOnly} view={view} log={log} />
         ))}
       {group.tally && (
         <li className="mv-row tally-row">
@@ -401,7 +401,7 @@ function Who({ seat, view }: { seat: number; view: View }) {
   );
 }
 
-function FeedLine({ event: e, godViewOnly, view, log }: { event: MatchEvent; godViewOnly: boolean; view: View; log: MatchEvent[] }) {
+function FeedLine({ event: e, narratorViewOnly, view, log }: { event: MatchEvent; narratorViewOnly: boolean; view: View; log: MatchEvent[] }) {
   const d = e.data;
   if (e.kind === "speech") {
     const s = d as unknown as Speech;
@@ -469,10 +469,10 @@ function FeedLine({ event: e, godViewOnly, view, log }: { event: MatchEvent; god
     );
   }
   const text = describeEvent(e, log);
-  if (godViewOnly) {
+  if (narratorViewOnly) {
     return (
-      <li className={`mv-row god ${e.kind === "turn_timed_out" ? "timeout" : ""}`} data-god-view-only="true" data-kind={e.kind}>
-        <span className="mv-gv">GOD VIEW</span> {e.kind === "wolf_chat" ? "🐺 " : ""}
+      <li className={`mv-row narrator ${e.kind === "turn_timed_out" ? "timeout" : ""}`} data-narrator-view-only="true" data-kind={e.kind}>
+        <span className="mv-nv">NARRATOR'S VIEW</span> {e.kind === "wolf_chat" ? "🐺 " : ""}
         {text}
       </li>
     );

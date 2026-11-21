@@ -1,6 +1,6 @@
 ---
 id: wl-liwr
-status: in_progress
+status: closed
 deps: [wl-gtil, wl-hozk]
 links: []
 created: 2026-11-21T18:04:53Z
@@ -24,3 +24,9 @@ The spectator toggle and every user-facing label say Narrator's View (GLOSSARY.m
 - [ ] grep finds no godView/God View identifiers in src/ or web/ (except the legacy ?god= alias)
 - [ ] All tests pass; the toggle behaves exactly as before
 
+
+## Notes
+
+**2026-11-21T18:53:02Z**
+
+Merged into integration/wl-xgp7 (impl/wl-liwr 3c157b5). Verification on integration: pnpm test 218/218, typecheck clean. AC evidence: test/vocabulary.test.ts fails on any 'god view', 'god mode' or bare 'god' in src/ and web/; the UI reads Narrator's View; the rename was mechanical (protocol godView → narratorView, test ids, data attributes and CSS classes renamed; the full map is in the implementer report). codex P2 (a ?god= alias) is not applicable, because no such param ever existed, so there is nothing to alias. Cosmetic follow-up: the runner line now reads 'Narrator (Narrator's View): …', which is redundant.

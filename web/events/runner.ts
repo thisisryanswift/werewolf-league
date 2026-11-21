@@ -18,7 +18,7 @@ export const runnerEvents: Record<string, EventRenderer> = {
   },
   drama_secret: (d) => {
     const flags = activeFlags(d);
-    return `Narrator (God View): ${flags.length ? flags.join(", ") : "no secret Drama Flags"}.`;
+    return `Narrator, secret: ${flags.length ? flags.join(", ") : "no secret Drama Flags"}.`;
   },
   // RatingChanges (src/shared/protocol.ts); the end screen (wl-hozk) can render it richer.
   ratings_settled: (d, log) => {

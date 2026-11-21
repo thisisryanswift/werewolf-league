@@ -1,6 +1,6 @@
 // Manual smoke test of the gemini-decision-1 Narrator against the real Decisions
 // API (never run in tests or CI). Plays a scripted Werewolf Match through the
-// pure Ruleset, and after a few steps sends its God View log to the Narrator,
+// pure Ruleset, and after a few steps sends its Narrator's View log to the Narrator,
 // printing latency, Drama Score and flag values.
 //
 //   GEMINI_API_KEY=... (from .dev.vars) then:

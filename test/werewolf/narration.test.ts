@@ -4,7 +4,7 @@ import type { RulesetEvent } from "../../src/shared/protocol";
 import { act, dealt, nightActions } from "./helpers";
 
 describe("Werewolf narration", () => {
-  it("gives the Narrator a God View log with roles, Wolf Chat and Seer results", () => {
+  it("gives the Narrator a Narrator's View log with roles, Wolf Chat and Seer results", () => {
     const t = dealt("narration");
     const events: RulesetEvent[] = [];
     // One Wolf Chat exchange, then the Seer inspects a wolf.

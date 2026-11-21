@@ -1,5 +1,5 @@
 // The League grid's model: which tiles show, in what order, which are promoted,
-// and what each tile shows for a God View setting.
+// and what each tile shows for a Narrator's View setting.
 import { describe, expect, it } from "vitest";
 import type { MatchTile, TileDramaFlag, TileSummary } from "../../src/shared/protocol";
 import { arrangeGrid, noteActivity, tileView, topAgents, type GridOptions } from "../../web/grid/model";
@@ -68,7 +68,7 @@ function tile(matchId: string, summary: Partial<TileSummary> | null = {}): Match
             alive: [1, 2, 3, 4, 5, 6, 7],
             latestSpeech: null,
             step: "Speech Round A",
-            godView: { roles: { 1: "werewolf", 2: "werewolf", 3: "seer", 4: "doctor", 5: "villager", 6: "villager", 7: "villager" }, step: "Speech Round A" },
+            narratorView: { roles: { 1: "werewolf", 2: "werewolf", 3: "seer", 4: "doctor", 5: "villager", 6: "villager", 7: "villager" }, step: "Speech Round A" },
             thinking: 0,
             timeouts: 0,
             ...summary,
@@ -76,7 +76,7 @@ function tile(matchId: string, summary: Partial<TileSummary> | null = {}): Match
   };
 }
 
-const opts = (o: Partial<GridOptions> = {}): GridOptions => ({ sort: "drama", filter: "all", godView: true, ...o });
+const opts = (o: Partial<GridOptions> = {}): GridOptions => ({ sort: "drama", filter: "all", narratorView: true, ...o });
 const ids = (tiles: MatchTile[]) => tiles.map((t) => t.matchId);
 /** All tiles in display order: promoted first, then the rest. */
 const order = (tiles: MatchTile[], o: Partial<GridOptions> = {}) => {
@@ -144,8 +144,8 @@ const secret = (id: string): TileDramaFlag => ({ id, visibility: "secret" });
 
 describe("filters", () => {
   const tiles = () => [
-    tile("vote", { step: "Vote", godView: { roles: {}, step: "Vote" }, dramaScore: 0.2, dramaFlags: [] }),
-    tile("night", { phase: "Night", round: 2, step: "Night actions", godView: { roles: {}, step: "Wolf Chat" }, dramaScore: 0.3, dramaFlags: [] }),
+    tile("vote", { step: "Vote", narratorView: { roles: {}, step: "Vote" }, dramaScore: 0.2, dramaFlags: [] }),
+    tile("night", { phase: "Night", round: 2, step: "Night actions", narratorView: { roles: {}, step: "Wolf Chat" }, dramaScore: 0.3, dramaFlags: [] }),
     tile("public", { dramaScore: 0.4, dramaFlags: [pub("claim_war")] }),
     tile("secret", { dramaScore: 0.5, dramaFlags: [secret("wolf_fooling_table")] }),
     tile("starting", null),
@@ -158,9 +158,9 @@ describe("filters", () => {
     expect(shown({ filter: "all" })).toHaveLength(5);
   });
 
-  it("counts secret Drama Flags as flagged only in God View", () => {
-    expect(shown({ filter: "flagged", godView: true })).toEqual(["public", "secret"]);
-    expect(shown({ filter: "flagged", godView: false })).toEqual(["public"]);
+  it("counts secret Drama Flags as flagged only in Narrator's View", () => {
+    expect(shown({ filter: "flagged", narratorView: true })).toEqual(["public", "secret"]);
+    expect(shown({ filter: "flagged", narratorView: false })).toEqual(["public"]);
   });
 
   it("offers the flagged filter only once a Match has a Drama Score, and ignores it before", () => {
@@ -180,14 +180,14 @@ describe("a tile", () => {
       round: 2,
       alive: [1, 3, 4, 6, 7],
       step: "Night actions",
-      godView: { roles: { 1: "werewolf", 2: "werewolf", 3: "seer", 4: "doctor", 5: "villager", 6: "villager", 7: "villager" }, step: "Wolf Chat" },
+      narratorView: { roles: { 1: "werewolf", 2: "werewolf", 3: "seer", 4: "doctor", 5: "villager", 6: "villager", 7: "villager" }, step: "Wolf Chat" },
       thinking: 2,
       timeouts: 1,
       dramaScore: 0.42,
       dramaFlags: [pub("table_split"), secret("wolves_split")],
     });
 
-  it("in God View shows roles, the God View step, the Night thinking count and secret flags", () => {
+  it("in Narrator's View shows roles, the Narrator's View step, the Night thinking count and secret flags", () => {
     const v = tileView(night(), true);
     expect(v.phase).toBe("Night 2");
     expect(v.step).toBe("Wolf Chat");
@@ -203,7 +203,7 @@ describe("a tile", () => {
     ]);
   });
 
-  it("with God View off hides roles, the Night step, the Night thinking count and secret flags", () => {
+  it("with Narrator's View off hides roles, the Night step, the Night thinking count and secret flags", () => {
     const v = tileView(night(), false);
     expect(v.step).toBe("Night actions");
     expect(v.thinking).toBeNull();
@@ -215,7 +215,7 @@ describe("a tile", () => {
     expect(JSON.stringify(v)).not.toMatch(/werewolf|seer|wolves_split|Wolf Chat/i);
   });
 
-  it("shows the Day thinking count without God View, and the latest speech with its speaker", () => {
+  it("shows the Day thinking count without Narrator's View, and the latest speech with its speaker", () => {
     const v = tileView(tile("d", { thinking: 3, latestSpeech: { seat: 4, text: "P2 is lying." } }), false);
     expect(v.thinking).toBe(3);
     expect(v.speech).toEqual({ seat: 4, speaker: "Name4 · Agent4 #1", text: "P2 is lying." });

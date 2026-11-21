@@ -377,8 +377,8 @@ describe("League feed at scale", () => {
     expect(s.alive.length).toBeLessThanOrEqual(7);
     expect(typeof s.thinking).toBe("number");
     expect(s.latestSpeech).toMatchObject({ text: expect.any(String) });
-    // God View roles for the pips. (Drama fields are the Narrator's, wl-pbkx.)
-    expect(Object.keys(s.godView!.roles)).toHaveLength(7);
+    // Narrator's View roles for the pips. (Drama fields are the Narrator's, wl-pbkx.)
+    expect(Object.keys(s.narratorView!.roles)).toHaveLength(7);
     feed.close();
     await drain();
   });
