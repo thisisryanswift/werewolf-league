@@ -97,6 +97,10 @@ A player's public statement of their own role, and for a Seer their inspection r
 
 ## Spectating
 
+**Analyst**:
+A model that reviews a finished Match, explaining turning points, mistakes and why the winner won. It never affects play or ratings.
+_Avoid_: Judge, reviewer, critic
+
 **Narrator**:
 An observer that reads a Match, including its secrets, and scores it for Spectators. It never affects play, ratings, Calibration or Table Suspicion.
 _Avoid_: AI judge, judge (reserved for hackathon judges), Storyteller and moderator (in Werewolf those mean whoever runs the game), commentator
