@@ -1,10 +1,9 @@
-// /leaderboard?league=<id>: stacked Overall, Village and Wolf Rating history charts
-// for one League (one legend, one y-scale), with the Leaderboard table below them. The history refetches every 15 s and whenever
+// /leaderboard?league=<id>: one Rating history chart for one League, toggled between
+// Overall, Village and Wolf Rating (each on its own y-scale), with the Leaderboard table below. The history refetches every 15 s and whenever
 // the League feed sends a new leaderboard (a rated Match settled).
 import { useEffect, useState } from "react";
 import { Leaderboard } from "../components/Leaderboard";
 import { LeagueSwitcher } from "../grid/LeagueSwitcher";
-import { sharedDomain } from "../leaderboard/chart-model";
 import { RatingChart } from "../leaderboard/RatingChart";
 import { useLeagueFeed } from "../useLeagueFeed";
 import { leagueIdFromSearch, searchForLeague } from "../../src/shared/leagues";
@@ -13,7 +12,7 @@ import "../grid/grid.css";
 
 const POLL_MS = 15_000;
 
-/** Stacked top to bottom; labels match the Leaderboard table's Side names. */
+/** Toggle order; labels match the Leaderboard table's Side names. */
 const METRICS = [
   { metric: "overall", yTitle: "Overall Rating" },
   { metric: "village", yTitle: "Village Rating" },
@@ -58,7 +57,7 @@ export function LeaderboardPage() {
       </div>
       <div className="lg-below lg-board">
         <section className="lg-card lg-chart-card">
-          <h2>Overall, Village and Wolf Rating by Match{league ? ` · ${league.league.name}` : ""}</h2>
+          <h2>Rating by Match{league ? ` · ${league.league.name}` : ""}</h2>
           {history ? <RatingCharts history={history} /> : <p className="lg-loading">Loading…</p>}
         </section>
         {leaderboard ? <Leaderboard data={leaderboard} /> : <p className="lg-loading">Feed: {status}</p>}
@@ -68,24 +67,29 @@ export function LeaderboardPage() {
 }
 
 function RatingCharts({ history }: { history: RatingsHistory }) {
-  if (history.points.length === 0) return <RatingChart history={history} />;
-  const domain = sharedDomain(history, METRICS.map((m) => m.metric));
-  // Tall enough that every Agent's end label fits at 24px apart (7 Agents need the minimum).
-  const height = Math.max(270, history.agents.length * 24 + 64);
+  const [metric, setMetric] = useState(METRICS[0]!.metric);
+  const current = METRICS.find((m) => m.metric === metric) ?? METRICS[0]!;
   return (
-    <div className="lg-chart-stack">
-      {METRICS.map((m, i) => (
-        <RatingChart
-          key={m.metric}
-          history={history}
-          metric={m.metric}
-          yTitle={m.yTitle}
-          height={i === METRICS.length - 1 ? height + 20 : height}
-          domain={domain}
-          legend={i === 0}
-          xTitle={i === METRICS.length - 1}
-        />
-      ))}
+    <div className="lg-chart-toggle">
+      <div className="lg-chips" role="group" aria-label="Rating shown">
+        {METRICS.map((m) => (
+          <button
+            key={m.metric}
+            type="button"
+            className={`lg-chip${m.metric === metric ? " on" : ""}`}
+            aria-pressed={m.metric === metric}
+            data-testid={`rating-metric-${m.metric}`}
+            onClick={() => setMetric(m.metric)}
+          >
+            {m.yTitle.replace(" Rating", "")}
+          </button>
+        ))}
+      </div>
+      {history.points.length === 0 ? (
+        <RatingChart history={history} />
+      ) : (
+        <RatingChart key={current.metric} history={history} metric={current.metric} yTitle={current.yTitle} legend xTitle />
+      )}
     </div>
   );
 }

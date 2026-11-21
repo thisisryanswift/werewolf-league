@@ -622,3 +622,10 @@ body:has(.lg-page) {
   border-top: 1px solid #e4e2dc;
   padding-top: 4px;
 }
+
+/* /leaderboard: Overall / Village / Wolf toggle above the single Rating chart. */
+.lg-chart-toggle .lg-chips {
+  display: flex;
+  gap: 8px;
+  margin: 6px 0 12px;
+}
