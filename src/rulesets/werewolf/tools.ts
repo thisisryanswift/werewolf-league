@@ -55,8 +55,29 @@ export const CHOOSE_KILL: ToolSpec = {
   parameters: { type: "object", properties: { target: seat }, required: ["target"] },
 };
 
-/** Tools per role. Night-role tickets extend this table. */
+export const WOLF_CHAT: ToolSpec = {
+  name: "wolf_chat",
+  description: "Werewolves only, at Night: send a private message to your Werewolf partner.",
+  parameters: { type: "object", properties: { text: { type: "string" } }, required: ["text"] },
+};
+
+export const INSPECT: ToolSpec = {
+  name: "inspect",
+  description: "Seer only, at Night: inspect a living player and privately learn their Side (wolf or village).",
+  parameters: { type: "object", properties: { target: seat }, required: ["target"] },
+};
+
+export const PROTECT: ToolSpec = {
+  name: "protect",
+  description:
+    "Doctor only, at Night: protect a living player (yourself allowed) from tonight's kill. You cannot protect the same player two Nights running.",
+  parameters: { type: "object", properties: { target: seat }, required: ["target"] },
+};
+
+/** Tools per role. */
 export const TOOLS_BY_ROLE: Record<Role, ToolSpec[]> = {
-  werewolf: [SPEAK, VOTE, CHOOSE_KILL],
+  werewolf: [SPEAK, VOTE, WOLF_CHAT, CHOOSE_KILL],
+  seer: [SPEAK, VOTE, INSPECT],
+  doctor: [SPEAK, VOTE, PROTECT],
   villager: [SPEAK, VOTE],
 };

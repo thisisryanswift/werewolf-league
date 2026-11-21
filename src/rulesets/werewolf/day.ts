@@ -3,6 +3,7 @@
 
 import type { Seat, ToolCall, TurnRequest } from "../../core/ruleset";
 import type { RulesetEvent } from "../../shared/protocol";
+import { startNight } from "./night";
 import { alive, killPlayer, player } from "./players";
 import type { PhaseModule, WerewolfState } from "./types";
 import { targetOf, validateTargeted } from "./validation";
@@ -50,7 +51,7 @@ function apply(s: WerewolfState, actions: Record<Seat, ToolCall | null>): { stat
     events.push({ kind: "no_elimination", audience: "all", data: { cycle: s.cycle, reason: top === 0 ? "all_abstain" : "tie" } });
   }
   const cycle = s.cycle + 1;
-  state = { ...state, phase: "night", cycle, night: { step: "kill" } };
+  state = { ...state, phase: "night", cycle, night: startNight(state.players, state.night) };
   events.push({ kind: "phase_started", audience: "all", data: { phase: "night", cycle } });
   return { state, events };
 }
