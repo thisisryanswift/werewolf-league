@@ -1,6 +1,6 @@
 ---
 id: wl-fuy2
-status: in_progress
+status: closed
 deps: [wl-2lfo]
 links: []
 created: 2026-11-21T20:06:38Z
@@ -60,3 +60,7 @@ Rebuild the grid Match tile (web/grid/LeagueGrid.tsx and its CSS) on variant C (
 **2026-11-21T20:13:16Z**
 
 Orchestrator: started at 15:13, before wl-2lfo lands, to hit the human's ~15:30 target for core items; merges wl-2lfo (the League switcher in the grid header) when it lands. Core items first, large-tile extras second.
+
+**2026-11-21T20:41:35Z**
+
+Merged into integration/wl-xgp7 (impl/wl-fuy2 f791da1) and deployed (version 2c0d00de). Verification on integration: pnpm test 311/311, typecheck clean. All core items and large-tile extras are in; nothing cut. AC1/2/4: tile-face tests in test/web/grid.test.ts (six lab states, both sizes, Narrator's View on and off, result headline). AC3 WCAG AA ratios: #111 on white 18.88, on #ffe500 14.80, on #ecebe6 15.82; white on navy #1d1b3a 16.53; #d2d1d8 on navy 10.91; #555 on white/yellow/starting 7.46/5.84/6.25; Villager #111 on #1f9e8a 5.68; Werewolf white on #e01f38 4.75 (new --lg-wolf; the old #e8213b was 4.46 and failed); Seer 6.49; Doctor 4.94; dead Werewolf 10.88. AC5: fits 1920x1080 at N=24 (large 617x200, small 303x120). AC6 screenshots: /tmp/wl-fuy2-verify/{before,after-nv-on,after-nv-off,after-nv-on-stress}-1920x1080.png. codex: 3 P2s fixed; none remain. Known: the speaker ring uses the latestSpeech seat as a proxy; small tiles omit the thinking count.
