@@ -8,9 +8,6 @@ import type { AgentConfig } from "./harness";
 import type { NarratorConfig } from "./narrator";
 import { narratorConfigError } from "../narrator";
 
-/** The League every Match reports to (one League for the demo). */
-export const LEAGUE_NAME = "default";
-
 export interface LeagueConfig {
   /** Matches kept live at once. */
   n: number;
@@ -55,15 +52,18 @@ export function fakeRoster(): AgentConfig[] {
   }));
 }
 
-/** A fresh League starts paused, so it spends nothing until the operator resumes it. */
-export function defaultLeagueConfig(): LeagueConfig {
+/**
+ * A fresh League starts paused, so it spends nothing until the operator resumes
+ * it. pi-open starts with an empty roster: its Agents need the pi Harness (wl-zst1).
+ */
+export function defaultLeagueConfig(leagueId?: string): LeagueConfig {
   return {
     n: 24,
     paused: true,
     seats: 7,
     rulesetId: DEFAULT_RULESET_ID,
     rulesetConfig: {},
-    roster: fakeRoster(),
+    roster: leagueId === "pi-open" ? [] : fakeRoster(),
     ...DEFAULT_PACING,
   };
 }

@@ -8,10 +8,13 @@
 //   N=36           live Matches (1-36)
 //   NARRATOR=fake  fake Narrator with varying Drama Scores (default); NARRATOR=off for none
 //   PAUSE=1        pause the League instead
+//   LEAGUE=pi-open which League (default gemini-managed)
 // ADMIN_SECRET comes from the environment, or else from .dev.vars. It is never printed.
 import { readFileSync } from "node:fs";
 
 const base = process.argv[2] ?? "http://127.0.0.1:8787";
+// LEAGUE=<id> picks a League (e.g. pi-open); unset uses the single-League routes, which are gemini-managed.
+const ADMIN_PATH = process.env.LEAGUE ? `/api/admin/leagues/${process.env.LEAGUE}` : "/api/admin/league";
 function devVarsSecret() {
   try {
     return /^ADMIN_SECRET=(.*)$/m.exec(readFileSync(new URL("../.dev.vars", import.meta.url), "utf8"))?.[1]?.trim();
@@ -23,7 +26,7 @@ const secret = process.env.ADMIN_SECRET ?? devVarsSecret();
 if (!secret) throw new Error("set ADMIN_SECRET (see .dev.vars)");
 
 async function admin(op, body = {}) {
-  const res = await fetch(`${base}/api/admin/league/${op}`, {
+  const res = await fetch(`${base}${ADMIN_PATH}/${op}`, {
     method: "POST",
     headers: { "x-admin-secret": secret, "content-type": "application/json", "user-agent": "werewolf-league-demo/1.0" },
     body: JSON.stringify(body),

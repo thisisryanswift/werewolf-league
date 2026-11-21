@@ -39,6 +39,8 @@ export interface MatchOptions {
   deadlines?: Partial<DeadlineConfig>;
   /** The Narrator for the Match; absent or null means none. */
   narrator?: NarratorConfig | null;
+  /** The League (by id) the Match reports to; absent means the default League. */
+  league?: string;
   agents: AgentConfig[];
 }
 
@@ -54,6 +56,7 @@ export function buildMatchInit(opts: MatchOptions): MatchInit {
     config: opts.config ?? {},
     ...(opts.deadlines ? { deadlines: opts.deadlines } : {}),
     ...(opts.narrator ? { narrator: opts.narrator } : {}),
+    ...(opts.league ? { league: opts.league } : {}),
     seats,
     agents: Object.fromEntries(opts.agents.map((a, i) => [i + 1, a])),
   };

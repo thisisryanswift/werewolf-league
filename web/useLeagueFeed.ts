@@ -1,4 +1,4 @@
-// Subscribe to the League WebSocket. The join message (also on every reconnect)
+// Subscribe to a League's WebSocket. The join message (also on every reconnect)
 // is a full snapshot; coalesced "tiles" messages after it carry per-tile diffs,
 // folded into the snapshot with applyLeagueDiff. `activity` stamps each Match's
 // latest activity (see noteActivity) for the grid's promotion without Drama Scores.
@@ -14,7 +14,7 @@ interface LeagueFeed {
   activity: Record<string, number>;
 }
 
-export function useLeagueFeed(): LeagueFeed {
+export function useLeagueFeed(leagueId: string): LeagueFeed {
   const [feed, setFeed] = useState<Omit<LeagueFeed, "status">>({ league: null, activity: {} });
   const [status, setStatus] = useState<FeedStatus>("connecting");
 
@@ -22,12 +22,15 @@ export function useLeagueFeed(): LeagueFeed {
     let ws: WebSocket | null = null;
     let retry: ReturnType<typeof setTimeout> | undefined;
     let stopped = false;
+    setFeed({ league: null, activity: {} });
+    setStatus("connecting");
 
     const open = () => {
       const proto = location.protocol === "https:" ? "wss:" : "ws:";
-      ws = new WebSocket(`${proto}//${location.host}/api/league/ws`);
+      ws = new WebSocket(`${proto}//${location.host}/api/leagues/${encodeURIComponent(leagueId)}/ws`);
       ws.onopen = () => setStatus("live");
       ws.onmessage = (m) => {
+        if (stopped) return; // a League switch closed this socket
         const msg = JSON.parse(m.data as string) as LeagueMessage;
         if (msg.type === "league") setFeed((f) => ({ ...f, league: msg.league }));
         else if (msg.type === "tiles")
@@ -46,7 +49,7 @@ export function useLeagueFeed(): LeagueFeed {
       clearTimeout(retry);
       ws?.close();
     };
-  }, []);
+  }, [leagueId]);
 
   return { ...feed, status };
 }

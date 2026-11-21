@@ -170,6 +170,8 @@ export interface FeaturedMatch extends SettledMatch {
 }
 
 export interface LeagueSnapshot {
+  /** Which League this is. Ratings and spend are this League's only. */
+  league: { id: string; name: string };
   config: LeagueConfigView;
   tiles: MatchTile[];
   /** Most recently settled League Matches, newest first. */

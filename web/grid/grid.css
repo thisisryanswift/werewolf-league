@@ -152,6 +152,13 @@ body:has(.lg-page) {
 .lg-chip.on {
   background: var(--lg-yellow);
 }
+.lg-leagues {
+  display: flex;
+  gap: 6px;
+}
+.lg-leagues a {
+  text-decoration: none;
+}
 .lg-chip:disabled {
   opacity: 0.45;
   cursor: not-allowed;

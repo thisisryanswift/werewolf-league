@@ -8,6 +8,7 @@ import { FeaturedMatchLink } from "../components/FinishedMatches";
 import { landedFeatures } from "../help/features";
 import { HelpButtons } from "../help/HelpButtons";
 import type { FeedStatus } from "../useMatchFeed";
+import { LeagueSwitcher } from "./LeagueSwitcher";
 import { arrangeGrid, tileView, topAgents, type GridFilter, type GridSort, type PromotionHold } from "./model";
 import { matchHash } from "./route";
 import "./grid.css";
@@ -49,6 +50,7 @@ export function LeagueGrid({ league, status, activity, narratorView, onNarratorV
       <header className="lg-hdr">
         <div className="lg-row">
           <h1>Werewolf League</h1>
+          <LeagueSwitcher current={league.league.id} />
           <span className="lg-count" data-testid="live-count">
             <b>{league.tiles.length}</b> {league.config.paused ? "live · paused" : `of ${league.config.n} live`}
           </span>
