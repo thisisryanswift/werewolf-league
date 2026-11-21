@@ -107,6 +107,17 @@ export class PlayerDO extends DurableObject<Env> {
   }
 
   /**
+   * Called by the Match when it gives up on the current turn without a successor (the
+   * Analyst's backstop): drop the turn and cancel it if it is in flight. Idempotent.
+   */
+  async abandon(): Promise<void> {
+    const turn = this.turn;
+    if (!turn) return;
+    this.ctx.storage.kv.delete("turn");
+    if (turn.handle) await this.cancelAndReport(turn.matchId, turn.handle);
+  }
+
+  /**
    * Called by the Match when it is over: let the Harness settle anything still billed
    * (e.g. the setup interaction of a seat that never acted) and report the seat's usage.
    */

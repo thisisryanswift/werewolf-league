@@ -103,6 +103,9 @@ interface AnalysisState {
   deadlineAt?: number;
   released?: boolean;
   closed?: boolean;
+  /** True once the Analyst's Player DO has dropped (and cancelled) any turn still in flight. */
+  abandoned?: boolean;
+  abandonAttempts?: number;
 }
 
 /** The Analyst's single turn ID per Match. */
@@ -616,6 +619,11 @@ export class MatchDO extends DurableObject<Env> {
     return this.meta?.analyst?.deadlineMs ?? DEFAULT_ANALYST_DEADLINE_MS;
   }
 
+  /** A League slot's lease: the run's deadline and grace plus a margin (renewed once the run starts). */
+  private get analystLeaseMs(): number {
+    return this.analystDeadlineMs + (this.meta?.deadlines.graceMs ?? 0) + 60_000;
+  }
+
   /** Arm the alarm for `at` unless it is already due sooner. */
   private async wakeBy(at: number): Promise<void> {
     const current = await this.ctx.storage.getAlarm();
@@ -638,7 +646,7 @@ export class MatchDO extends DurableObject<Env> {
       if (now - a.queuedAt > (meta.analyst?.maxWaitMs ?? DEFAULT_ANALYST_MAX_WAIT_MS)) {
         return this.finishAnalysis({ status: "failed", reason: "no_slot", detail: "waited too long for an Analyst slot" });
       }
-      const lease = this.analystDeadlineMs + graceMs + 60_000;
+      const lease = this.analystLeaseMs;
       const slot = await this.env.LEAGUE.getByName(meta.league ?? LEAGUE_NAME)
         .acquireAnalystSlot(meta.matchId, lease)
         .catch(() => "wait" as const);
@@ -652,7 +660,17 @@ export class MatchDO extends DurableObject<Env> {
       if (now >= a.deadlineAt! + graceMs) return this.finishAnalysis({ status: "failed", reason: "timeout", detail: "backstop" });
       return this.wakeBy(a.deadlineAt! + graceMs);
     }
-    if (!a.released) {
+    if (!a.abandoned && (a.abandonAttempts ?? 0) < MAX_CLOSE_ATTEMPTS) {
+      // Stop a run still in flight (e.g. after the backstop) before its slot is freed, so the cap holds.
+      const stopped = await this.env.PLAYER.getByName(`${meta.matchId}:${ANALYST_SEAT}`)
+        .abandon()
+        .then(() => true)
+        .catch(() => false);
+      const cur = this.meta!.analysis!;
+      this.meta = { ...this.meta!, analysis: { ...cur, abandoned: stopped, abandonAttempts: (cur.abandonAttempts ?? 0) + 1 } };
+      if (!stopped) return this.wakeBy(Date.now() + retryMs);
+    }
+    if (!this.meta!.analysis!.released) {
       const freed = await this.env.LEAGUE.getByName(meta.league ?? LEAGUE_NAME)
         .releaseAnalystSlot(meta.matchId)
         .then(() => true)
@@ -697,6 +715,10 @@ export class MatchDO extends DurableObject<Env> {
     // Persisted before the turn is handed over, so a fast report finds the run.
     this.meta = { ...this.meta!, analysis: { ...this.meta!.analysis!, status: "running", startedAt, deadlineAt } };
     await this.wakeBy(deadlineAt + meta.deadlines.graceMs);
+    // Renew the lease from now, so slow provisioning never lets it lapse mid-run (best effort).
+    await this.env.LEAGUE.getByName(meta.league ?? LEAGUE_NAME)
+      .acquireAnalystSlot(meta.matchId, this.analystLeaseMs)
+      .catch(() => {});
     try {
       await player.takeTurn({
         matchId: meta.matchId,

@@ -82,7 +82,7 @@ export type AnalystSlots = Record<string, number>;
 
 /**
  * Try to take a slot for `matchId`. A Match already holding one keeps it (so a
- * retried request is granted again). Waiting Matches are not queued in order: each
+ * retried request is granted again) and its lease is extended to `now + leaseMs`. Waiting Matches are not queued in order: each
  * retries until a slot is free, or gives up after its maxWaitMs.
  */
 export function acquireSlot(
@@ -93,7 +93,8 @@ export function acquireSlot(
   leaseMs: number,
 ): { slots: AnalystSlots; granted: boolean } {
   const live: AnalystSlots = Object.fromEntries(Object.entries(slots).filter(([, until]) => until > now));
-  if (matchId in live) return { slots: live, granted: true };
+  // Renewed: a Match re-acquires its slot once its run has started, so the lease covers the whole run.
+  if (matchId in live) return { slots: { ...live, [matchId]: Math.max(live[matchId]!, now + leaseMs) }, granted: true };
   if (Object.keys(live).length >= cap) return { slots: live, granted: false };
   return { slots: { ...live, [matchId]: now + leaseMs }, granted: true };
 }

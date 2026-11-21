@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { REPORT_TOOL, validateReport } from "../../src/core/analyst";
+import { acquireSlot, REPORT_TOOL, validateReport } from "../../src/core/analyst";
 
 const seats = [1, 2, 3, 4, 5, 6, 7];
 
@@ -13,6 +13,21 @@ const report = (over: Record<string, unknown> = {}) => ({
   best_play: { seat: 5, why: "A fake Seer Claim that fit every death." },
   why_winner_won: "The village's mistakes.",
   ...over,
+});
+
+describe("League Analyst slots", () => {
+  it("grants up to the cap, renews a holder's lease, and frees expired leases", () => {
+    let s = acquireSlot({}, "a", 0, 2, 100).slots;
+    s = acquireSlot(s, "b", 0, 2, 100).slots;
+    expect(acquireSlot(s, "c", 50, 2, 100).granted).toBe(false);
+    // A holder re-acquiring extends its lease past the original expiry.
+    s = acquireSlot(s, "a", 90, 2, 100).slots;
+    expect(s.a).toBe(190);
+    // b's lease (100) has lapsed at 150, so c gets its slot; a's renewed lease still holds.
+    const r = acquireSlot(s, "c", 150, 2, 100);
+    expect(r.granted).toBe(true);
+    expect(Object.keys(r.slots).sort()).toEqual(["a", "c"]);
+  });
 });
 
 describe("the Analyst's submit_report", () => {
