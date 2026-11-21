@@ -2,6 +2,7 @@
 // Every League route takes a League id (src/shared/leagues.ts):
 //   GET  /api/leagues                      the Leagues: { default, leagues: [{ id, name, paused, n, live, stats, spend }] }
 //   GET  /api/leagues/:id                  League snapshot (config, live tiles, recent results, leaderboard, spend)
+//   GET  /api/leagues/:id/ratings-history  { agents: [{ agentId, name }], points: [{ matchNumber, settledAt, overall: { agentId: rating } }] }
 //   GET  /api/leagues/:id/ws               League feed: the snapshot on join, then coalesced "tiles" diffs and "leaderboard" messages
 //   POST /api/admin/leagues/:id/pause      running Matches finish, no new ones start
 //   POST /api/admin/leagues/:id/resume
@@ -31,6 +32,7 @@ const noSuchLeague = (id: string) => Response.json({ error: `no such League: ${i
 const MATCH_ROUTE = /^\/api\/matches\/([\w-]+)(\/ws)?$/;
 /** League feed and snapshot, by id or (old route) the default League. */
 const LEAGUE_ROUTE = /^\/api\/(?:leagues\/([\w-]+)|league)(\/ws)?$/;
+const HISTORY_ROUTE = /^\/api\/leagues\/([\w-]+)\/ratings-history$/;
 const ADMIN_ROUTE = /^\/api\/admin\/(?:leagues\/([\w-]+)|league)\/(pause|resume|config|featured)$/;
 
 export async function handleApi(request: Request, env: Env, url: URL): Promise<Response> {
@@ -44,6 +46,13 @@ export async function handleApi(request: Request, env: Env, url: URL): Promise<R
       }),
     );
     return Response.json({ default: DEFAULT_LEAGUE_ID, leagues });
+  }
+
+  const history = HISTORY_ROUTE.exec(url.pathname);
+  if (history) {
+    const id = history[1]!;
+    if (!isLeagueId(id)) return noSuchLeague(id);
+    return Response.json(await leagueStub(env, id).ratingsHistory());
   }
 
   const leagueRoute = LEAGUE_ROUTE.exec(url.pathname);
