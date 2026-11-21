@@ -15,6 +15,8 @@ declare namespace Cloudflare {
     PLAYER_POLL_MS: string;
     /** Retry interval in milliseconds for League Match starts and Match result delivery. */
     LEAGUE_RETRY_MS: string;
+    /** Gemini API key for the managed-agent harness. Secret: .dev.vars / Wrangler secret only. */
+    GEMINI_API_KEY?: string;
   }
 }
 type Env = Cloudflare.Env;

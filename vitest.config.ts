@@ -7,7 +7,7 @@ export default defineConfig({
       wrangler: { configPath: "./wrangler.jsonc" },
       miniflare: {
         // Test-only values. Real secrets live in .dev.vars / Wrangler secrets.
-        bindings: { ADMIN_SECRET: "test-admin-secret", PLAYER_POLL_MS: "5", LEAGUE_RETRY_MS: "20" },
+        bindings: { ADMIN_SECRET: "test-admin-secret", PLAYER_POLL_MS: "5", LEAGUE_RETRY_MS: "20", GEMINI_API_KEY: "test-gemini-key" },
       },
     }),
   ],
