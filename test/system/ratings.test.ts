@@ -152,13 +152,16 @@ describe("Side Ratings", () => {
 
     const m = seedWith("live", ["live-a", "live-b"], { wolves: ["live-a", "live-b"], village: ["live-a", "live-a", "live-a", "live-b", "live-b"] });
     const matchId = await playOne(m.seed, [villageWins("live-a", m.wolfSeats), villageWins("live-b", m.wolfSeats)]);
-    const update = await waitFor(async () => messages.find((x) => x.league.recent.some((r) => r.matchId === matchId)));
-    const row = update.league.leaderboard.rows.find((r) => r.agentId === "live-a")!;
+    // The settlement pushes its own leaderboard message, naming the Match that moved it.
+    const update = await waitFor(async () => messages.find((x) => x.type === "leaderboard" && x.matchId === matchId));
+    if (update.type !== "leaderboard") throw new Error("unreachable");
+    const row = update.leaderboard.rows.find((r) => r.agentId === "live-a")!;
     expect(row).toMatchObject({ ratings: { wolf: 1184, village: 1248 }, overall: 1216, matches: 1 });
-    // Before the settlement the Agent had no record yet or was still at 1200.
-    const before = messages.find((x) => x.league.tiles.some((t) => t.matchId === matchId))!;
-    const prior = before.league.leaderboard.rows.find((r) => r.agentId === "live-a");
-    expect(prior?.overall ?? 1200).toBe(1200);
+    expect(messages.filter((x) => x.type === "leaderboard" && x.matchId === matchId)).toHaveLength(1);
+    // The joining snapshot carried the leaderboard from before the Match.
+    const joined = messages[0]!;
+    if (joined.type !== "league") throw new Error("expected the snapshot first");
+    expect(joined.league.leaderboard.rows.find((r) => r.agentId === "live-a")?.overall ?? 1200).toBe(1200);
     ws.close(1000, "bye");
   });
 

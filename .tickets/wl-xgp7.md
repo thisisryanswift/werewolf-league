@@ -26,13 +26,13 @@ The core is ruleset-agnostic: League, Elo, Player and the spectator plumbing tal
 ## User Stories
 
 ### Spectating
-1. As a Spectator, I want a home page showing a grid of every live Match, so that I can see the whole League at a glance.
-2. As a Spectator, I want each Match tile to show the current phase, Day/Night number, who is alive and the latest speech line, so that I can spot an interesting Match.
+1. As a Spectator, I want a home page showing a dense grid of every live Match (built for up to 36), so that I can see the whole League at a glance.
+2. As a Spectator, I want each small Match tile to show seat pips, phase, Day/Night number, step tag, alive count, Drama Score, how many Players are thinking and timeouts, so that I can spot an interesting Match without reading text.
 3. As a Spectator, I want the grid to update live without refreshing, so that the demo feels alive.
-4. As a Spectator, I want to click a tile to open that Match's full view, so that I can follow it closely.
+4. As a Spectator, I want to click a tile to open that Match's full view as a modal over the live grid, with its own link, so that I can follow it closely and share it.
 5. As a Spectator, I want to receive the complete event log when I open a Match mid-way, so that I can catch up on what already happened.
 6. As a Spectator, I want new events to stream in live after I join, so that I can watch the Match unfold.
-7. As a Spectator, I want to leave a Match and go back to the grid at any time without affecting the Match, so that I can drop in and out freely.
+7. As a Spectator, I want to close the Match modal (Esc, a backdrop click or the back button) at any time without affecting the Match, while the grid keeps updating underneath, so that I can drop in and out freely.
 8. As a Spectator, I want God View on by default, showing every Player's role and the Wolf Chat, so that I can enjoy the dramatic irony.
 9. As a Spectator, I want to turn God View off, so that I can play along with only the public information.
 10. As a Spectator, I want each Player labelled with its Agent and a copy number (e.g. "Hydrogen #2") when an Agent fills several seats, so that I can tell copies apart.
@@ -40,7 +40,7 @@ The core is ruleset-agnostic: League, Elo, Player and the spectator plumbing tal
 12. As a Spectator, I want Accusations shown as visual links between Players, so that I can see who suspects whom.
 13. As a Spectator, I want Claims (e.g. "I am the Seer; P3 is a Werewolf") shown as badges, so that I can follow claim wars and spot lies in God View.
 14. As a Spectator, I want each vote shown with the voter's target (or Abstain) and short reason, so that I understand why someone was eliminated.
-15. As a Spectator in God View, I want a "who's lying" meter showing the table's average suspicion of each Player next to their true role, so that I can see who is fooling the table.
+15. As a Spectator in God View, I want a Table Suspicion meter showing the table's average stated suspicion of each Player next to their true role, so that I can see who is fooling the table.
 16. As a Spectator, I want deaths to reveal the dead Player's role, so that I know what was lost.
 17. As a Spectator, I want a clear end-of-Match screen with the winning Side, all roles, and each Agent's rating changes, so that the result lands.
 18. As a Spectator, I want to see when a Player timed out and received a default action, so that a strange move isn't mistaken for strategy.
@@ -55,9 +55,9 @@ The core is ruleset-agnostic: League, Elo, Player and the spectator plumbing tal
 25. As a Spectator, I want the leaderboard to update live as Matches finish, so that rankings visibly change during judging.
 
 ### League operation
-26. As the operator, I want the League to keep N Matches running at once (default 6) and start a new one whenever one finishes, so that the grid stays full without manual work.
-27. As the operator, I want to change N live, so that I can trade spend against spectacle.
-28. As the operator, I want to pause and resume the League, so that I can stop spending between demos; pausing lets running Matches finish but starts no new ones.
+26. As the operator, I want the League to keep N Matches running at once (default 24, started at a staggered pace) and start a new one whenever one finishes, so that the grid stays full without manual work.
+27. As the operator, I want to change N live, so that I can trade spend against spectacle. This is demo-critical: it is the main cost and quota control.
+28. As the operator, I want to pause and resume the League, so that I can stop spending between demos; pausing lets running Matches finish but starts no new ones. Demo-critical, even if its UI is cut.
 29. As the operator, I want admin controls protected by a shared secret, so that judges can't change the League.
 30. As the operator, I want each new Match to draw Agents at random from the roster (copies allowed) and deal roles at random from a recorded match seed, so that Matches vary and can be replayed deterministically.
 31. As the operator, I want the dealer never to give both Werewolf seats to the same Agent, so that the mirror effect doesn't inflate Wolf Ratings.
@@ -99,6 +99,16 @@ The core is ruleset-agnostic: League, Elo, Player and the spectator plumbing tal
 ### Modularity
 62. As a future developer, I want the Match runner, League, Elo and spectator plumbing to depend only on a Ruleset interface, so that a new Ruleset can be added without touching them.
 63. As a future developer, I want the Harness to be an interface with a Managed Agent implementation, so that direct-call or self-hosted harnesses can be added later.
+71. As a future developer, I want the Narrator behind an interface with a Decisions API implementation and a scripted fake, so that tests stay offline and deterministic.
+
+### Scale and Narrator (added 2026-11-21 revision)
+64. As a Spectator, I want to sort the grid by Drama Score, alive count or Match number, and filter it to all, flagged, voting or Night, so that I can find the action among dozens of Matches.
+65. As a Spectator, I want the top 3 Matches by Drama Score promoted to large tiles showing the latest speech line, so that the best Matches are readable at a glance.
+66. As a Spectator, I want a header strip showing the top Agents by Overall Rating, so that rankings stay visible from the grid.
+67. As a Spectator, I want each tile to show a Drama Score and its active Drama Flags, so that I can tell which Matches are heating up.
+68. As a Spectator with God View off, I want to see only public-safe Drama Flags, so that the Narrator never reveals secrets.
+69. As the operator, I want the League to stagger Match starts and back off when Players hit rate limits (429), so that ramping up to N doesn't exhaust the Gemini quota.
+70. As the operator, I want the Narrator never to block a Match or affect play, ratings, Calibration or Table Suspicion, so that a spectator feature can't break the game.
 
 ## Implementation Decisions
 
@@ -132,13 +142,28 @@ The core is ruleset-agnostic: League, Elo, Player and the spectator plumbing tal
 
 **Stack.** TypeScript; one Worker deployed with Wrangler; SQLite-backed DOs with WebSocket hibernation; React + Vite frontend served as Workers static assets; Gemini API key as a Wrangler secret; admin endpoints require a shared-secret header. Scripts calling the Worker must send an explicit User-Agent.
 
-**HTTP/WebSocket surface (shape, not final paths).** Get the League snapshot (live Matches, leaderboard, config); a League WebSocket feed of tile summaries and leaderboard updates; get a Match's snapshot/event log; a Match WebSocket that sends the full log then live events, with God View filtering done client-side from a spectator view that includes private events; admin: pause/resume, set N, set config.
+**Scale and League feed.** N defaults to 24 and is settable live; the grid and the feed are built and tested for 36.
+- **Staggered starts:** the League starts at most 4 new Matches every 30 s (both configurable).
+- **429 backoff:** when a Player reports a 429, the League stops starting new Matches for a backoff period (configurable, default 60 s) and records the event.
+- **Coalesced feed:** Match DOs push tile summaries to the League. The League coalesces them and broadcasts small per-tile diffs to grid clients at most every ~500 ms (configurable), never one push per event. Leaderboard changes are pushed on settlement.
+- **Owners:** wl-d5wn owns scheduling at scale and the feed (follow-up to the closed wl-kh5w); wl-gtil owns the dense grid and the Match modal (design: variant E, wl-qpvr).
+
+**Narrator (stretch, go/no-go ~13:30, wl-pbkx).** `narrate(godViewLog) → { dramaScore, flags[{ id, value, visibility }] }`, with a `gemini-decision-1` implementation and a scripted fake.
+- **When:** after each published step (dawn, each Speech Round, Right of Reply, vote), the Match DO sends the God View log to the Narrator. The Narrator sees roles, Wolf Chat and Seer results, because drama depends on what the wolves are doing.
+- **Questions:** one score question (drama, calm to explosive) plus yes/no Drama Flags, each tagged public-safe or secret. Public-safe: claim war; vote on a knife edge; table split on who the wolves are; village eliminated its own power role. Secret: a wolf is fooling the table; wolves split in Wolf Chat.
+- **Flags:** a flag is active at or above a threshold (default 0.7). Answers are never summed.
+- **Output:** the result is stored as a Match event; secret flags are God-View-only, filtered like other private events. The Drama Score and active flags go into the tile summary. The bare Drama Score is shown even with God View off.
+- **Throttling:** at most one call per Match is in flight, and a newer step supersedes a pending one. A failed or slow call (over ~5 s) is dropped, and the tile keeps its last value.
+- **Isolation:** the Narrator never feeds play, observations, ratings, Calibration or Table Suspicion.
+
+**HTTP/WebSocket surface (shape, not final paths).** Get the League snapshot (live Matches, leaderboard, config); a League WebSocket feed of coalesced per-tile diffs and leaderboard updates; get a Match's snapshot/event log; a Match WebSocket that sends the full log then live events, with God View filtering done client-side from a spectator view that includes private events; admin: pause/resume, set N, set config.
 
 **Milestones.**
 - M1 (~10:30): sanity check. One short game-sized chain each on Hydrogen and 3.8 Flash.
 - M2 (~12:00): Ruleset + Match + Player running one full Match, with logs.
 - M3 (~13:30): League scheduling + Elo/Brier.
-- M4 (~15:00): grid, Match view, leaderboard.
+- M4 (~15:00): dense grid with Match modal, Match view, leaderboard.
+- Narrator: stretch, with a go/no-go call at ~13:30 based on wave 2.
 - M5 (~16:00): deploy, God View toggle, replays, polish.
 - Freeze 16:30. If behind at 14:00, cut replays and admin controls first.
 
@@ -147,7 +172,8 @@ The core is ruleset-agnostic: League, Elo, Player and the spectator plumbing tal
 - Good tests exercise external behaviour only: what a Spectator or the League can observe (event log, WebSocket messages, leaderboard values), never internal DO storage layout or private helpers.
 - **Seam 1: Harness.** A scripted Fake Harness replaces Gemini. Whole-system tests run in the Workers runtime with `@cloudflare/vitest-pool-workers`. They create a League with scripted Agents, drive real League/Match/Player DOs and alarms, and check: a Match runs to a correct result; the event log and WebSocket feed (full log on join, then live); rating changes and Overall Rating; normalized Brier; timeout defaults and per-Agent timeout counts (a fake that never answers); invalid-call error feedback; pause and N behaviour; no same-Agent wolf pairs; deterministic replay from the seed.
 - **Seam 2: Ruleset interface.** Pure tests of the Werewolf Ruleset with hand-written actions: night resolution (wolf split → Pack Leader, Doctor save, consecutive-protect rule), Right of Reply scoring/ties/repeat-skip, presentation order rotation, plurality/tie/all-Abstain, win conditions and the 6-cycle cap, defaults on timeout, out-of-phase validation messages.
-- Elo, normalization and reply selection are tested only through these two seams.
+- **Seam 3: Narrator.** A scripted fake Narrator in the same whole-system tests checks that: results become events and reach tile summaries; God View tagging hides secret flags; a failing or slow Narrator never blocks a Match; at most one call per Match is in flight.
+- Elo, normalization, reply selection, feed coalescing and start staggering are tested only through these seams.
 - Real Gemini calls happen only in the M1 sanity check and a manual smoke test before the demo, never in CI.
 - Prior art: none (greenfield repo). The M1 probes in `~/dev/personal/managed-agents-testing` show working request shapes.
 
@@ -167,7 +193,9 @@ The core is ruleset-agnostic: League, Elo, Player and the spectator plumbing tal
 ## Further Notes
 
 - Measured facts behind these decisions are in `~/dev/personal/managed-agents-testing/FINDINGS.md`: per-turn latency (Hydrogen ~13 s typical; ~1 in 7 continuations takes ~40 s), no list endpoint, `requires_action` survives ≥46 h, single stream per interaction, and `tools: []` meaning default tools.
-- Expected Match length is roughly 15–25 min on the fast roster, so 6 concurrent Matches complete about 15–24 Matches an hour. Cost is well within the $2000 Gemini credit.
+- **Match throughput:** Matches take roughly 15–25 min. At the default N=24 that's about 58–96 Matches an hour; at N=36, about 86–144.
+- **Cost:** on the fast roster a Match costs about $1–1.5 (Hydrogen-only ~$2, Flash ~$1, Flash-Lite ~$0.35; FINDINGS §9). The "~$4 mixed table" figure included Neon. That's ~$60–145/hour at N=24 and ~$85–215/hour at N=36, roughly 9–35 hours of the $2000 credit. The Narrator adds ~$0.05–0.15 per Match. Pause/resume and set-N are the cost controls and are demo-critical.
+- **Quota risk:** 100 concurrent agents were measured with no errors (FINDINGS R2-8). With parallel Days that is ~12 Matches fully in flight. N=24 (~192 seats) and N=36 (~288) are unmeasured, and fresh sandbox creation in bursts takes 9–15 s. Staggered starts, 429 backoff and the rehearsal ramp test (wl-t4no) handle this; the demo N and a fallback N come from the ramp test.
 - Function-only agents don't randomize. That's fine, because all game randomness is server-side from the match seed.
 - Vocabulary follows `GLOSSARY.md`; architecture follows `docs/adr/0001` and `0002`.
 

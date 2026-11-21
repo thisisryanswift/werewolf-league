@@ -183,8 +183,12 @@ describe("League feed", () => {
   it("sends the snapshot on join, then live tile updates as a Match progresses", async () => {
     const res = await exports.default.fetch("http://test/api/league/ws", { headers: { Upgrade: "websocket" } });
     const ws = res.webSocket!;
-    const messages: LeagueMessage[] = [];
-    ws.addEventListener("message", (m) => messages.push(JSON.parse(m.data as string)));
+    // Snapshot messages only (settlements also send leaderboard messages).
+    const messages: Extract<LeagueMessage, { type: "league" }>[] = [];
+    ws.addEventListener("message", (m) => {
+      const msg = JSON.parse(m.data as string) as LeagueMessage;
+      if (msg.type === "league") messages.push(msg);
+    });
     ws.accept();
     await waitFor(async () => messages.length >= 1);
     expect(messages[0]!.type).toBe("league");

@@ -12,7 +12,7 @@ import { applyMatch, rankStandings, ratePlayers, snapshotOf, standing, type Agen
 import type { MatchSummary } from "../core/ruleset";
 import { buildMatchInit } from "../core/start-match";
 import { getRuleset } from "../rulesets";
-import type { Leaderboard, LeagueMessage, LeagueSnapshot, MatchTile, RatingChanges, SettledMatch, TileSeat } from "../shared/protocol";
+import type { FeaturedMatch, Leaderboard, LeagueMessage, LeagueSnapshot, MatchTile, RatingChanges, SettledMatch, TileSeat } from "../shared/protocol";
 
 /** A live League Match: its tile plus what is needed to (re)start it. */
 interface LiveMatch extends MatchTile {
@@ -81,6 +81,16 @@ export class LeagueDO extends DurableObject<Env> {
   private set agents(a: Record<string, AgentRecord>) {
     this.ctx.storage.kv.put("agents", a);
   }
+  /** The operator-pinned featured Match, if any. */
+  private get pinned(): SettledMatch | null {
+    return this.ctx.storage.kv.get<SettledMatch>("featured") ?? null;
+  }
+  private get featured(): FeaturedMatch | null {
+    const pinned = this.pinned;
+    if (pinned) return { ...pinned, pinned: true };
+    const latest = this.recent[0];
+    return latest ? { ...latest, pinned: false } : null;
+  }
   private get blocked(): string | null {
     return this.ctx.storage.kv.get<string>("blocked") ?? null;
   }
@@ -109,6 +119,7 @@ export class LeagueDO extends DurableObject<Env> {
         .sort((a, b) => a.startedAt - b.startedAt)
         .map(({ matchId, seed, status, seats, summary, startedAt }) => ({ matchId, seed, status, seats, summary, startedAt })),
       recent: this.recent,
+      featured: this.featured,
       stats: this.stats,
       blocked: this.blocked,
       leaderboard: this.leaderboard(),
@@ -123,6 +134,19 @@ export class LeagueDO extends DurableObject<Env> {
     const names = new Map<string, string>(Object.entries(records).map(([id, r]) => [id, r.name]));
     for (const a of c.roster) names.set(a.id, a.name);
     return { sides, rows: rankStandings([...names].map(([id, name]) => standing(id, name, records[id], sides))) };
+  }
+
+  /** Push the leaderboard after a rated Match settles, as its own feed message. */
+  private broadcastLeaderboard(matchId: string): void {
+    const msg: LeagueMessage = { type: "leaderboard", matchId, leaderboard: this.leaderboard() };
+    const text = JSON.stringify(msg);
+    for (const ws of this.ctx.getWebSockets()) {
+      try {
+        ws.send(text);
+      } catch {
+        // Closed socket; the runtime drops it.
+      }
+    }
   }
 
   private broadcast(): void {
@@ -184,6 +208,23 @@ export class LeagueDO extends DurableObject<Env> {
     return { ok: true, league: this.snapshot() };
   }
 
+  /**
+   * Pin a finished Match (League or one-off) as the featured Match, or clear
+   * the pin with null so the most recent finished Match is featured.
+   */
+  async setFeatured(matchId: string | null): Promise<{ ok: true; league: LeagueSnapshot } | { ok: false; error: string }> {
+    if (matchId === null) {
+      this.ctx.storage.kv.delete("featured");
+    } else {
+      const s = this.ctx.storage.kv.get<Settlement>(`settled:${matchId}`);
+      if (!s) return { ok: false, error: `Match ${matchId} has not finished` };
+      const pinned: SettledMatch = { matchId, winner: s.result.winner, settledAt: s.settledAt };
+      this.ctx.storage.kv.put("featured", pinned);
+    }
+    this.broadcast();
+    return { ok: true, league: this.snapshot() };
+  }
+
   // ---- from Match DOs ----------------------------------------------------
 
   /** A Match's latest public summary for its tile. Stale or unknown updates are ignored. */
@@ -210,6 +251,7 @@ export class LeagueDO extends DurableObject<Env> {
     const entry = live[matchId];
     const settlement = this.settle({ matchId, result, seats: entry?.seats ?? null, settledAt: Date.now(), ratings: null }, entry);
     this.ctx.storage.kv.put(`settled:${matchId}`, settlement);
+    if (settlement.ratings) this.broadcastLeaderboard(matchId);
     if (entry) {
       delete live[matchId];
       this.live = live;
