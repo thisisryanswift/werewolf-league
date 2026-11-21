@@ -5,17 +5,20 @@
 // God View off those events are dropped before anything else is derived, so no
 // role, Wolf Chat, Night choice, turn marker or secret Drama Flag can leak.
 import type { AgentRatingChange, MatchEvent } from "../../src/shared/protocol";
+import { spectatorLabel } from "../../src/shared/seat-label";
 import { countTimeouts, thinkingSeats } from "../../src/shared/turn-events";
 
 export interface SeatInfo {
   seat: number;
   label: string;
+  /** Absent in Matches recorded before Display Names. */
+  displayName?: string;
   agentId: string;
 }
 
-/** How a seat is named everywhere in the Match view. */
+/** How a seat is named everywhere in the Match view: "Mara · Hydrogen #2". */
 export function playerLabel(s: SeatInfo): string {
-  return s.label;
+  return spectatorLabel(s);
 }
 
 /** The Agent's name for a seat ("Hydrogen" for "Hydrogen #2"). */
@@ -97,6 +100,24 @@ export function visibleEvents(events: MatchEvent[], godView: boolean): MatchEven
   return godView ? events : events.filter((e) => !isGodViewOnly(e));
 }
 
+const sideOfRole = (role: string) => (role === "werewolf" ? "wolf" : "village");
+
+/**
+ * A Claim is true only if the claimed role is the seat's real one and every claimed
+ * result names that seat's true Side. Any known falsehood makes it a lie; otherwise
+ * it is unjudged (null) while the claimer's role or a claimed seat's role is hidden.
+ */
+function claimTruth(claim: Omit<ClaimView, "truth">, role: string | null, roles: Map<number, string>): ClaimView["truth"] {
+  if (role !== null && role !== claim.role) return "lie";
+  let unknown = role === null;
+  for (const r of claim.results) {
+    const actual = roles.get(Number(r.seat));
+    if (actual === undefined) unknown = true;
+    else if (sideOfRole(actual) !== r.side) return "lie";
+  }
+  return unknown ? null : "true";
+}
+
 export function buildMatchView(events: MatchEvent[], opts: { godView: boolean }): MatchView {
   const log = visibleEvents(events, opts.godView);
   const setup = (log.find((e) => e.kind === "match_setup")?.data.seats ?? []) as SeatInfo[];
@@ -122,7 +143,7 @@ export function buildMatchView(events: MatchEvent[], opts: { godView: boolean })
       ...s,
       alive: !dead.has(s.seat),
       role,
-      claim: claim ? { ...claim, truth: role === null ? null : role === claim.role ? "true" : "lie" } : null,
+      claim: claim ? { ...claim, truth: claimTruth(claim, role, roles) } : null,
       thinking: thinking.has(s.seat),
       timeouts: timeouts[s.seat] ?? 0,
     };
