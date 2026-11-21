@@ -55,6 +55,15 @@ describe("ratingsHistory", () => {
     expect(h.points).toEqual([{ matchNumber: 2, settledAt: 2, overall: { a: 1215 }, sides: { wolf: { a: 1230 }, village: { a: 1200 } } }]);
   });
 
+  it("seeds a Side not played in the window from its last rating before the window", () => {
+    const settlements: RatedSettlement[] = [
+      { matchNumber: 1, settledAt: 1, ratings: { players: [], agents: [ch("a", "village", 1200, 100)] } },
+      { matchNumber: 2, settledAt: 2, ratings: { players: [], agents: [ch("a", "wolf", 1200, 20)] } },
+    ];
+    const h = ratingsHistory({ settlements, sides, names, cap: 1 });
+    expect(h.points).toEqual([{ matchNumber: 2, settledAt: 2, overall: { a: 1260 }, sides: { wolf: { a: 1220 }, village: { a: 1300 } } }]);
+  });
+
   it("skips unrated settlements and is empty with none rated", () => {
     expect(ratingsHistory({ settlements: [{ settledAt: 1, ratings: null }], sides, names })).toEqual({ agents: [], points: [] });
   });
