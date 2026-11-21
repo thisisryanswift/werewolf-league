@@ -1,6 +1,6 @@
 ---
 id: wl-2qjw
-status: in_progress
+status: closed
 deps: [wl-b8rj]
 links: []
 created: 2026-11-21T15:06:09Z
@@ -27,3 +27,9 @@ Extend the Werewolf Ruleset Night: Wolf Chat (2 exchanges, visible to wolves and
 - [ ] Whole-system test with fake Agents covers a 7-seat Match with all roles
 - [ ] Ruleset tests: a deal never puts both Werewolf seats on one Agent; an all-one-Agent seat list returns a setup error; the same seed gives the same deal
 - [ ] Ruleset test: when only the non-leader wolf submits a kill, that target dies (unless protected)
+
+## Notes
+
+**2026-11-21T16:17:49Z**
+
+Merged into integration/wl-xgp7 (3219019; impl/wl-2qjw 5b67ae5). codex review: no findings. Verification on integration: pnpm test 53/53, typecheck clean. AC evidence: test/werewolf/night-roles.test.ts (Pack Leader split and alternation, Doctor save, consecutive-protect error naming the rule, Seer side sent privately, lone non-leader wolf kill); a Night privacy test (village observations contain no Wolf Chat or Seer results); test/system/night-roles.test.ts (7-seat Match with all roles through real DOs); test/werewolf/deal.test.ts (different-Agent wolves over 200 seeds, all-one-Agent setup error, same seed gives the same deal). In a wrangler dev headless run the Match page showed Wolf Chat, the Seer result, the Pack Leader kill and the Doctor save. New event kinds: wolf_chat, kill_decided, seer_result, protect_chosen, doctor_saved (God View only). The fake harness gained a 'say' option.
