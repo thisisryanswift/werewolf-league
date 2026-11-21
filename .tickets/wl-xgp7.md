@@ -235,3 +235,7 @@ Final code review (15:26, main...integration/wl-xgp7, two axes): no P0/P1. Stand
 **2026-11-21T20:34:50Z**
 
 Final review fix pass merged (impl/review-fixes 182d584): Day thinking and timeout markers are public (Night stays Narrator's-View-only); death and role reveals use display names; configure() keeps a spend-cap block unless the cap is lifted. Implementer: 293/293, codex clean. Remaining review P2s are recorded above.
+
+**2026-11-21T21:24:52Z**
+
+Live config 16:24 (human-approved): gemini-managed N=7 (TPM headroom for the Neon Analyst; 429s went from 35 to 41 after Neon came on) and turn deadline 75 s (firstTurn 90 s unchanged) to cut 3.8 Flash timeouts (21 vs 0-2 for the others). pi-open N=1 on the 7-model roster (40 GB Agent37 limit). Analyst on (Neon, concurrency 2); first deployed report: Match 82. Deployed version fc3c8293. main and integration/wl-xgp7 pushed by the human. Worktree cleanup deferred until after the demo video.
