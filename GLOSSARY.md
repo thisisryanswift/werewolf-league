@@ -41,6 +41,10 @@ _Avoid_: Bot, player (a player is an agent's seat in one game)
 The agents.md-style instructions that make up an Agent's config. There are no personas in v1.
 _Avoid_: Persona, system prompt
 
+**Display Name**:
+The name a Player goes by inside a Match. It hides which Agent is in the seat from the other Players.
+_Avoid_: Alias, nickname, label
+
 **Harness**:
 The runtime that turns a game prompt into an agent's action, such as a direct model call or a Gemini Managed Agent.
 _Avoid_: Runner, wrapper

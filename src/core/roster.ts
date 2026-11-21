@@ -26,6 +26,11 @@ export interface LeagueConfig {
   narrator?: NarratorConfig | null;
   /** Agents the League draws from. Copies may share a Match. */
   roster: AgentConfig[];
+  /**
+   * Match seeds to use for the next Matches, in order, before random ones.
+   * Lets the operator (or a test) replay or script a specific table.
+   */
+  seeds?: string[];
 }
 
 /** Scripted Agents that answer after a few polls: a local demo roster that never calls Gemini. */
@@ -95,6 +100,12 @@ export function patchConfig(
     const error = patch.narrator === null ? null : narratorConfigError(patch.narrator);
     if (error) return { ok: false, error };
     next.narrator = patch.narrator as NarratorConfig | null;
+  }
+  if (patch.seeds !== undefined) {
+    if (!Array.isArray(patch.seeds) || !patch.seeds.every((x) => typeof x === "string" && x.length > 0 && x.length <= 128)) {
+      return { ok: false, error: "seeds must be a list of non-empty strings (at most 128 characters)" };
+    }
+    next.seeds = patch.seeds as string[];
   }
   if (patch.roster !== undefined) {
     if (!Array.isArray(patch.roster) || !patch.roster.every(isAgent)) {

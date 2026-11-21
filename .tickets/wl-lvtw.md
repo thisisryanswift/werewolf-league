@@ -1,6 +1,6 @@
 ---
 id: wl-lvtw
-status: in_progress
+status: closed
 deps: [wl-kh5w, wl-cpl1]
 links: []
 created: 2026-11-21T15:06:09Z
@@ -26,3 +26,9 @@ When a Match ends, the League updates each Player's Agent's Side Rating: start 1
 - [ ] Leaderboard updates live when a Match finishes
 - [ ] Match end event reports rating changes
 - [ ] Whole-system test: a result delivered twice with a lost acknowledgement gives exactly one rating update and identical deltas in the leaderboard and the Match end event, with two copies of one Agent on the winning side
+
+## Notes
+
+**2026-11-21T16:48:13Z**
+
+Merged into integration/wl-xgp7 (impl/wl-lvtw 25c55c2). Verification on integration: pnpm test 125/125, typecheck clean. AC evidence in test/system/ratings.test.ts: exact hand-worked rating values over two scripted Matches; concurrent Matches rated from their draw-time snapshot (fails if the snapshot is ignored); the League WS pushes one {type:'leaderboard'} message per settlement; the Match commits one ratings_settled event after match_over; a lost-ack redelivery with 3 copies of one Agent on the winning side gives identical deltas, one rating update and one event. A wrangler dev run with headless Chromium showed the leaderboard updating live and sortable Overall, Wolf and Village columns. codex review P2, not fixed: League Matches persisted before this change lack ratingsBefore, and the fallback snapshots at settlement time. This only matters for Matches already live when the change deploys; nothing is deployed yet.

@@ -6,7 +6,7 @@ import { setup } from "./deal";
 import { day } from "./day";
 import { night } from "./night";
 import { briefing, renderObservation } from "./text";
-import type { PhaseModule, WerewolfState } from "./types";
+import type { PhaseModule, Side, WerewolfState } from "./types";
 import { summary } from "./summary";
 import { NARRATION_QUESTIONS, narrationLog } from "./narration";
 import { resultOf, settle } from "./win";
@@ -19,6 +19,7 @@ function phaseOf(s: WerewolfState): PhaseModule | null {
 
 export const werewolf: Ruleset<WerewolfState> = {
   id: "werewolf",
+  sides: ["wolf", "village"] satisfies Side[],
   setup,
   nextStep(s) {
     const result = this.result(s);
