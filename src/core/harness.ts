@@ -31,6 +31,8 @@ export interface PlayerContext {
    * sections. Harnesses deliver them at provisioning (managed-agent: /.agents/AGENTS.md).
    */
   instructions?: string;
+  /** Replaces the Harness's Player preamble (the Analyst's run is not a seat in play). */
+  preamble?: string;
   /** Opaque Harness-owned state (environment ID, last interaction ID, ...). */
   chain: Record<string, unknown>;
 }

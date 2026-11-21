@@ -51,6 +51,8 @@ export function priceUsage(m: ModelUsage, table: Record<string, ModelPrice> = PR
 export interface MatchUsage {
   bySeat: Record<number, ModelUsage>;
   narrator: ModelUsage;
+  /** The post-Match Analyst's cumulative usage (its Player DO's latest report). */
+  analyst?: ModelUsage;
 }
 
 /** Price a Match's usage per Player, per Agent and in total. Every seat and Agent appears, zeros included. */
@@ -70,6 +72,17 @@ export function matchCost(u: MatchUsage, seats: { seat: number; agentId: string 
   const narrator = priceUsage(u.narrator);
   narrator.unpriced.forEach((m) => unpriced.add(m));
   all = mergeModelUsage(all, u.narrator);
+  const analyst = priceUsage(u.analyst ?? {});
+  analyst.unpriced.forEach((m) => unpriced.add(m));
+  all = mergeModelUsage(all, u.analyst ?? {});
   const players = Object.values(bySeat).reduce((a, b) => a + b, 0);
-  return { total: players + narrator.cost, bySeat, byAgent, narrator: narrator.cost, tokens: totalUsage(all), unpriced: [...unpriced].sort() };
+  return {
+    total: players + narrator.cost + analyst.cost,
+    bySeat,
+    byAgent,
+    narrator: narrator.cost,
+    analyst: analyst.cost,
+    tokens: totalUsage(all),
+    unpriced: [...unpriced].sort(),
+  };
 }
