@@ -1,6 +1,6 @@
 ---
 id: wl-2lfo
-status: in_progress
+status: closed
 deps: [wl-gtil, wl-d5wn, wl-64dn, wl-ks6l]
 links: []
 created: 2026-11-21T18:22:17Z
@@ -33,3 +33,9 @@ Support several Leagues, each a League DO with its own id, roster, config, Side 
 - [ ] Grid League switcher works and the URL carries the League; the default is gemini-managed
 - [ ] Existing single-League tests pass unchanged against the default League
 
+
+## Notes
+
+**2026-11-21T20:38:10Z**
+
+Merged into integration/wl-xgp7 (impl/wl-2lfo 37d99e6, includes wl-zst1). Verification on integration: pnpm test 299/299, typecheck and build clean. AC evidence: test/system/leagues.test.ts (two Leagues running with separate rosters, leaderboards, spend and feeds; per-League admin returns 401 without the secret and 404 for an unknown id; pausing pi-open leaves gemini-managed running); headless check of the League switcher (/tmp/wl2lfo-cdp/). Deployed state is preserved: gemini-managed maps to the existing DO 'default', and the old routes are kept. pi-open is seeded paused with piRoster(). codex: no findings.

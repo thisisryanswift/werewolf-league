@@ -1,6 +1,6 @@
 ---
 id: wl-c75z
-status: in_progress
+status: closed
 deps: [wl-gtil]
 links: []
 created: 2026-11-21T18:04:53Z
@@ -49,3 +49,7 @@ Code merged into integration/wl-xgp7 (impl/wl-c75z 8def297). Verification on int
 **2026-11-21T19:42:18Z**
 
 Human copy pass done (84ac683). Orchestrator removed 'illegal moves' from about.md line 25 (that metric was dropped). Remaining for AC4: the Neon Analyst bullet (line 11) and 'the Analyst explains where Agents fail' (line 25) describe wl-ofdn, which is in progress. The human will revisit line 11 once wl-ofdn lands; close this ticket then.
+
+**2026-11-21T20:38:10Z**
+
+Closing: the Neon bullet is now true (the Analyst landed, ~86 s and ~$0.16) and the About copy was updated with measured facts. The Pi paragraph stays gated (no client detector for the Pi League yet), so nothing about unlanded features is shown. All ACs met.

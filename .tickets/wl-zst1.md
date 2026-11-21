@@ -1,6 +1,6 @@
 ---
 id: wl-zst1
-status: in_progress
+status: closed
 deps: [wl-t4no, wl-cizy, wl-2lfo]
 links: []
 created: 2026-11-21T17:26:10Z
@@ -84,3 +84,7 @@ Human go (~15:00): build it now. The spike is on prototype/pi-spike (prototypes/
 **2026-11-21T20:29:39Z**
 
 Pi harness merged into integration/wl-xgp7 (impl/wl-zst1 c35b5b7). Verification on integration: install, typecheck and build clean; harness, architecture and vocabulary tests pass (implementer full suite 289/289). AC1-7 evidence: test/harness/pi.test.ts (11); src/harness/pi/ (adapter, PiSeatDO per ADR-0003, Agent37 client); real local smokes with pi seats mixed with managed seats: Haiku 5.5 $0.0075 for 3 seats, DeepSeek V4.1 Flash $0.0031, Hydrogen via OpenRouter $0.145 (needs thinkingLevel low), all village wins in 80-108 s, 0 timeouts; notes via sandbox bash (16 notes_updated); sandboxes deleted on close. Deploy needs OPENROUTER_API_KEY and AGENT37_API_KEY as Wrangler secrets. NOT YET: the pi-open League seeded with piRoster() (waits on wl-2lfo). Open P2s: the pause sweep deletes wl-pi-* sandboxes older than 2 h, which could hit a live Match running over 2 h; the 32-bit hash in sandbox names; the notes-capture commit was not codex-reviewed; mid-run eviction recovery untested.
+
+**2026-11-21T20:38:10Z**
+
+pi-open is now seeded paused with piRoster() via wl-2lfo (merged). OPENROUTER_API_KEY and AGENT37_API_KEY uploaded as Wrangler secrets (human-approved). All ACs met locally; the deployed Pi League starts at the final deploy.

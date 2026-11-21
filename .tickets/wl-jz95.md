@@ -1,6 +1,6 @@
 ---
 id: wl-jz95
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-11-21T20:29:20Z
@@ -29,3 +29,9 @@ Each '📝 Seat N (Name · Agent) rewrote its notes' feed item becomes expandabl
 - [ ] Hidden entirely when Narrator's View is off
 - [ ] Works in the Match modal and in finished-Match replays
 
+
+## Notes
+
+**2026-11-21T20:38:10Z**
+
+Merged (impl/wl-jz95 e3a156e). Typecheck clean; web, architecture and vocabulary tests pass. AC1: native <details> per notes item, collapsed by default, showing that version's text and marked (truncated) when cut; the feed doesn't jump. AC2: hidden with Narrator's View off (unit test and browser). AC3: works on a finished Match; the modal mounts the same MatchView. Screenshots in /tmp/wl-jz95-verify/. The optional diff highlight was skipped and codex was skipped (timebox).
