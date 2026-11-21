@@ -190,12 +190,13 @@ describe("League at scale", () => {
 
   it("Matches held through a backoff use up the start window when it ends", { timeout: 90_000 }, async () => {
     const time = await fakeClock();
-    const roster = [fakeAgent("hw-429", { rateLimitProvision: true }), ...slowRoster("hw")];
+    // Every seat refuses its first provision, so all four reserved Matches are held.
+    const roster = slowRoster("hw", { rateLimitProvision: true });
     await admin("config", { ...SHORT, n: 4, startsPerWindow: 4, startWindowMs: 30_000, backoffMs: 60_000, roster });
     await admin("resume");
     const held = await waitFor(async () => {
       const s = await league();
-      return s.rateLimit.backoffUntil !== null && s.tiles.length === 4 && s.tiles.some((t) => t.status === "starting") ? s : null;
+      return s.rateLimit.backoffUntil !== null && s.tiles.length === 4 && s.tiles.every((t) => t.status === "starting") ? s : null;
     });
     await admin("config", { n: 8 });
     // The backoff outlasts the window the four were reserved in.

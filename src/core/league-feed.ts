@@ -44,7 +44,8 @@ export class FeedCoalescer {
     this.timer = true;
     this.deps.setTimer(() => {
       this.timer = false;
-      this.flush();
+      // Re-check the interval: a forced flush (a join) may have happened meanwhile.
+      this.changed();
     }, wait);
   }
 
