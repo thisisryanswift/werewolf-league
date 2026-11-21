@@ -90,6 +90,21 @@ export class PlayerDO extends DurableObject<Env> {
     if (current?.handle) await this.cancelAndReport(current.matchId, current.handle);
   }
 
+  /**
+   * Called by the Match when it is over: let the Harness settle anything still billed
+   * (e.g. the setup interaction of a seat that never acted) and report the seat's usage.
+   */
+  async close(): Promise<void> {
+    const seating = this.ctx.storage.kv.get<Seating>("seating");
+    if (!seating || this.ctx.storage.kv.get<boolean>("closed")) return;
+    const harness = harnessFor(seating.agent, this.env);
+    const r = await harness.close?.(this.context(seating));
+    this.collect(r?.usage);
+    if (r?.chain) this.ctx.storage.kv.put("chain", r.chain);
+    this.ctx.storage.kv.put("closed", true);
+    if (r?.usage?.length) await this.env.MATCH.getByName(seating.matchId).recordUsage(seating.seat, this.usage);
+  }
+
   async alarm(): Promise<void> {
     const seating = this.ctx.storage.kv.get<Seating>("seating");
     const turn = this.turn;

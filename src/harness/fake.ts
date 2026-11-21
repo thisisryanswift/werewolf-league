@@ -14,6 +14,7 @@
 //   echo: string        — put a digest of the observation into this argument (tests compare observations)
 //   usage: Usage        — bill every interaction (each started turn, including invalid-call retries) this
 //                         usage, on the Agent's model (or "fake"); reported when it ends or is cancelled
+//   setupUsage: Usage   — bill the seat's setup this usage; reported by its first turn, or by close() if it had none
 
 import type { Harness, PlayerContext, PollResult, TurnHandle, TurnInput, Usage, UsageReading } from "../core/harness";
 import type { ToolCall } from "../core/ruleset";
@@ -29,6 +30,14 @@ interface FakeOptions {
   args?: Record<string, Record<string, unknown>>;
   echo?: string;
   usage?: Usage;
+  setupUsage?: Usage;
+}
+
+/** The scripted setup usage, while the seat's setup is still unreported. */
+function setupUsageOf(ctx: PlayerContext): UsageReading[] {
+  const usage = (ctx.agent.options as FakeOptions | undefined)?.setupUsage;
+  if (!usage || !ctx.chain.setupPending) return [];
+  return [{ id: `${ctx.matchId}:${ctx.seat}:setup`, model: ctx.agent.model ?? "fake", usage }];
 }
 
 /** The scripted usage of the interaction behind `handle`, if any. */
@@ -75,18 +84,26 @@ function decide(opts: FakeOptions, input: TurnInput, turnNo: number): ToolCall |
 export const fakeHarness: Harness = {
   async provision(ctx) {
     // Records the Agent Instructions it was given, so tests can check what each seat got.
-    return { ...ctx.chain, environment: `fake-env-${ctx.matchId}-${ctx.seat}`, turns: 0, instructions: ctx.instructions };
+    return {
+      ...ctx.chain,
+      environment: `fake-env-${ctx.matchId}-${ctx.seat}`,
+      turns: 0,
+      instructions: ctx.instructions,
+      setupPending: true,
+    };
   },
   async startTurn(ctx, input) {
     const opts = (ctx.agent.options ?? {}) as FakeOptions;
     const turns = Number(ctx.chain.turns ?? 0) + 1;
+    const setup = setupUsageOf(ctx);
     return {
+      ...(setup.length ? { usage: setup } : {}),
       handle: {
         decision: decide(opts, input, turns),
         pollsLeft: opts.delayPolls ?? 0,
         interaction: `${ctx.matchId}:${ctx.seat}:${turns}`,
       },
-      chain: { ...ctx.chain, turns },
+      chain: { ...ctx.chain, turns, setupPending: false },
     };
   },
   async poll(ctx, handle): Promise<PollResult> {
@@ -98,5 +115,9 @@ export const fakeHarness: Harness = {
   },
   async cancel(ctx, handle) {
     return usageOf(ctx, handle);
+  },
+  async close(ctx) {
+    const usage = setupUsageOf(ctx);
+    return { chain: { ...ctx.chain, setupPending: false }, ...(usage.length ? { usage } : {}) };
   },
 };

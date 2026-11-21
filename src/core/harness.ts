@@ -83,4 +83,9 @@ export interface Harness {
    * Returns the cancelled call's usage if it can be read.
    */
   cancel?(ctx: PlayerContext, handle: TurnHandle): Promise<CancelResult | void>;
+  /**
+   * The Match is over: settle anything still open that was billed, such as a setup
+   * interaction of a seat that never took a turn, and return its usage. Optional.
+   */
+  close?(ctx: PlayerContext): Promise<CancelResult | void>;
 }

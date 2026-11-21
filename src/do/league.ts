@@ -286,6 +286,7 @@ export class LeagueDO extends DurableObject<Env> {
     if (!r.ok) return r;
     this.config = r.config;
     this.blocked = null;
+    this.enforceSpendCap(); // a new cap at or below current spend pauses before anything is scheduled
     await this.schedule();
     return { ok: true, league: this.snapshot() };
   }

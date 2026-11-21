@@ -329,6 +329,16 @@ describe("Managed Agent harness: usage", () => {
     expect(await s.cancel(h)).toEqual([{ id, model: "gemini-4-hydrogen", usage: U2 }]);
   });
 
+  it("on close, cancels and bills the setup interaction of a seat that never took a turn, once", async () => {
+    const s = await seat();
+    const setupId = s.api.latest().id;
+    s.api.billOnCancel.set(setupId, { total_input_tokens: 900, total_cached_tokens: 0, total_thought_tokens: 10, total_output_tokens: 0 });
+    const closed = await s.harness.close!(s.ctx);
+    expect(s.api.interactions.get(setupId)!.status).toBe("cancelled");
+    expect(closed!.usage).toEqual([{ id: setupId, model: "gemini-4-hydrogen", usage: { input: 900, cached: 0, thought: 10, output: 0 } }]);
+    expect(await s.harness.close!({ ...s.ctx, chain: closed!.chain! })).toBeUndefined();
+  });
+
   it("reports the setup interaction's usage when the first turn cancels it", async () => {
     const s = await seat();
     const setupId = s.api.latest().id;

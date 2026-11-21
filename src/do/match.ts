@@ -147,6 +147,17 @@ export class MatchDO extends DurableObject<Env> {
     );
   }
 
+  /** Tell every Player the Match is over, so billed leftovers (unused setup interactions) are counted. Best effort. */
+  private closePlayers(meta: MatchMeta): void {
+    for (const s of meta.seats) {
+      this.ctx.waitUntil(
+        this.env.PLAYER.getByName(`${meta.matchId}:${s.seat}`)
+          .close()
+          .catch(() => {}),
+      );
+    }
+  }
+
   private ruleset(meta: MatchMeta): Ruleset<unknown> {
     return getRuleset(meta.rulesetId);
   }
@@ -340,6 +351,7 @@ export class MatchDO extends DurableObject<Env> {
       const done: MatchMeta = { ...current, status: "finished", result };
       this.meta = done;
       this.commit([matchCostEvent(cost)]);
+      this.closePlayers(done);
       await this.deliverResult(done);
       return;
     }

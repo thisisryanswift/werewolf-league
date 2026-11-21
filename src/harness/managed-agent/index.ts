@@ -311,6 +311,18 @@ export function managedAgentHarness(opts: ManagedAgentOptions): Harness {
       return { status: "error", message: `interaction ${id} ended ${it.status}`, ...withUsage };
     },
 
+    async close(ctx) {
+      const chain = ctx.chain as unknown as Chain;
+      if (!chain.setupInteraction) return;
+      // The seat never took a turn, so its setup interaction was never cancelled or read.
+      const setup = await cancelAndRead(chain.setupInteraction, SETUP_CANCEL_TIMEOUT_MS);
+      const usage = setup ? usageOf(ctx, setup) : [];
+      return {
+        chain: { ...chain, setupInteraction: undefined } as unknown as Record<string, unknown>,
+        ...(usage.length ? { usage } : {}),
+      };
+    },
+
     async cancel(ctx, handle) {
       const chain = ctx.chain as unknown as Chain;
       const f = chain.inFlight;

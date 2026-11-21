@@ -6,6 +6,7 @@
 import { exports } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 import type { AgentConfig } from "../../src/core/harness";
+import { werewolf } from "../../src/rulesets/werewolf";
 import type { LeagueSnapshot, MatchCost, MatchEvent } from "../../src/shared/protocol";
 import type { MatchCostData } from "../../src/shared/turn-events";
 import { ADMIN, fakeAgent, finished, snapshot, startMatch, waitFor } from "./helpers";
@@ -26,6 +27,14 @@ const mute = (id: string): AgentConfig => ({ ...fakeAgent(id, { script: "silent"
 const deadlines = { turnMs: 300, firstTurnMs: 400, graceMs: 300 };
 const turnsOf = (events: MatchEvent[], seat: number) => events.filter((e) => e.kind === "turn_started" && e.data.seat === seat).length;
 const latestCost = (events: MatchEvent[]) => events.filter((e) => e.kind === "match_cost").at(-1)?.data as MatchCostData | undefined;
+
+/** Each seat's role as the Werewolf Ruleset deals a 7-seat table of distinct Agents with this seed. */
+function dealtRoles(seed: string): Record<number, string> {
+  const seats = Array.from({ length: 7 }, (_, i) => ({ seat: i + 1, agentId: `x${i}`, label: "x", displayName: `N${i + 1}` }));
+  const r = werewolf.setup({}, seed, seats);
+  if (!r.ok) throw new Error(r.error);
+  return Object.fromEntries(r.events.filter((e) => e.kind === "role_assigned").map((e) => [Number(e.data.seat), String(e.data.role)]));
+}
 
 async function league(): Promise<LeagueSnapshot> {
   const res = await exports.default.fetch("http://test/api/league");
@@ -84,6 +93,32 @@ describe("measured Match cost", () => {
     const snap = await finished(await startMatch({ seed: "usage-retry", agents }));
     // Every turn of seat 1 took two interactions: the rejected call, then the retry.
     expect(snap.result!.cost!.bySeat[1]).toBeCloseTo(2 * turnsOf(snap.events, 1) * TALK_USD, 10);
+  });
+
+  it("bills every seat's setup interaction, even a seat that never takes a turn", async () => {
+    // Hydrogen setup: 2,000 uncached input × $1.50/M = $0.003.
+    const SETUP = { input: 2_000, cached: 0, thought: 0, output: 0 };
+    // The Werewolves kill a Villager on Night 1 (the Doctor protects a Werewolf), so that seat never acts.
+    const seed = "usage-setup";
+    const roles = dealtRoles(seed);
+    const victim = Number(Object.keys(roles).find((s) => roles[Number(s)] === "villager"));
+    const wolf = Number(Object.keys(roles).find((s) => roles[Number(s)] === "werewolf"));
+    const agents = Array.from({ length: 7 }, (_, i) => {
+      const role = roles[i + 1];
+      const prefer = role === "werewolf" ? [victim] : role === "doctor" ? [wolf] : undefined;
+      return { ...fakeAgent(`s-${i + 1}`, { usage: TALK, setupUsage: SETUP, ...(prefer ? { prefer } : {}) }), model: "gemini-4-hydrogen" };
+    });
+    const matchId = await startMatch({ seed, agents });
+    await finished(matchId);
+    // Setup interactions of seats that never acted are read when the Match ends, so the cost may update after the result.
+    const { events, cost } = await waitFor(async () => {
+      const s = await snapshot(matchId);
+      const c = s.result?.cost;
+      const want = (seat: number) => turnsOf(s.events, seat) * TALK_USD + 0.003;
+      return c && [1, 2, 3, 4, 5, 6, 7].every((seat) => Math.abs(c.bySeat[seat]! - want(seat)) < 1e-9) ? { events: s.events, cost: c } : null;
+    });
+    expect(turnsOf(events, victim)).toBe(0);
+    expect(latestCost(events)!.total).toBeCloseTo(cost.total, 10);
   });
 
   it("adds the Narrator's calls to the Match total but to no Agent", async () => {
