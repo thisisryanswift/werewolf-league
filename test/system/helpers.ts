@@ -2,7 +2,7 @@ import { exports } from "cloudflare:workers";
 import { werewolf } from "../../src/rulesets/werewolf";
 import type { TimeoutCounts } from "../../src/core/deadlines";
 import type { AgentConfig } from "../../src/core/harness";
-import type { MatchEvent, ServerMessage } from "../../src/shared/protocol";
+import type { MatchCost, MatchEvent, ServerMessage } from "../../src/shared/protocol";
 
 export const ADMIN = { "x-admin-secret": "test-admin-secret" };
 
@@ -23,8 +23,8 @@ export async function startMatch(body: Record<string, unknown>): Promise<string>
 export interface Snapshot {
   matchId: string;
   status: "running" | "finished";
-  result: { winner: string; sides: Record<string, string>; timeouts: TimeoutCounts } | null;
-  stats: { timeouts: TimeoutCounts };
+  result: { winner: string; sides: Record<string, string>; timeouts: TimeoutCounts; cost?: MatchCost } | null;
+  stats: { timeouts: TimeoutCounts; cost: number };
   events: MatchEvent[];
 }
 

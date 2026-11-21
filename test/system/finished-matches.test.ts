@@ -52,7 +52,7 @@ describe("Finished Matches", () => {
     const events = log!.type === "log" ? log!.events : [];
     expect(events.map((e) => e.seq)).toEqual(Array.from({ length: done.events.length }, (_, i) => i + 1));
     expect(decisions(events)).toEqual(decisions(done.events));
-    expect(events.at(-1)?.kind).toBe("match_over");
+    expect(events.filter((e) => e.kind !== "match_cost").at(-1)?.kind).toBe("match_over");
   });
 
   it("features the most recent finished Match until an operator pins one", async () => {

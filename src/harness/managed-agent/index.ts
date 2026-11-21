@@ -22,9 +22,9 @@
 // All state lives in the JSON `chain` the Player DO persists. startTurn reconciles the
 // previous in-flight interaction itself, so it works whether or not cancel() was called.
 
-import type { AgentConfig, Harness, PlayerContext, PollResult, TurnHandle, TurnInput } from "../../core/harness";
+import type { AgentConfig, Harness, PlayerContext, PollResult, TurnHandle, TurnInput, UsageReading } from "../../core/harness";
 import type { ToolSpec } from "../../core/ruleset";
-import { ACTIVE, AGENT, ApiError, type Fetch, type Interaction, InteractionsClient, pendingCalls } from "./api";
+import { ACTIVE, AGENT, ApiError, type Fetch, type Interaction, InteractionsClient, pendingCalls, readUsage } from "./api";
 
 export const MANAGED_AGENT_HARNESS_ID = "managed-agent";
 export const DEFAULT_MODEL = "gemini-4-hydrogen";
@@ -94,10 +94,15 @@ export function toApiTools(tools: ToolSpec[]) {
   return tools.map((t) => ({ type: "function", name: t.name, description: t.description, parameters: t.parameters }));
 }
 
+const modelOf = (agent: AgentConfig) => agent.model ?? DEFAULT_MODEL;
+
 function agentConfig(agent: AgentConfig) {
   const max = Number(agent.options?.maxTotalTokens ?? DEFAULT_MAX_TOTAL_TOKENS);
-  return { type: "antigravity", model: agent.model ?? DEFAULT_MODEL, max_total_tokens: max };
+  return { type: "antigravity", model: modelOf(agent), max_total_tokens: max };
 }
+
+/** Bound on the read after a cancel, so a hung API never holds up a turn for long. */
+const CANCEL_READ_TIMEOUT_MS = 5_000;
 
 function base(ctx: PlayerContext) {
   if (ctx.tools.length === 0) throw new Error(`seat ${ctx.seat} has no tools; an empty list means default tools`);
@@ -124,17 +129,37 @@ export function managedAgentHarness(opts: ManagedAgentOptions): Harness {
   // Late-bound so the Worker's global fetch is used at call time.
   const api = new InteractionsClient(opts.apiKey, opts.fetch ?? ((i, init) => fetch(i, init)));
 
+  const usageOf = (ctx: PlayerContext, it: Interaction): UsageReading[] => {
+    const r = readUsage(it, modelOf(ctx.agent));
+    return r ? [r] : [];
+  };
+
+  /**
+   * Cancel an interaction, then read it again for its usage (its tokens were billed).
+   * The read after the cancel is preferred; the cancel response is the fallback. Bounded.
+   */
+  async function cancelAndRead(id: string, timeoutMs?: number): Promise<Interaction | null> {
+    const response = await api.cancel(id, timeoutMs).catch(() => null);
+    const after = await api.get(id, CANCEL_READ_TIMEOUT_MS).catch(() => null);
+    return after?.usage ? after : (response ?? after);
+  }
+
   /** Settle the previous in-flight interaction and fold its outcome into the chain. */
-  async function reconcile(ctx: PlayerContext, chain: Chain): Promise<Chain> {
+  async function reconcile(ctx: PlayerContext, chain: Chain): Promise<{ chain: Chain; usage: UsageReading[] }> {
     const f = chain.inFlight;
-    if (!f) return chain;
+    if (!f) return { chain, usage: [] };
     let it: Interaction = await api.get(f.id);
     let cancelled = !!f.cancelled;
     if (ACTIVE.has(it.status)) {
       // A new turn arrived while this one was still running: its turn is over.
-      it = await api.cancel(f.id).catch(() => it);
+      it = (await cancelAndRead(f.id)) ?? it;
       cancelled = true;
     }
+    return { chain: settle(ctx, chain, f, it, cancelled), usage: usageOf(ctx, it) };
+  }
+
+  /** Fold a settled in-flight interaction's outcome into the chain. */
+  function settle(ctx: PlayerContext, chain: Chain, f: InFlight, it: Interaction, cancelled: boolean): Chain {
     const calls = it.status === "requires_action" ? pendingCalls(it, toolNames(ctx)) : [];
     if (calls.length > 0) {
       // It landed (perhaps after its deadline); its calls are now the ones to answer.
@@ -210,12 +235,16 @@ export function managedAgentHarness(opts: ManagedAgentOptions): Harness {
 
     async startTurn(ctx, input: TurnInput) {
       let chain = ctx.chain as unknown as Chain;
+      const usage: UsageReading[] = [];
       if (chain.setupInteraction) {
-        // Best effort and bounded: the setup interaction is never continued.
-        await api.cancel(chain.setupInteraction, SETUP_CANCEL_TIMEOUT_MS).catch(() => undefined);
+        // Best effort and bounded: the setup interaction is never continued. It ran the model, so it is billed.
+        const setup = await cancelAndRead(chain.setupInteraction, SETUP_CANCEL_TIMEOUT_MS);
+        if (setup) usage.push(...usageOf(ctx, setup));
         chain = { ...chain, setupInteraction: undefined };
       }
-      chain = await reconcile(ctx, chain);
+      const settled = await reconcile(ctx, chain);
+      chain = settled.chain;
+      usage.push(...settled.usage);
       // An invalid-call retry repeats the same frozen observation, which the Agent has seen.
       if (input.firstTurn && !input.error) {
         // The Match's first-turn text holds the briefing and everything seen so far:
@@ -253,7 +282,11 @@ export function managedAgentHarness(opts: ManagedAgentOptions): Harness {
         note: undefined,
         inFlight: { id: created.id, parent, upTo },
       };
-      return { handle: { interactionId: created.id }, chain: next as unknown as Record<string, unknown> };
+      return {
+        handle: { interactionId: created.id },
+        chain: next as unknown as Record<string, unknown>,
+        ...(usage.length ? { usage } : {}),
+      };
     },
 
     async poll(ctx, handle: TurnHandle): Promise<PollResult> {
@@ -269,19 +302,25 @@ export function managedAgentHarness(opts: ManagedAgentOptions): Harness {
         throw err;
       }
       if (ACTIVE.has(it.status)) return { status: "pending", handle };
+      const usage = usageOf(ctx, it);
+      const withUsage = usage.length ? { usage } : {};
       if (it.status === "requires_action" || it.status === "completed") {
         const call = it.status === "requires_action" ? pendingCalls(it, toolNames(ctx))[0] : undefined;
-        return { status: "done", call: call ? { name: call.name, args: call.args } : null };
+        return { status: "done", call: call ? { name: call.name, args: call.args } : null, ...withUsage };
       }
-      return { status: "error", message: `interaction ${id} ended ${it.status}` };
+      return { status: "error", message: `interaction ${id} ended ${it.status}`, ...withUsage };
     },
 
     async cancel(ctx, handle) {
       const chain = ctx.chain as unknown as Chain;
       const f = chain.inFlight;
-      if (!f || f.id !== handle.interactionId) return ctx.chain;
-      await api.cancel(f.id).catch(() => undefined);
-      return { ...chain, inFlight: { ...f, cancelled: true } } as unknown as Record<string, unknown>;
+      if (!f || f.id !== handle.interactionId) return;
+      const it = await cancelAndRead(f.id);
+      const usage = it ? usageOf(ctx, it) : [];
+      return {
+        chain: { ...chain, inFlight: { ...f, cancelled: true } } as unknown as Record<string, unknown>,
+        ...(usage.length ? { usage } : {}),
+      };
     },
   };
 }

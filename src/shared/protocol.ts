@@ -54,6 +54,8 @@ export interface MatchSummary {
   dramaScore?: number;
   /** Active Drama Flags of the latest narration; absent before the first narration. */
   dramaFlags?: TileDramaFlag[];
+  /** Measured USD spent on the Match so far (Players and Narrator); absent before any usage is reported. */
+  cost?: number;
 }
 
 /** Public-safe Drama Flags are shown to everyone; secret ones only in God View. */
@@ -108,6 +110,8 @@ export interface LeagueConfigView {
   seats: number;
   rulesetId: string;
   roster: RosterAgent[];
+  /** Total League spend (USD) at which the League pauses itself; null for no cap. */
+  spendCap: number | null;
 }
 
 /** A recently settled Match. */
@@ -133,7 +137,37 @@ export interface LeagueSnapshot {
   stats: { started: number; settled: number };
   /** Why the League cannot start Matches right now (e.g. a roster that is too small), else null. */
   blocked: string | null;
+  spend: LeagueSpend;
   leaderboard: Leaderboard;
+}
+
+/** Measured League spend in USD (Players and Narrator), from the token usage the model APIs report. */
+export interface LeagueSpend {
+  /** Every settled Match (League and one-off) plus the cost so far of every live League Match. */
+  total: number;
+  /** `total` minus the total when the League was last resumed. */
+  sinceResume: number;
+  /** Per Agent, from settled League Matches only (a live Match's per-Agent cost could hint at roles). */
+  byAgent: Record<string, number>;
+  /** When the League was last resumed (epoch ms); null if never. */
+  resumedAt: number | null;
+}
+
+/**
+ * A Match's measured cost in USD. Public once the Match is over (in its result
+ * and its `match_cost` event); while it runs, only the total is shown.
+ */
+export interface MatchCost {
+  /** Players plus Narrator. */
+  total: number;
+  bySeat: Record<number, number>;
+  byAgent: Record<string, number>;
+  /** The Narrator's calls: in the total, in no Agent's cost. */
+  narrator: number;
+  /** Tokens over every call; `input` includes `cached`. */
+  tokens: { input: number; cached: number; thought: number; output: number };
+  /** Models billed with no row in the price table (counted at $0). */
+  unpriced: string[];
 }
 
 // ---- Ratings ------------------------------------------------------------
@@ -161,6 +195,8 @@ export interface AgentStanding {
   timeouts: number;
   /** Calibration: Brier score over the Agent's village-side beliefs (lower is better); null before any are scored. */
   calibration: number | null;
+  /** Mean measured USD per Match for this Agent's seats; null before any costed Match. */
+  costPerMatch?: number | null;
 }
 
 /** The leaderboard: every current roster Agent plus every Agent with a rated Match. */

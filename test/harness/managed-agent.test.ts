@@ -49,7 +49,9 @@ async function seat(opts: { hangCancels?: boolean } = {}) {
     },
     poll: (h: TurnHandle) => harness.poll(ctx, h),
     async cancel(h: TurnHandle) {
-      ctx.chain = (await harness.cancel!(ctx, h)) ?? ctx.chain;
+      const r = await harness.cancel!(ctx, h);
+      ctx.chain = r?.chain ?? ctx.chain;
+      return r?.usage;
     },
     /** Start a turn and have the Agent answer it with a call. Returns the interaction ID. */
     async act(i: TurnInput, name: string, args: Record<string, unknown>) {
@@ -298,5 +300,70 @@ describe("Managed Agent harness: late results", () => {
     await s.cancel(old);
     await s.start(input("OBS-B"));
     expect(await s.poll(old)).toMatchObject({ status: "error" });
+  });
+});
+
+describe("Managed Agent harness: usage", () => {
+  const U1 = { input: 5000, cached: 1200, thought: 300, output: 40 };
+  const U2 = { input: 7000, cached: 4000, thought: 90, output: 25 };
+
+  it("returns the interaction's usage with the turn result, keyed by interaction ID and model", async () => {
+    const s = await seat();
+    const h = await s.start(input("BRIEFING-1", "vote", { firstTurn: true }));
+    const id = s.api.latest().id;
+    s.api.callTool(id, "vote", { target: 2 });
+    s.api.bill(id, U1);
+    expect(await s.poll(h)).toEqual({
+      status: "done",
+      call: { name: "vote", args: { target: 2 } },
+      usage: [{ id, model: "gemini-4-hydrogen", usage: U1 }],
+    });
+  });
+
+  it("reads a cancelled (timed-out) interaction's usage after the cancel, because its tokens were billed", async () => {
+    const s = await seat();
+    await s.act(input("BRIEFING-1", "vote", { firstTurn: true }), "vote", { target: 2 });
+    const h = await s.start(input("OBS", "speak"));
+    const id = String(h.interactionId);
+    s.api.billOnCancel.set(id, { total_input_tokens: 7000, total_cached_tokens: 4000, total_thought_tokens: 90, total_output_tokens: 25 });
+    expect(await s.cancel(h)).toEqual([{ id, model: "gemini-4-hydrogen", usage: U2 }]);
+  });
+
+  it("reports the setup interaction's usage when the first turn cancels it", async () => {
+    const s = await seat();
+    const setupId = s.api.latest().id;
+    s.api.billOnCancel.set(setupId, { total_input_tokens: 900, total_cached_tokens: 0, total_thought_tokens: 10, total_output_tokens: 0 });
+    const started = await s.harness.startTurn(s.ctx, input("BRIEFING-1", "vote", { firstTurn: true }));
+    expect(started.usage).toEqual([{ id: setupId, model: "gemini-4-hydrogen", usage: { input: 900, cached: 0, thought: 10, output: 0 } }]);
+  });
+
+  it("reports a superseded interaction's usage when the next turn settles it", async () => {
+    const s = await seat();
+    await s.act(input("BRIEFING-1", "vote", { firstTurn: true }), "vote", { target: 2 });
+    const stale = await s.start(input("MISSED-A", "speak"));
+    const staleId = String(stale.interactionId);
+    s.api.bill(staleId, U1);
+    const started = await s.harness.startTurn(s.ctx, input("MISSED-A\nNEW-B"));
+    expect(started.usage).toEqual([{ id: staleId, model: "gemini-4-hydrogen", usage: U1 }]);
+  });
+
+  it("bills the harness's default model when the Agent names none", async () => {
+    const api = new StubInteractionsApi();
+    const harness = managedAgentHarness({ apiKey: "test-key", fetch: api.fetch });
+    const ctx: PlayerContext = { matchId: "m1", seat: 3, agent: { ...AGENT, model: undefined }, tools: TOOLS, chain: {} };
+    ctx.chain = await harness.provision(ctx);
+    const started = await harness.startTurn(ctx, input("BRIEFING-1", "vote", { firstTurn: true }));
+    ctx.chain = started.chain;
+    const id = api.latest().id;
+    api.complete(id);
+    api.bill(id, U1);
+    expect(await harness.poll(ctx, started.handle)).toMatchObject({ usage: [{ id, model: "gemini-4-hydrogen", usage: U1 }] });
+  });
+
+  it("returns no usage field when the API reports none", async () => {
+    const s = await seat();
+    const h = await s.start(input("BRIEFING-1", "vote", { firstTurn: true }));
+    s.api.complete(s.api.latest().id);
+    expect(await s.poll(h)).toEqual({ status: "done", call: null });
   });
 });

@@ -12,8 +12,10 @@
 //   say: string         — for actions without legal targets (e.g. a chat), call the tool with { text: say }
 //   args: { [actionKind]: object } — extra call arguments per action kind, over the defaults below
 //   echo: string        — put a digest of the observation into this argument (tests compare observations)
+//   usage: Usage        — bill every interaction (each started turn, including invalid-call retries) this
+//                         usage, on the Agent's model (or "fake"); reported when it ends or is cancelled
 
-import type { Harness, PollResult, TurnInput } from "../core/harness";
+import type { Harness, PlayerContext, PollResult, TurnHandle, TurnInput, Usage, UsageReading } from "../core/harness";
 import type { ToolCall } from "../core/ruleset";
 
 interface FakeOptions {
@@ -26,6 +28,14 @@ interface FakeOptions {
   say?: string;
   args?: Record<string, Record<string, unknown>>;
   echo?: string;
+  usage?: Usage;
+}
+
+/** The scripted usage of the interaction behind `handle`, if any. */
+function usageOf(ctx: PlayerContext, handle: TurnHandle): { usage?: UsageReading[] } {
+  const usage = (ctx.agent.options as FakeOptions | undefined)?.usage;
+  if (!usage) return {};
+  return { usage: [{ id: String(handle.interaction), model: ctx.agent.model ?? "fake", usage }] };
 }
 
 /** Default extra arguments per action kind, so scripted calls are well-formed. */
@@ -71,15 +81,22 @@ export const fakeHarness: Harness = {
     const opts = (ctx.agent.options ?? {}) as FakeOptions;
     const turns = Number(ctx.chain.turns ?? 0) + 1;
     return {
-      handle: { decision: decide(opts, input, turns), pollsLeft: opts.delayPolls ?? 0 },
+      handle: {
+        decision: decide(opts, input, turns),
+        pollsLeft: opts.delayPolls ?? 0,
+        interaction: `${ctx.matchId}:${ctx.seat}:${turns}`,
+      },
       chain: { ...ctx.chain, turns },
     };
   },
-  async poll(_ctx, handle): Promise<PollResult> {
+  async poll(ctx, handle): Promise<PollResult> {
     const decision = handle.decision as ToolCall | null | "never";
     const pollsLeft = Number(handle.pollsLeft ?? 0);
     if (decision === "never") return { status: "pending", handle };
     if (pollsLeft > 0) return { status: "pending", handle: { ...handle, pollsLeft: pollsLeft - 1 } };
-    return { status: "done", call: decision };
+    return { status: "done", call: decision, ...usageOf(ctx, handle) };
+  },
+  async cancel(ctx, handle) {
+    return usageOf(ctx, handle);
   },
 };

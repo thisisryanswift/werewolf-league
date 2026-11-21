@@ -45,6 +45,8 @@ describe("the Decisions Narrator", () => {
         { id: "claim_war", value: 0.91, visibility: "public-safe" },
         { id: "wolves_split", value: 0.12, visibility: "secret" },
       ],
+      // Decisions bills input tokens only.
+      usage: [{ id: expect.any(String), model: "gemini-decision-1", usage: { input: 300, cached: 0, thought: 0, output: 0 } }],
     });
     expect(api.calls).toHaveLength(1);
     const { url, init } = api.calls[0]!;

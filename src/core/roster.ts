@@ -31,6 +31,8 @@ export interface LeagueConfig {
    * Lets the operator (or a test) replay or script a specific table.
    */
   seeds?: string[];
+  /** Total League spend (USD) at which the League pauses itself; absent or null for no cap. */
+  spendCap?: number | null;
 }
 
 /** Scripted Agents that answer after a few polls: a local demo roster that never calls Gemini. */
@@ -106,6 +108,13 @@ export function patchConfig(
       return { ok: false, error: "seeds must be a list of non-empty strings (at most 128 characters)" };
     }
     next.seeds = patch.seeds as string[];
+  }
+  if (patch.spendCap !== undefined) {
+    const cap = patch.spendCap;
+    if (cap !== null && !(typeof cap === "number" && Number.isFinite(cap) && cap >= 0)) {
+      return { ok: false, error: "spendCap must be null or a non-negative number of USD" };
+    }
+    next.spendCap = cap as number | null;
   }
   if (patch.roster !== undefined) {
     if (!Array.isArray(patch.roster) || !patch.roster.every(isAgent)) {

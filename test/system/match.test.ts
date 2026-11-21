@@ -51,7 +51,7 @@ describe("a fake Match end to end", () => {
       { seat: wolves[0], role: "werewolf", cause: "vote", cycle: 1 },
       { seat: wolves[1], role: "werewolf", cause: "vote", cycle: 2 },
     ]);
-    expect(snap.events.at(-1)?.kind).toBe("match_over");
+    expect(snap.events.filter((e) => e.kind !== "match_cost").at(-1)?.kind).toBe("match_over");
   });
 
   it("runs to a Werewolf win at parity when the wolves kill and vote out villagers", async () => {

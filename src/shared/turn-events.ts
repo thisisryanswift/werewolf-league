@@ -8,10 +8,21 @@
 //   step_resolved  { step }                                audience "all"    committed before the Ruleset's events for the step
 //   ratings_settled RatingChanges { players, agents }      audience "all"    committed once, after the Ruleset's last event, when
 //                                                                            the League acknowledges a rated (League-scheduled) result
+//   match_cost     MatchCostData (MatchCost minus byAgent)  audience "all"    committed when the Match finishes, and again if usage
+//                                                                            arrives later (e.g. the last narration); the latest one wins
 
-import type { RatingChanges, RulesetEvent } from "./protocol";
+import type { MatchCost, RatingChanges, RulesetEvent } from "./protocol";
 
-export const RUNNER_EVENT_KINDS: ReadonlySet<string> = new Set(["turn_started", "turn_timed_out", "step_resolved", "ratings_settled"]);
+/** The `match_cost` event's data. Per-Agent costs follow from the seats; leaving them out keeps Agent IDs out of the log. */
+export type MatchCostData = Omit<MatchCost, "byAgent">;
+
+/** The Match's public cost event. */
+export function matchCostEvent(cost: MatchCost): RulesetEvent {
+  const { byAgent: _byAgent, ...data } = cost;
+  return { kind: "match_cost", audience: "all", data: { ...data } };
+}
+
+export const RUNNER_EVENT_KINDS: ReadonlySet<string> = new Set(["turn_started", "turn_timed_out", "step_resolved", "ratings_settled", "match_cost"]);
 
 /** The Match end event reporting each Player's and each Agent's rating change; null for an unrated Match. */
 export function ratingsSettledEvent(changes: RatingChanges | null): RulesetEvent | null {
