@@ -1,10 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { werewolf } from "../../src/rulesets/werewolf";
-import { actors, dealt, kill } from "./helpers";
+import { actors, dealt, kill, toNightAction } from "./helpers";
 
-describe("Werewolf Night (minimal)", () => {
+/** A dealt table, past Night 1's Wolf Chat. */
+const atAction = () => {
+  const t = dealt();
+  return { ...t, state: toNightAction(t.state) };
+};
+
+describe("Werewolf Night kill", () => {
   it("kills the wolves' target and reveals its role publicly, then starts Day 1", () => {
-    const { state, wolves, villagers } = dealt();
+    const { state, wolves, villagers } = atAction();
     const target = villagers[0]!;
     const { state: next, events } = werewolf.applyActions(state, {
       [wolves[0]!]: kill(target),
@@ -17,20 +23,20 @@ describe("Werewolf Night (minimal)", () => {
   });
 
   it("kills nobody when no wolf chooses (default)", () => {
-    const { state, wolves } = dealt();
+    const { state, wolves } = atAction();
     const { events } = werewolf.applyActions(state, { [wolves[0]!]: null, [wolves[1]!]: null });
     expect(events.some((e) => e.kind === "player_died")).toBe(false);
     expect(events.find((e) => e.kind === "night_passed")?.data).toEqual({ cycle: 1, killed: null });
   });
 
   it("uses the lone proposal when only one wolf chooses", () => {
-    const { state, wolves, villagers } = dealt();
+    const { state, wolves, villagers } = atAction();
     const { events } = werewolf.applyActions(state, { [wolves[0]!]: null, [wolves[1]!]: kill(villagers[2]!) });
     expect(events.find((e) => e.kind === "player_died")?.data.seat).toBe(villagers[2]);
   });
 
   it("shows the wolves' choices only to the wolves", () => {
-    const { state, wolves, villagers } = dealt();
+    const { state, wolves, villagers } = atAction();
     const { events } = werewolf.applyActions(state, {
       [wolves[0]!]: kill(villagers[0]!),
       [wolves[1]!]: kill(villagers[0]!),
@@ -41,7 +47,7 @@ describe("Werewolf Night (minimal)", () => {
   });
 
   it("rejects an out-of-phase or illegal call with a message naming the required action", () => {
-    const { state, wolves } = dealt();
+    const { state, wolves } = atAction();
     const wrongTool = werewolf.validate(state, wolves[0]!, { name: "vote", args: { target: 1 } });
     expect(wrongTool).toEqual({ ok: false, error: expect.stringContaining("choose_kill") });
     const wolfTarget = werewolf.validate(state, wolves[0]!, kill(wolves[1]!));

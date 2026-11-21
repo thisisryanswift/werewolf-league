@@ -10,13 +10,18 @@ const adminStart = (body: Record<string, unknown>) =>
     body: JSON.stringify(body),
   });
 
-/** Wolf seats the Ruleset deals for a 7-seat table of distinct Agents with this seed. */
-function wolvesFor(seed: string): number[] {
+/** The deal the Ruleset makes for a 7-seat table of distinct Agents with this seed. */
+function dealFor(seed: string) {
   const seats = Array.from({ length: 7 }, (_, i) => ({ seat: i + 1, agentId: `x${i}`, label: "x" }));
   const r = werewolf.setup({}, seed, seats);
   if (!r.ok) throw new Error(r.error);
-  return r.events.find((e) => e.kind === "wolf_team")!.data.wolves as number[];
+  const roles = Object.fromEntries(r.state.players.map((p) => [p.seat, p.role as string]));
+  const seatOf = (role: string) => r.state.players.find((p) => p.role === role)!.seat;
+  return { roles, wolves: r.events.find((e) => e.kind === "wolf_team")!.data.wolves as number[], seer: seatOf("seer"), doctor: seatOf("doctor") };
 }
+
+/** Wolf seats the Ruleset deals for a 7-seat table of distinct Agents with this seed. */
+const wolvesFor = (seed: string): number[] => dealFor(seed).wolves;
 
 describe("a fake Match end to end", () => {
   it("rejects starting a Match without the admin secret", async () => {
@@ -60,11 +65,12 @@ describe("a fake Match end to end", () => {
     const snap = await finished(await startMatch({ seed, agents }));
     expect(snap.result?.winner).toBe("wolf");
     expect(snap.events.find((e) => e.kind === "match_over")?.data.reason).toBe("parity");
-    // 2 wolves v 5 villagers -> Night 1 kill, Day 1 vote-out, Night 2 kill -> 2 v 2.
+    // 2 wolves v 5 village seats -> Night 1 kill, Day 1 vote-out, Night 2 kill -> 2 v 2.
+    const { roles } = dealFor(seed);
     expect(snap.events.filter((e) => e.kind === "player_died").map((e) => e.data)).toEqual([
-      { seat: villagers[0], role: "villager", cause: "night_kill", cycle: 1 },
-      { seat: villagers[1], role: "villager", cause: "vote", cycle: 1 },
-      { seat: villagers[2], role: "villager", cause: "night_kill", cycle: 2 },
+      { seat: villagers[0], role: roles[villagers[0]!], cause: "night_kill", cycle: 1 },
+      { seat: villagers[1], role: roles[villagers[1]!], cause: "vote", cycle: 1 },
+      { seat: villagers[2], role: roles[villagers[2]!], cause: "night_kill", cycle: 2 },
     ]);
   });
 

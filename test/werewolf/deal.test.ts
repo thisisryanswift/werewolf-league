@@ -8,27 +8,40 @@ function setupOk(seed: string, n = 7) {
   return r;
 }
 
+const rolesOf = (r: { events: { kind: string; data: Record<string, unknown> }[] }) =>
+  Object.fromEntries(r.events.filter((e) => e.kind === "role_assigned").map((e) => [e.data.seat, e.data.role]));
+
+const count = (roles: Record<string, unknown>) => {
+  const out: Record<string, number> = {};
+  for (const r of Object.values(roles)) out[r as string] = (out[r as string] ?? 0) + 1;
+  return out;
+};
+
 describe("Werewolf deal", () => {
-  it("deals two Werewolves and Villagers for the rest, the same way for the same seed", () => {
+  it("deals 2 Werewolves, a Seer, a Doctor and Villagers for the rest, the same way for the same seed", () => {
     const a = setupOk("seed-1");
-    const b = setupOk("seed-1");
     expect(werewolf.result(a.state)).toBeNull();
-    const wolves = (r: typeof a) =>
-      r.events.filter((e) => e.kind === "role_assigned" && e.data.role === "werewolf").map((e) => e.data.seat);
-    expect(wolves(a)).toHaveLength(2);
-    expect(wolves(a)).toEqual(wolves(b));
-    const roles = a.events.filter((e) => e.kind === "role_assigned").map((e) => e.data.role);
-    expect(roles.filter((r) => r === "villager")).toHaveLength(5);
+    expect(count(rolesOf(a))).toEqual({ werewolf: 2, seer: 1, doctor: 1, villager: 3 });
+    expect(count(rolesOf(setupOk("seed-1", 8)))).toEqual({ werewolf: 2, seer: 1, doctor: 1, villager: 4 });
+    expect(rolesOf(setupOk("seed-1"))).toEqual(rolesOf(a));
   });
 
-  it("gives every seat speak and vote, and Werewolves choose_kill too", () => {
+  it("varies the deal with the seed", () => {
+    const deals = new Set(Array.from({ length: 20 }, (_, i) => JSON.stringify(rolesOf(setupOk(`vary-${i}`)))));
+    expect(deals.size).toBeGreaterThan(10);
+  });
+
+  it("gives every seat speak and vote, plus its role's fixed night tools", () => {
     const r = setupOk("seed-2");
-    const wolfSeats = r.events
-      .filter((e) => e.kind === "role_assigned" && e.data.role === "werewolf")
-      .map((e) => e.data.seat as number);
+    const roles = rolesOf(r);
+    const expected: Record<string, string[]> = {
+      werewolf: ["choose_kill", "speak", "vote", "wolf_chat"],
+      seer: ["inspect", "speak", "vote"],
+      doctor: ["protect", "speak", "vote"],
+      villager: ["speak", "vote"],
+    };
     for (let seat = 1; seat <= 7; seat++) {
-      const names = r.tools[seat]!.map((t) => t.name).sort();
-      expect(names).toEqual(wolfSeats.includes(seat) ? ["choose_kill", "speak", "vote"] : ["speak", "vote"]);
+      expect(r.tools[seat]!.map((t) => t.name).sort()).toEqual(expected[roles[seat] as string]);
     }
   });
 
@@ -76,6 +89,6 @@ describe("Werewolf deal", () => {
     const step = werewolf.nextStep(r.state);
     expect(step.type).toBe("turns");
     if (step.type !== "turns") return;
-    expect(step.turns.map((t) => t.actionKind)).toEqual(["choose_kill", "choose_kill"]);
+    expect(step.turns.map((t) => t.actionKind)).toEqual(["wolf_chat", "wolf_chat"]);
   });
 });

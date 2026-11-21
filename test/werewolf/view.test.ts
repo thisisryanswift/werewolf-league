@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { werewolf } from "../../src/rulesets/werewolf";
-import { seatsOf } from "./helpers";
+import { nightKill, seatsOf } from "./helpers";
 
 function table() {
   const r = werewolf.setup({}, "view", seatsOf(7));
@@ -30,18 +30,20 @@ describe("Werewolf view and observations", () => {
     expect(text).toContain("Agent 7");
   });
 
+  it("briefs the Seer and Doctor with their role and the Night rules", () => {
+    const { state } = table();
+    const seat = (role: string) => state.players.find((p) => p.role === role)!.seat;
+    expect(werewolf.briefing(state, seat("seer"))).toContain("Your secret role: Seer");
+    const doctor = werewolf.briefing(state, seat("doctor"));
+    expect(doctor).toContain("Your secret role: Doctor");
+    expect(doctor).toMatch(/same player on consecutive Nights/);
+    expect(doctor).toMatch(/Wolf Chat/);
+    expect(doctor).toMatch(/Pack Leader/);
+  });
+
   it("renders new events and the required action into the observation", () => {
-    const { state, wolves, villager } = table();
-    const step = werewolf.nextStep(state);
-    if (step.type !== "turns") throw new Error();
-    const { events } = werewolf.applyActions(state, {
-      [wolves[0]!]: { name: "choose_kill", args: { target: villager } },
-      [wolves[1]!]: null,
-    });
-    const s2 = werewolf.applyActions(state, {
-      [wolves[0]!]: { name: "choose_kill", args: { target: villager } },
-      [wolves[1]!]: null,
-    }).state;
+    const { state: s0, villager } = table();
+    const { state: s2, events } = nightKill(s0, villager);
     const next = werewolf.nextStep(s2);
     if (next.type !== "turns") throw new Error();
     const me = next.turns[0]!;
