@@ -3,7 +3,7 @@ import { werewolf } from "../../src/rulesets/werewolf";
 import type { ToolCall } from "../../src/core/ruleset";
 import type { WerewolfState } from "../../src/rulesets/werewolf/types";
 import type { RulesetEvent } from "../../src/shared/protocol";
-import { act, actionOf, actors, day1, day1Vote, nightKill, speak, speakUntilVote, turnsOf, vote, voteAll } from "./helpers";
+import { act, actionOf, actors, day1, day1Vote, nightKill, seatsOf, speak, speakUntilVote, turnsOf, vote, voteAll } from "./helpers";
 
 const speeches = (events: RulesetEvent[]) => events.filter((e) => e.kind === "speech").map((e) => e.data);
 const kinds = (events: RulesetEvent[]) => events.map((e) => e.kind);
@@ -98,11 +98,35 @@ describe("Werewolf Day: Speech Rounds", () => {
     expect(day2Order).toHaveLength(6);
     expect(day2Order).not.toContain(next);
 
-    // The starting seat number advances one per Day (Day 3: two on from Day 1), and Day 4 one more.
+    // Each later Day starts at the next living seat after the previous Day's starter, so it always changes.
+    const day2Start = day2Order[0]!;
     s = nightKill(voteAll(s, {}).state, null).state;
-    expect(order(s)[0]).toBe((next % 7) + 1);
-    s = nightKill(voteAll(s, {}).state, null).state;
-    expect(order(s)[0]).toBe((((next % 7) + 1) % 7) + 1);
+    expect(order(s)[0]).toBe((day2Start % 7) + 1);
+  });
+
+  it("shows Round B speakers the Round A speeches, with their Accusations and Claims", () => {
+    const { state } = day1();
+    const a = act(state, (seat) =>
+      seat === 2
+        ? speak("Seat 3 is lying", { accuse: [3], claim: { role: "seer", results: [{ seat: 3, side: "wolf" }] } })
+        : null,
+    );
+    const turn = turnsOf(a.state).find((t) => t.seat === 5)!;
+    const text = werewolf.renderObservation(a.state, 5, werewolf.view(a.events, { seat: 5 }), turn);
+    expect(text).toContain('"Seat 3 is lying"');
+    expect(text).toContain("accuses seat 3");
+    expect(text).toContain("claims to be seer (seat 3 is wolf)");
+    expect(text).toContain("Speech Round B");
+  });
+
+  it("removes abstain from the vote tool when voluntary Abstain is disabled", () => {
+    const voteTool = (config: Record<string, unknown>) => {
+      const r = werewolf.setup(config, "tools", seatsOf(7));
+      if (!r.ok) throw new Error(r.error);
+      return JSON.stringify(r.tools[1]!.find((t) => t.name === "vote"));
+    };
+    expect(voteTool({})).toContain("abstain");
+    expect(voteTool({ allowAbstain: false })).not.toContain("abstain");
   });
 
   it("gives the same event log for the same seed and the same actions", () => {

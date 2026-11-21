@@ -4,12 +4,13 @@
 // Every step's speeches/ballots are published in presentation order: seat order
 // from a starting seat that rotates each Day. The Match page uses the same order.
 
-import type { Seat, ToolCall, TurnRequest, Validation } from "../../core/ruleset";
+import type { Seat, ToolCall, ToolSpec, TurnRequest, Validation } from "../../core/ruleset";
 import { rngFrom } from "../../core/rng";
 import type { RulesetEvent } from "../../shared/protocol";
 import { normalizeBeliefs } from "./beliefs";
 import { startNight } from "./night";
 import { alive, asSeat, killPlayer, player } from "./players";
+import { VOTE } from "./tools";
 import type { DayState, PhaseModule, WerewolfState } from "./types";
 import { targetOf, validateTargeted } from "./validation";
 
@@ -18,9 +19,29 @@ export const DAY_RULES = `- Each Day has Speech Rounds in which all living playe
 - After the Speech Rounds, the most-accused players get a Right of Reply (accusations in Round A count once, in Round B twice).
 - The Day ends with one simultaneous vote. Give your P(werewolf) for every other living player and a short reason. The player with the most votes is eliminated; a tie, or everyone abstaining, eliminates nobody.`;
 
-/** A fresh Day state. Night calls this when the Day starts. */
-export function startDay(cycle: number): DayState {
-  return { cycle, step: "speech", round: 1, accusations: [], replied: [] };
+/**
+ * A fresh Day state; Night calls this when the Day starts, with the Players as the
+ * Day begins and the previous Day's state. The starting seat is seeded on Day 1 and
+ * then moves to the next living seat after the previous Day's starter.
+ */
+export function startDay(s: Pick<WerewolfState, "seed" | "players">, cycle: number, previous: DayState | null): DayState {
+  const seats = s.players.map((p) => p.seat).sort((a, b) => a - b);
+  const living = s.players.filter((p) => p.alive).map((p) => p.seat).sort((a, b) => a - b);
+  const prev = previous && previous.cycle < cycle ? previous.starter : null;
+  const from = prev ?? seats[rngFrom(`${s.seed}:day:start`).int(seats.length)]! - 1;
+  const starter = living.find((x) => x > from) ?? living[0] ?? 0;
+  return { cycle, step: "speech", round: 1, starter, accusations: [], replied: [] };
+}
+
+/** The vote tool for this config: without the abstain option when voluntary Abstain is off. */
+export function voteTool(allowAbstain: boolean): ToolSpec {
+  if (allowAbstain) return VOTE;
+  const params = VOTE.parameters as { properties: Record<string, unknown> };
+  return {
+    ...VOTE,
+    description: "Vote to eliminate a player at the end of the Day.",
+    parameters: { ...VOTE.parameters, properties: { ...params.properties, target: { type: "integer", description: "Seat number" } } },
+  };
 }
 
 const roundName = (round: number) => String.fromCharCode(64 + round); // 1 -> "A"
@@ -30,9 +51,7 @@ const roundName = (round: number) => String.fromCharCode(64 + round); // 1 -> "A
  * rotates by one each Day, from a seeded offset. Dead seats are skipped.
  */
 export function presentationOrder(s: WerewolfState): Seat[] {
-  const seats = s.players.map((p) => p.seat).sort((a, b) => a - b);
-  const offset = rngFrom(`${s.seed}:day:start`).int(seats.length);
-  const start = seats[(offset + s.cycle - 1) % seats.length]!;
+  const start = s.day.starter;
   const living = alive(s)
     .map((p) => p.seat)
     .sort((a, b) => a - b);

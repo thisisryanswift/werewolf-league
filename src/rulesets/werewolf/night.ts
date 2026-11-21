@@ -181,7 +181,7 @@ function applyAct(s: WerewolfState, actions: Record<Seat, ToolCall | null>): { s
     });
   }
   events.push({ kind: "night_passed", audience: "all", data: { cycle: s.cycle, killed } });
-  state = { ...state, phase: "day", day: startDay(s.cycle) };
+  state = { ...state, phase: "day", day: startDay(state, s.cycle, s.day) };
   events.push({ kind: "phase_started", audience: "all", data: { phase: "day", cycle: s.cycle } });
   return { state, events };
 }

@@ -45,11 +45,13 @@ export interface DayConfig {
   replySlots: number;
 }
 
-/** Day sub-state. Start each Day with `startDay(cycle)` from day.ts. */
+/** Day sub-state. Start each Day with `startDay` from day.ts. */
 export interface DayState {
   /** The Day this state belongs to. */
   cycle: number;
   step: "speech" | "reply" | "vote";
+  /** The seat that speaks first in this Day's presentation order. */
+  starter: Seat;
   /** 1-based Speech Round while `step` is "speech". */
   round: number;
   /** Accusations from this Day's Speech Rounds, for Right of Reply scoring. */
