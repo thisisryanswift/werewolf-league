@@ -6,7 +6,7 @@
 // role, Wolf Chat, Night choice, turn marker or secret Drama Flag can leak.
 import type { AgentRatingChange, MatchEvent } from "../../src/shared/protocol";
 import { spectatorLabel } from "../../src/shared/seat-label";
-import { countTimeouts, thinkingSeats } from "../../src/shared/turn-events";
+import { countTimeouts, thinkingSeats, type MatchCostData } from "../../src/shared/turn-events";
 
 export interface SeatInfo {
   seat: number;
@@ -76,6 +76,17 @@ export interface EndScreen {
   roles: { seat: number; label: string; role: string; alive: boolean }[];
   /** Each Agent's rating change; null until `ratings_settled` arrives (never, for an unrated one-off Match). */
   ratings: (AgentRatingChange & { name: string })[] | null;
+  /** Final measured cost in USD (the latest `match_cost` event); null if the Match reported none. */
+  cost: EndCost | null;
+}
+
+export interface EndCost {
+  /** Players plus Narrator. */
+  total: number;
+  narrator: number;
+  /** Each Agent's share (the sum of its seats), in seat order of first appearance. */
+  agents: { agentId: string; name: string; cost: number }[];
+  tokens: { input: number; cached: number; thought: number; output: number };
 }
 
 export interface MatchView {
@@ -182,11 +193,26 @@ function endScreen(log: MatchEvent[], seats: SeatView[]): EndScreen | null {
     reason: String(over.data.reason),
     roles: seats.map((s) => ({ seat: s.seat, label: playerLabel(s), role: roles[s.seat] ?? s.role ?? "?", alive: s.alive })),
     ratings: agents && agents.map((a) => ({ ...a, name: nameOf(a.agentId) })),
+    cost: endCost(log, seats),
   };
 }
 
-/** Runner bookkeeping that is shown as seat markers, never as feed lines. */
-const MARKER_KINDS = new Set(["turn_started", "step_resolved"]);
+function endCost(log: MatchEvent[], seats: SeatView[]): EndCost | null {
+  const latest = log.filter((e) => e.kind === "match_cost").at(-1);
+  if (!latest) return null;
+  const d = latest.data as unknown as MatchCostData;
+  const agents: EndCost["agents"] = [];
+  for (const s of seats) {
+    const usd = Number(d.bySeat?.[s.seat] ?? 0);
+    const row = agents.find((a) => a.agentId === s.agentId);
+    if (row) row.cost += usd;
+    else agents.push({ agentId: s.agentId, name: agentName(s), cost: usd });
+  }
+  return { total: Number(d.total), narrator: Number(d.narrator ?? 0), agents, tokens: d.tokens };
+}
+
+/** Runner bookkeeping that is shown as seat markers (or on the end screen), never as feed lines. */
+const MARKER_KINDS = new Set(["turn_started", "step_resolved", "match_cost"]);
 const VOTE_KINDS = new Set(["votes_revealed", "beliefs_recorded", "no_elimination"]);
 const RESULT_KINDS = new Set(["match_over", "ratings_settled"]);
 

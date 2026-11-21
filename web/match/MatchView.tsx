@@ -18,6 +18,7 @@ import { useMatchFeed, type FeedStatus } from "../useMatchFeed";
 import "./match-view.css";
 import { buildMatchView, panelsFor, playerLabel, type EndScreen, type FeedGroup, type MatchView as View, type SeatView, type VoteTally } from "./model";
 import { GodViewContext, MATCH_PANELS, SEAT_SLOTS, useGodView, type MatchPanelProps } from "./panels";
+import { formatUsd } from "../cost";
 
 export interface MatchViewProps {
   matchId: string;
@@ -512,6 +513,33 @@ function End({ end, onHide }: { end: EndScreen; onHide: () => void }) {
           </li>
         ))}
       </ul>
+      <h4>Cost</h4>
+      {end.cost ? (
+        <table className="mv-ratings" data-testid="match-cost">
+          <tbody>
+            {end.cost.agents.map((a) => (
+              <tr key={a.agentId}>
+                <th>{a.name}</th>
+                <td>{formatUsd(a.cost)}</td>
+              </tr>
+            ))}
+            {end.cost.narrator > 0 && (
+              <tr>
+                <th>Narrator</th>
+                <td>{formatUsd(end.cost.narrator)}</td>
+              </tr>
+            )}
+            <tr>
+              <th>Total</th>
+              <td data-testid="match-cost-total">
+                <b>{formatUsd(end.cost.total)}</b>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      ) : (
+        <p className="mv-muted">No cost was recorded for this Match.</p>
+      )}
       <h4>Rating changes</h4>
       {end.ratings ? (
         <table className="mv-ratings" data-testid="rating-changes">

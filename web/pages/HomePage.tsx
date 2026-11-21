@@ -4,6 +4,7 @@ import { Leaderboard } from "../components/Leaderboard";
 import { FeaturedMatchLink, FinishedMatchList } from "../components/FinishedMatches";
 import { spectatorLabel } from "../../src/shared/seat-label";
 import { useLeagueFeed } from "../useLeagueFeed";
+import { formatUsd } from "../cost";
 
 function phaseText(tile: MatchTile): string {
   const s = tile.summary;
@@ -29,6 +30,11 @@ function Tile({ tile }: { tile: MatchTile }) {
             </li>
           ))}
         </ul>
+        {tile.summary?.cost !== undefined && (
+          <p className="tile-cost" data-testid="tile-cost">
+            Cost so far {formatUsd(tile.summary.cost)}
+          </p>
+        )}
         <p className="tile-speech">
           {speech ? (
             <>
@@ -56,6 +62,12 @@ export function HomePage() {
             {league.config.paused ? "Paused" : `${league.tiles.length} of ${league.config.n} Matches live`}
             {" · "}
             {league.stats.settled} finished
+            {league.spend && (
+              <span data-testid="league-spend">
+                {" · "}Spend {formatUsd(league.spend.total)} ({formatUsd(league.spend.sinceResume)} since resume)
+                {league.config.spendCap != null && ` · cap ${formatUsd(league.config.spendCap)}`}
+              </span>
+            )}
           </>
         )}
       </p>

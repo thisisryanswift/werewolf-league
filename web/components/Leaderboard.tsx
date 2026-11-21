@@ -3,6 +3,7 @@
 // renders whatever the League feed last sent, so it updates live as Matches settle.
 import { useState } from "react";
 import type { AgentStanding, Leaderboard as LeaderboardData } from "../../src/shared/protocol";
+import { formatUsd } from "../cost";
 
 /** Display names for Side keys; unknown Sides are capitalised. */
 const SIDE_NAMES: Record<string, string> = { wolf: "Wolf", village: "Village" };
@@ -44,6 +45,14 @@ function columns(sides: string[]): Column[] {
       render: (r) => (r.calibration === null ? "—" : r.calibration.toFixed(3)),
     },
     { key: "timeouts", label: "Timeouts", title: "Turns that missed their deadline", value: (r) => r.timeouts, render: (r) => String(r.timeouts) },
+    {
+      key: "cost",
+      label: "$/Match",
+      title: "Measured model cost per Match, all of the Agent's seats",
+      // Sorting is cheapest first, Agents with no cost yet last.
+      value: (r) => (r.costPerMatch == null ? -Infinity : -r.costPerMatch),
+      render: (r) => (r.costPerMatch == null ? "—" : formatUsd(r.costPerMatch)),
+    },
   ];
 }
 
