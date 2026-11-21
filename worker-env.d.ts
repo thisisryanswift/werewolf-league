@@ -1,0 +1,15 @@
+// Bindings for the Worker and its Durable Objects. Kept by hand (instead of
+// `wrangler types`) so it composes with @cloudflare/workers-types.
+declare namespace Cloudflare {
+  interface Env {
+    LEAGUE: DurableObjectNamespace<import("./src/do/league").LeagueDO>;
+    MATCH: DurableObjectNamespace<import("./src/do/match").MatchDO>;
+    PLAYER: DurableObjectNamespace<import("./src/do/player").PlayerDO>;
+    ASSETS: Fetcher;
+    /** Shared secret for admin endpoints (`x-admin-secret` header). Secret; never in wrangler.jsonc. */
+    ADMIN_SECRET?: string;
+    /** Player DO Harness poll interval in milliseconds. */
+    PLAYER_POLL_MS: string;
+  }
+}
+type Env = Cloudflare.Env;
