@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AgentConfig } from "../../src/core/harness";
 import { API_BASE } from "../../src/harness/managed-agent/api";
 import { StubInteractionsApi } from "../harness/stub-interactions-api";
-import { finished, snapshot, startMatch } from "./helpers";
+import { fakeAgent, finished, snapshot, startMatch } from "./helpers";
 import { expectNoAgentIdentity, playerTexts } from "./player-text";
 
 const REQUIRED = /Required action: (\w+) with target one of ([^.]+)\./;
@@ -52,6 +52,15 @@ const agents = [hydrogen, flash, hydrogen, lite, flash, hydrogen, lite];
 afterEach(() => vi.restoreAllMocks());
 
 describe("Display Names through a whole Match", () => {
+  it("the spectator log carries each seat's Display Name with its Agent and copy label", async () => {
+    const fake = [fakeAgent("a"), fakeAgent("a"), fakeAgent("b"), fakeAgent("b"), fakeAgent("c"), fakeAgent("c"), fakeAgent("c")];
+    const matchId = await startMatch({ seed: "display-names-log", agents: fake });
+    const snap = (await finished(matchId)) as unknown as Awaited<ReturnType<typeof finished>> & { seats: object[] };
+    const setup = snap.events.find((e) => e.kind === "match_setup")!.data.seats as Record<string, unknown>[];
+    expect(setup).toEqual(snap.seats.map((s) => expect.objectContaining(s)));
+    expect(setup[1]).toMatchObject({ seat: 2, agentId: "a", label: "a #2", displayName: expect.stringMatching(/^[A-Z][a-z]+$/) });
+  });
+
   it("no text sent to any Player contains a roster Agent name, id, model id or copy label", async () => {
     const api = new StubInteractionsApi();
     const realFetch = globalThis.fetch;

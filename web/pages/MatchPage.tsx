@@ -5,9 +5,10 @@ import { countTimeouts, thinkingSeats } from "../../src/shared/turn-events";
 import { describeEvent } from "../events";
 import { HIDDEN_KINDS } from "../events/runner";
 import { Speech } from "../events/Speech";
+import { spectatorLabel } from "../../src/shared/seat-label";
 import { useMatchFeed } from "../useMatchFeed";
 
-type SeatInfo = { seat: number; label: string; agentId: string };
+type SeatInfo = { seat: number; label: string; displayName?: string; agentId: string };
 
 function Seats({ events }: { events: MatchEvent[] }) {
   const seats = (events.find((e) => e.kind === "match_setup")?.data.seats ?? []) as SeatInfo[];
@@ -22,7 +23,7 @@ function Seats({ events }: { events: MatchEvent[] }) {
           return (
             <li key={s.seat} data-seat={s.seat} className={dead.has(s.seat) ? "dead" : ""}>
               <span className="seat-label">
-                Seat {s.seat} ({s.label})
+                Seat {s.seat} ({spectatorLabel(s)})
               </span>
               {thinking.has(s.seat) && (
                 <span className="thinking" data-testid="thinking">
