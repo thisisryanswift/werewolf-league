@@ -1,9 +1,6 @@
 // Leaderboard panel: Agents ranked by Overall Rating, with sortable Side Rating
-// columns, Matches played, wins per Side and timeouts. It renders whatever the
-// League feed last sent, so it updates live as Matches settle.
-//
-// Extension point (wl-bfo1): add a Calibration column by adding an entry to
-// COLUMNS once AgentStanding carries it.
+// columns, Matches played, wins per Side, Calibration (Brier) and timeouts. It
+// renders whatever the League feed last sent, so it updates live as Matches settle.
 import { useState } from "react";
 import type { AgentStanding, Leaderboard as LeaderboardData } from "../../src/shared/protocol";
 
@@ -38,6 +35,14 @@ function columns(sides: string[]): Column[] {
       value: (r: AgentStanding) => r.wins[s] ?? 0,
       render: (r: AgentStanding) => String(r.wins[s] ?? 0),
     })),
+    {
+      key: "calibration",
+      label: "Calibration",
+      title: "Brier score of village-side beliefs at each vote (lower is better)",
+      // Sorting is best-first: lower Brier first, Agents with no score last.
+      value: (r) => (r.calibration === null ? -Infinity : -r.calibration),
+      render: (r) => (r.calibration === null ? "—" : r.calibration.toFixed(3)),
+    },
     { key: "timeouts", label: "Timeouts", title: "Turns that missed their deadline", value: (r) => r.timeouts, render: (r) => String(r.timeouts) },
   ];
 }
