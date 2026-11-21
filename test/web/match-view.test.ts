@@ -96,7 +96,7 @@ describe("Match view", () => {
     ]);
     const roundA = view.feed.find((g) => g.title === "Day 1 · Round A")!;
     // Presentation order is log order.
-    expect(roundA.items.map((i) => i.event.data.seat)).toEqual([3, 4, 1, 2]);
+    expect(roundA.items.filter((i) => i.event.kind === "speech").map((i) => i.event.data.seat)).toEqual([3, 4, 1, 2]);
     const vote = view.feed.find((g) => g.title === "Day 1 · Vote")!;
     expect(vote.tally).toEqual({
       counts: [
@@ -109,7 +109,7 @@ describe("Match view", () => {
     });
   });
 
-  it("puts a step's timeout markers in that step's group (Narrator's View only)", () => {
+  it("puts a step's timeout markers in that step's group", () => {
     const on = buildMatchView(logOf([...night1, ...day1]), { narratorView: true });
     const roundA = on.feed.find((g) => g.title === "Day 1 · Round A")!;
     expect(roundA.items.map((i) => i.event.kind)).toContain("turn_timed_out");
@@ -307,18 +307,35 @@ describe("Match view", () => {
     expect(view.seats.find((s) => s.seat === 6)!.accusations.score).toBe(chosen[1]!.data.score);
   });
 
-  it("marks thinking seats and timeouts only in Narrator's View, since Night turns would reveal roles", () => {
+  it("shows Day thinking and timeout markers in either view, since every living seat acts by Day", () => {
     const midStep = logOf([
       ...night1,
       ...day1.slice(0, 6),
       priv("turn_started", [3], { step: 6, seat: 3, actionKind: "speak", deadlineMs: 1000 }),
       priv("turn_started", [4], { step: 6, seat: 4, actionKind: "speak", deadlineMs: 1000 }),
     ]);
-    const on = buildMatchView(midStep, { narratorView: true });
-    expect(on.seats.filter((s) => s.thinking).map((s) => s.seat)).toEqual([3, 4]);
-    expect(on.seats.map((s) => s.timeouts)).toEqual([0, 1, 0, 0, 0]);
-    const off = buildMatchView(midStep, { narratorView: false });
+    for (const narratorView of [true, false]) {
+      const view = buildMatchView(midStep, { narratorView });
+      expect(view.seats.filter((s) => s.thinking).map((s) => s.seat)).toEqual([3, 4]);
+      expect(view.seats.map((s) => s.timeouts)).toEqual([0, 1, 0, 0, 0]);
+      const roundA = view.feed.find((g) => g.title === "Day 1 · Round A")!;
+      const marker = roundA.items.find((i) => i.event.kind === "turn_timed_out")!;
+      expect(marker.narratorViewOnly).toBe(false);
+    }
+  });
+
+  it("keeps Night thinking and timeout markers Narrator's-View-only, since who acts at Night reveals roles", () => {
+    const midNight = logOf([
+      ...night1.slice(0, 8),
+      priv("turn_started", [1], { step: 1, seat: 1, actionKind: "wolf_chat", deadlineMs: 1000 }),
+      priv("turn_timed_out", [3], { step: 0, seat: 3, actionKind: "inspect", by: "player" }),
+    ]);
+    const on = buildMatchView(midNight, { narratorView: true });
+    expect(on.seats.filter((s) => s.thinking).map((s) => s.seat)).toEqual([1]);
+    expect(on.seats.map((s) => s.timeouts)).toEqual([0, 0, 1, 0, 0]);
+    const off = buildMatchView(midNight, { narratorView: false });
     expect(off.seats.some((s) => s.thinking || s.timeouts > 0)).toBe(false);
+    expect(off.feed.flatMap((g) => g.items.map((i) => i.event.kind))).not.toContain("turn_timed_out");
   });
 
   it("treats any event not addressed to everyone as Narrator's-View-only, whatever its kind", () => {

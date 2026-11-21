@@ -3,7 +3,9 @@
 //
 // Narrator's View rule: an event is Narrator's-View-only when its audience is not "all". With
 // Narrator's View off those events are dropped before anything else is derived, so no
-// role, Wolf Chat, Night choice, turn marker or secret Drama Flag can leak.
+// role, Wolf Chat, Night choice, Night turn marker or secret Drama Flag can leak. The one
+// exception: turn markers (thinking, timeouts) committed during a Day are treated as public,
+// since every living seat acts by Day and they reveal nothing (see publicDayTurnMarkers).
 import type { AgentRatingChange, MatchEvent } from "../../src/shared/protocol";
 import type { AnalysisEventData, AnalysisReport } from "../../src/shared/analysis";
 import { spectatorLabel } from "../../src/shared/seat-label";
@@ -33,9 +35,9 @@ export interface SeatView extends SeatInfo {
   role: string | null;
   /** The seat's latest Claim. */
   claim: ClaimView | null;
-  /** A turn is in flight (Narrator's View only: who acts at Night would reveal roles). */
+  /** A turn is in flight (Night turns are Narrator's View only: who acts at Night would reveal roles). */
   thinking: boolean;
-  /** Turns that missed their deadline (Narrator's View only). */
+  /** Turns that missed their deadline (Night ones are Narrator's View only). */
   timeouts: number;
   /** The current Day's Accusations to and from this seat (public: shown in either view). */
   accusations: SeatAccusations;
@@ -140,6 +142,21 @@ export function visibleEvents(events: MatchEvent[], narratorView: boolean): Matc
   return narratorView ? events : events.filter((e) => !isNarratorViewOnly(e));
 }
 
+const TURN_MARKER_KINDS = new Set(["turn_started", "turn_timed_out"]);
+
+/**
+ * Turn markers committed while the public phase is Day, readdressed to everyone. Every living
+ * seat acts in a Speech Round, Right of Reply or Vote, so showing who is thinking or timed out
+ * leaks nothing. Night (and Wolf Chat) markers keep their seat audience: who acts reveals roles.
+ */
+export function publicDayTurnMarkers(events: MatchEvent[]): MatchEvent[] {
+  let phase: unknown = null;
+  return events.map((e) => {
+    if (e.kind === "phase_started" && e.audience === "all") phase = e.data.phase;
+    return phase === "day" && TURN_MARKER_KINDS.has(e.kind) && e.audience !== "all" ? { ...e, audience: "all" } : e;
+  });
+}
+
 const sideOfRole = (role: string) => (role === "werewolf" ? "wolf" : "village");
 
 /**
@@ -159,7 +176,7 @@ function claimTruth(claim: Omit<ClaimView, "truth">, role: string | null, roles:
 }
 
 export function buildMatchView(events: MatchEvent[], opts: { narratorView: boolean }): MatchView {
-  const log = visibleEvents(events, opts.narratorView);
+  const log = visibleEvents(publicDayTurnMarkers(events), opts.narratorView);
   const setup = (log.find((e) => e.kind === "match_setup")?.data.seats ?? []) as SeatInfo[];
   const roles = new Map<number, string>();
   const dead = new Set<number>();

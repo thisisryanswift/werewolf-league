@@ -6,14 +6,14 @@ import type { RulesetEvent } from "../../shared/protocol";
 import { DAY_RULES, dayText } from "./day";
 import { NIGHT_RULES, ROLE_NAMES, nightText } from "./night";
 import { player, who, wolfSeats } from "./players";
-import type { WerewolfState } from "./types";
+import type { Role, WerewolfState } from "./types";
 
 export type EventDescriber = (data: Record<string, unknown>, s: WerewolfState) => string | null;
 
 const commonText: Record<string, EventDescriber> = {
   phase_started: (d) => `--- ${d.phase === "night" ? "Night" : "Day"} ${d.cycle} begins ---`,
   player_died: (d, s) =>
-    `${who(s, d.seat)} ${d.cause === "vote" ? "was eliminated by vote" : "was killed in the Night"}. Their role was ${d.role}.`,
+    `${who(s, d.seat)} ${d.cause === "vote" ? "was eliminated by vote" : "was killed in the Night"}. Their role was ${ROLE_NAMES[d.role as Role] ?? d.role}.`,
   match_over: (d) => `The Match is over. Winner: ${d.winner === "wolf" ? "the Werewolves" : "the Village"}.`,
   // Setup events are covered by the briefing.
   match_setup: () => null,
