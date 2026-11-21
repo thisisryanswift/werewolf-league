@@ -1,7 +1,7 @@
 ---
 id: wl-liwr
 status: closed
-deps: [wl-gtil, wl-hozk]
+deps: [wl-gtil, wl-hozk, wl-fuy2]
 links: []
 created: 2026-11-21T18:04:53Z
 type: task
