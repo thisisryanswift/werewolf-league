@@ -1,6 +1,7 @@
-// The dense live grid (after prototype variant E): a header with live counts,
-// the leaderboard strip and the Narrator's View toggle; sort and filter chips; then the
-// three promoted large tiles and the rest. Each tile links to #match=<id>.
+// The dense live grid (after prototype variant E): a header with live counts
+// and the Narrator's View toggle; sort and filter chips; then the three promoted
+// large tiles and the rest, filled to 21 cards with recently finished Matches.
+// Each card links to #match=<id>.
 import { memo, useMemo, useRef, useState } from "react";
 import { matchLabel } from "../../src/shared/match-label";
 import type { LeagueSnapshot, MatchTile, SettledMatch } from "../../src/shared/protocol";
@@ -9,7 +10,7 @@ import { landedFeatures } from "../help/features";
 import { HelpButtons } from "../help/HelpButtons";
 import type { FeedStatus } from "../useMatchFeed";
 import { LeagueSwitcher } from "./LeagueSwitcher";
-import { arrangeGrid, fillGrid, finishedView, tileView, topAgents, type GridCard, type GridFilter, type GridSort, type PromotionHold } from "./model";
+import { arrangeGrid, fillGrid, finishedView, tileView, type GridCard, type GridFilter, type GridSort, type PromotionHold } from "./model";
 import { matchHash } from "./route";
 import "./grid.css";
 
@@ -19,7 +20,6 @@ const SORTS: { key: GridSort; label: string }[] = [
   { key: "number", label: "#" },
 ];
 const FILTER_LABELS: Record<GridFilter, string> = { all: "All", flagged: "⚑ Flagged", voting: "Voting", night: "Night" };
-const STRIP_AGENTS = 5;
 
 export interface LeagueGridProps {
   league: LeagueSnapshot;
@@ -57,14 +57,6 @@ export function LeagueGrid({ league, status, activity, narratorView, onNarratorV
           <span className="lg-count">
             <b>{league.stats.settled.toLocaleString()}</b> finished
           </span>
-          <ol className="lg-board" aria-label="Top Agents by Overall Rating" data-testid="leaderboard-strip">
-            {topAgents(league.leaderboard, STRIP_AGENTS).map((a) => (
-              // Keyed by rating, so an entry re-mounts (and flashes) when a settlement changes it.
-              <li key={`${a.agentId}:${a.rating}`} className={a.rank === 1 ? "first" : undefined} data-agent-id={a.agentId}>
-                {a.rank} {a.name} <b>{a.rating}</b>
-              </li>
-            ))}
-          </ol>
           <span className={`lg-feed lg-feed-${status}`} data-testid="feed-status" title="Live connection to the League">
             {status === "live" ? "● live" : status}
           </span>
