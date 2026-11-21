@@ -139,3 +139,8 @@ body {
   color: #8e44ad;
   font-weight: 600;
 }
+.featured {
+  padding: 0.5rem 0.75rem;
+  border-left: 4px solid #c0392b;
+  background: #fdf2f0;
+}
