@@ -67,9 +67,9 @@ export function arrangeGrid(tiles: MatchTile[], options: GridOptions): GridArran
   const filters: GridFilter[] = hasDrama ? ["all", "flagged", "voting", "night"] : ["all", "voting", "night"];
   const filter = filters.includes(options.filter) ? options.filter : "all";
   const shown = tiles.filter((t) => FILTERS[filter](t, options.narratorView));
-  // Match number is start order: the feed keeps tiles in it.
-  const number = new Map(tiles.map((t, i) => [t.matchId, i]));
-  const byNumber = (a: MatchTile, b: MatchTile) => number.get(a.matchId)! - number.get(b.matchId)!;
+  // By Match Number; older Matches without one come first, in start order (the feed keeps tiles in it).
+  const index = new Map(tiles.map((t, i) => [t.matchId, i]));
+  const byNumber = (a: MatchTile, b: MatchTile) => (a.matchNumber ?? 0) - (b.matchNumber ?? 0) || index.get(a.matchId)! - index.get(b.matchId)!;
   const drama = (t: MatchTile) => t.summary?.dramaScore ?? -1;
   const byDrama = (a: MatchTile, b: MatchTile) => drama(b) - drama(a) || byNumber(a, b);
   const alive = (t: MatchTile) => t.summary?.alive.length ?? t.seats.length;

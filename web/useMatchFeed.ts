@@ -5,8 +5,9 @@ import { mergeEvents, type MatchEvent, type ServerMessage } from "../src/shared/
 
 export type FeedStatus = "connecting" | "live" | "reconnecting";
 
-export function useMatchFeed(matchId: string): { events: MatchEvent[]; status: FeedStatus } {
+export function useMatchFeed(matchId: string): { events: MatchEvent[]; status: FeedStatus; matchNumber?: number } {
   const [events, setEvents] = useState<MatchEvent[]>([]);
+  const [matchNumber, setMatchNumber] = useState<number | undefined>();
   const [status, setStatus] = useState<FeedStatus>("connecting");
 
   useEffect(() => {
@@ -15,6 +16,7 @@ export function useMatchFeed(matchId: string): { events: MatchEvent[]; status: F
     let stopped = false;
     // A new Match (or a remount) starts from its own full log, never a previous one's.
     setEvents([]);
+    setMatchNumber(undefined);
     setStatus("connecting");
 
     const open = () => {
@@ -24,6 +26,7 @@ export function useMatchFeed(matchId: string): { events: MatchEvent[]; status: F
       ws.onmessage = (m) => {
         if (stopped) return;
         const msg = JSON.parse(m.data as string) as ServerMessage;
+        if (msg.type === "log") setMatchNumber(msg.matchNumber);
         const incoming = msg.type === "log" ? msg.events : [msg.event];
         setEvents((prev) => mergeEvents(prev, incoming));
       };
@@ -41,5 +44,5 @@ export function useMatchFeed(matchId: string): { events: MatchEvent[]; status: F
     };
   }, [matchId]);
 
-  return { events, status };
+  return { events, status, ...(matchNumber !== undefined ? { matchNumber } : {}) };
 }
