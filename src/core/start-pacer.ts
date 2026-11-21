@@ -14,9 +14,9 @@ export interface StartBudget {
   nextAt: number | null;
 }
 
-/** Start times still inside the window ending at `now`, oldest first. */
+/** Start times still inside the window ending at `now`, oldest first. Times after `now` (a clock set back) are dropped. */
 export function recentStarts(starts: number[], now: number, pacing: Pacing): number[] {
-  return starts.filter((t) => t > now - pacing.startWindowMs).sort((a, b) => a - b);
+  return starts.filter((t) => t > now - pacing.startWindowMs && t <= now).sort((a, b) => a - b);
 }
 
 /** How many Matches may start at `now`, given earlier start times and the backoff end. */
