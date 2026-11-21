@@ -2,6 +2,7 @@
 import type { MatchTile } from "../../src/shared/protocol";
 import { Leaderboard } from "../components/Leaderboard";
 import { FeaturedMatchLink, FinishedMatchList } from "../components/FinishedMatches";
+import { spectatorLabel } from "../../src/shared/seat-label";
 import { useLeagueFeed } from "../useLeagueFeed";
 
 function phaseText(tile: MatchTile): string {
@@ -24,14 +25,14 @@ function Tile({ tile }: { tile: MatchTile }) {
         <ul className="tile-seats">
           {tile.seats.map((s) => (
             <li key={s.seat} className={alive.has(s.seat) ? "" : "dead"}>
-              {s.seat}. {s.label}
+              {s.seat}. {spectatorLabel(s)}
             </li>
           ))}
         </ul>
         <p className="tile-speech">
           {speech ? (
             <>
-              <strong>{speaker ? speaker.label : `Seat ${speech.seat}`}:</strong> {speech.text}
+              <strong>{speaker ? spectatorLabel(speaker) : `Seat ${speech.seat}`}:</strong> {speech.text}
             </>
           ) : (
             <span className="muted">No speeches yet</span>

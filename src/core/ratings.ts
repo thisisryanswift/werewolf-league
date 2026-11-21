@@ -14,7 +14,8 @@ import {
   type PlayerRatingChange,
   type RatingChanges,
 } from "../shared/protocol";
-import type { SeatAgent } from "./ruleset";
+import { calibrationBySeat, type BrierTally } from "../shared/beliefs";
+import type { MatchResult, SeatAgent } from "./ruleset";
 
 export const K = 32;
 
@@ -28,6 +29,8 @@ export interface AgentRecord {
   matches: number;
   wins: Record<string, number>;
   timeouts: number;
+  /** Running Brier tally over the Agent's scored beliefs (absent on records from before Calibration). */
+  brier?: BrierTally;
 }
 
 const ratingOf = (snap: RatingSnapshot, agentId: string, side: string): number => snap[agentId]?.[side] ?? INITIAL_RATING;
@@ -73,6 +76,8 @@ export function applyMatch(opts: {
   sideOrder: readonly string[];
   names: Record<string, string>;
   timeoutsByAgent: Record<string, number>;
+  /** This Match's Brier tally per Agent (see `calibrationByAgent`). */
+  calibrationByAgent?: Record<string, BrierTally>;
 }): { records: Record<string, AgentRecord>; changes: RatingChanges } {
   const records = { ...opts.records };
   const net = new Map<string, AgentRatingChange>();
@@ -100,9 +105,34 @@ export function applyMatch(opts: {
       matches: prev.matches + 1,
       wins: won ? { ...prev.wins, [opts.winner]: (prev.wins[opts.winner] ?? 0) + 1 } : prev.wins,
       timeouts: prev.timeouts + (opts.timeoutsByAgent[agentId] ?? 0),
+      brier: addTally(prev.brier, opts.calibrationByAgent?.[agentId]),
     };
   }
   return { records, changes: { players: opts.players, agents } };
+}
+
+const addTally = (a: BrierTally | undefined, b: BrierTally | undefined): BrierTally => ({
+  sum: (a?.sum ?? 0) + (b?.sum ?? 0),
+  n: (a?.n ?? 0) + (b?.n ?? 0),
+});
+
+/**
+ * A Match's Brier tally per Agent: every ballot its Players cast from a Side
+ * other than the belief Side, summed over its seats. Empty if the Ruleset
+ * collects no ballots.
+ */
+export function calibrationByAgent(
+  seats: SeatAgent[],
+  result: Pick<MatchResult, "ballots" | "sides" | "beliefSide">,
+): Record<string, BrierTally> {
+  if (!result.ballots || result.beliefSide === undefined) return {};
+  const bySeat = calibrationBySeat({ ballots: result.ballots, sides: result.sides, beliefSide: result.beliefSide });
+  const out: Record<string, BrierTally> = {};
+  for (const s of seats) {
+    const t = bySeat[s.seat];
+    if (t) out[s.agentId] = addTally(out[s.agentId], t);
+  }
+  return out;
 }
 
 /** An Agent's leaderboard row. */
@@ -117,6 +147,7 @@ export function standing(agentId: string, name: string, record: AgentRecord | un
     matches: record?.matches ?? 0,
     wins,
     timeouts: record?.timeouts ?? 0,
+    calibration: record?.brier?.n ? record.brier.sum / record.brier.n : null,
   };
 }
 

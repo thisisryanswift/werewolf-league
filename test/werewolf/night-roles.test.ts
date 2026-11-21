@@ -48,7 +48,7 @@ describe("Pack Leader", () => {
     })();
     const step = werewolf.nextStep(state);
     if (step.type !== "turns") throw new Error();
-    for (const t of step.turns) expect(t.prompt).toContain(`Pack Leader is seat ${leader}`);
+    for (const t of step.turns) expect(t.prompt).toContain(`Name${leader} (seat ${leader}):`);
   });
 
   it("when only the non-leader wolf submits a kill, that target dies", () => {
@@ -147,7 +147,7 @@ describe("Night privacy", () => {
       expect(text).not.toMatch(/Wolf Chat|inspect/i);
       expect(text).toContain("was killed in the Night");
     }
-    expect(observe(seer)).toContain(`Seat ${wolves[0]}`);
+    expect(observe(seer)).toContain(`Name${wolves[0]} (seat ${wolves[0]}) is on the wolf side`);
     expect(observe(seer)).toMatch(/wolf side/);
     expect(observe(wolves[1]!)).toContain("secret plan");
     expect(observe(wolves[1]!)).not.toMatch(/wolf side/);

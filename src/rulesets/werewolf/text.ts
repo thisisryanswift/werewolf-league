@@ -5,20 +5,15 @@ import type { Seat, TurnRequest } from "../../core/ruleset";
 import type { RulesetEvent } from "../../shared/protocol";
 import { DAY_RULES, dayText } from "./day";
 import { NIGHT_RULES, ROLE_NAMES, nightText } from "./night";
-import { player, wolfSeats } from "./players";
+import { player, who, wolfSeats } from "./players";
 import type { WerewolfState } from "./types";
 
 export type EventDescriber = (data: Record<string, unknown>, s: WerewolfState) => string | null;
 
-const label = (s: WerewolfState, seat: unknown) => {
-  const p = player(s, Number(seat));
-  return p ? `Seat ${p.seat} (${p.label})` : `Seat ${String(seat)}`;
-};
-
 const commonText: Record<string, EventDescriber> = {
   phase_started: (d) => `--- ${d.phase === "night" ? "Night" : "Day"} ${d.cycle} begins ---`,
   player_died: (d, s) =>
-    `${label(s, d.seat)} ${d.cause === "vote" ? "was eliminated by vote" : "was killed in the Night"}. Their role was ${d.role}.`,
+    `${who(s, d.seat)} ${d.cause === "vote" ? "was eliminated by vote" : "was killed in the Night"}. Their role was ${d.role}.`,
   match_over: (d) => `The Match is over. Winner: ${d.winner === "wolf" ? "the Werewolves" : "the Village"}.`,
   // Setup events are covered by the briefing.
   match_setup: () => null,
@@ -43,11 +38,11 @@ ${DAY_RULES}
 
 export function briefing(s: WerewolfState, seat: Seat): string {
   const me = player(s, seat)!;
-  const lines = [RULES, "", "Seats:", ...s.players.map((p) => `- Seat ${p.seat}: ${p.label}`), ""];
-  lines.push(`You are seat ${seat}. Your secret role: ${ROLE_NAMES[me.role]}.`);
+  const lines = [RULES, "", "Seats:", ...s.players.map((p) => `- Seat ${p.seat}${p.displayName ? `: ${p.displayName}` : ""}`), ""];
+  lines.push(`You are ${who(s, seat)}. Your secret role: ${ROLE_NAMES[me.role]}.`);
   if (me.role === "werewolf") {
     const partner = wolfSeats(s).filter((w) => w !== seat);
-    lines.push(`Your Werewolf partner is seat ${partner.join(", ")}.`);
+    lines.push(`Your Werewolf partner is ${partner.map((w) => who(s, w)).join(", ")}.`);
   }
   return lines.join("\n");
 }

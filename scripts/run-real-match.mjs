@@ -20,14 +20,13 @@ const secret = process.env.ADMIN_SECRET ?? devVarsSecret();
 if (!secret) throw new Error("set ADMIN_SECRET (see .dev.vars)");
 const UA = "werewolf-league-real-smoke/1.0";
 
-const INSTRUCTIONS =
-  "Play to win for your Side. Read every observation carefully, reason about who is lying, " +
-  "and always answer with exactly the tool call the game asks for.";
 // Two Agents on the same model, so the dealer can put the Werewolves on different Agents.
+// No `instructions`: each seat gets its Ruleset-named sections of the Ruleset's Agent
+// Instructions (docs/agent-instructions/werewolf.md), mounted as /.agents/AGENTS.md.
 const agents = Array.from({ length: 7 }, (_, i) =>
   i % 2 === 0
-    ? { id: "hydrogen-a", name: "Hydrogen A", harness: "managed-agent", model, instructions: INSTRUCTIONS }
-    : { id: "hydrogen-b", name: "Hydrogen B", harness: "managed-agent", model, instructions: INSTRUCTIONS },
+    ? { id: "hydrogen-a", name: "Hydrogen A", harness: "managed-agent", model }
+    : { id: "hydrogen-b", name: "Hydrogen B", harness: "managed-agent", model },
 );
 
 const t0 = Date.now();

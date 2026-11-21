@@ -14,6 +14,8 @@ interface Seating {
   seat: Seat;
   agent: AgentConfig;
   tools: ToolSpec[];
+  /** Assembled Agent Instructions for this seat (see PlayerContext). */
+  instructions?: string;
 }
 
 interface CurrentTurn extends TurnAssignment {

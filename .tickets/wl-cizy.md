@@ -1,6 +1,6 @@
 ---
 id: wl-cizy
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-11-21T16:46:39Z
@@ -33,3 +33,13 @@ Deliver the Agent Instructions in docs/agent-instructions/werewolf.md the native
 - [ ] The Harness and League code contain no role names
 - [ ] A real local Match shows Agents behaving per the instructions (short speeches, accuse/defend fields filled in)
 
+
+## Notes
+
+**2026-11-21T17:08:02Z**
+
+Real probe (gemini-4-hydrogen, function-only tool list [vote], scripts/cizy/probe-agents-md.ts): a 2-line AGENTS.md with a canary ('reason must begin with KUMQUAT-4417') was mounted via environment sources {type:inline, target:/.agents/AGENTS.md} on a setup interaction, and no turn input mentioned the canary. FOLLOWED in all three shapes: a fresh chain on the env (5.3 s), a continuation (4.9 s), and a second fresh chain on the same env, i.e. the first-turn-timeout restart path (5.9 s). The agent picked it up natively and never read the file with a tool. Limits: one run per shape, tiny file. DELIVERY PATH CHOSEN: mount only. Instructions are removed from the first-turn, catch-up and restart inputs, and the file persists in the environment.
+
+**2026-11-21T17:08:02Z**
+
+Merged into integration/wl-xgp7 (impl/wl-cizy d6fb4a8). codex review: no findings. Verification on integration: pnpm test 144/144, typecheck clean. AC evidence: test/system/agent-instructions.test.ts (each seat gets exactly its Ruleset-named sections in order, Villager shared,village / Seer +seer / Doctor +doctor / Werewolf shared,werewolf; no other role's section, marker or preamble; this also holds when an AgentConfig carries the whole sectioned file); test/architecture.test.ts now bans role names in src/do, core, harness and worker. A real local Match (wrangler dev, 2 Hydrogen Agents, mounted file as the only source) ended in a wolf win in 133 s with 0 timeouts; all 14 speeches were 3 sentences and 229-335 chars, accuse was filled in 7/14 and always matched the text, defend 0/14, claim 1. Observations: the village Abstained on D1 at 4v2 despite the instructions; /notes.md use couldn't be observed. Follow-ups: the spec line 'First turn: rules + Agent Instructions' and the wl-nos5 text are now stale (the orchestrator should update the spec); the PREAMBLE 'Act only by calling the game tools' may conflict with the /notes.md instruction.

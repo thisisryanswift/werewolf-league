@@ -4,7 +4,7 @@ import type { WerewolfState } from "../../src/rulesets/werewolf/types";
 import type { RulesetEvent } from "../../src/shared/protocol";
 
 export function seatsOf(n: number): SeatAgent[] {
-  return Array.from({ length: n }, (_, i) => ({ seat: i + 1, agentId: `agent-${i + 1}`, label: `Agent ${i + 1}` }));
+  return Array.from({ length: n }, (_, i) => ({ seat: i + 1, agentId: `agent-${i + 1}`, label: `Agent ${i + 1}`, displayName: `Name${i + 1}` }));
 }
 
 export const kill = (target: number): ToolCall => ({ name: "choose_kill", args: { target } });

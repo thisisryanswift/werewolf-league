@@ -57,7 +57,7 @@ export function setup(rawConfig: Record<string, unknown>, seed: string, seats: S
     {
       kind: "match_setup",
       audience: "all",
-      data: { ruleset: "werewolf", seats: players.map((p) => ({ seat: p.seat, label: p.label, agentId: p.agentId })) },
+      data: { ruleset: "werewolf", seats: players.map((p) => ({ seat: p.seat, label: p.label, displayName: p.displayName, agentId: p.agentId })) },
     },
     ...players.map((p): RulesetEvent => ({ kind: "role_assigned", audience: [p.seat], data: { seat: p.seat, role: p.role } })),
     { kind: "wolf_team", audience: wolves, data: { wolves } },

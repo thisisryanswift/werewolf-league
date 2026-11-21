@@ -48,3 +48,7 @@ Design verdict (2026-11-21): build from variant E on prototype/spectator-ui (com
 **2026-11-21T16:43:58Z**
 
 Human decision 2026-11-21: the human wants to be involved in the final design pass. The implementer builds from variant E, then stops and reports with a runnable local build (wrangler dev plus fake League) for the human's review. The orchestrator does not merge wl-gtil until the human has done the design pass.
+
+**2026-11-21T17:01:52Z**
+
+From wl-pbkx: tile dramaFlags include secret flags tagged visibility:'secret'. The grid MUST filter them through visibleDramaFlags(flags, godView) so they are hidden when God View is off. dramaScore/dramaFlags are optional MatchSummary fields.
