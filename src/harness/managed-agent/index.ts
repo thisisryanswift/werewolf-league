@@ -206,7 +206,7 @@ export function managedAgentHarness(opts: ManagedAgentOptions): Harness {
 
   function freshInput(ctx: PlayerContext, chain: Chain, error: string | undefined): string {
     // The Agent Instructions are not repeated here: they stay mounted in the environment.
-    const parts = [PREAMBLE];
+    const parts = [ctx.preamble ?? PREAMBLE];
     const restart = chain.transcript.length > 1;
     if (restart || chain.note) parts.push([chain.note, restart ? NOTE_RESTART : null].filter(Boolean).join(" "));
     parts.push(markEarlier(chain.transcript));
@@ -235,7 +235,7 @@ export function managedAgentHarness(opts: ManagedAgentOptions): Harness {
       const setup = await api.create({
         ...base(ctx),
         environment: environmentConfig(ctx),
-        input: `${PREAMBLE}\n\nSetup only: your sandbox is being prepared. Do nothing; the Match starts soon.`,
+        input: `${ctx.preamble ?? PREAMBLE}\n\nSetup only: your sandbox is being prepared. Do nothing; the Match starts soon.`,
       });
       const environment = setup.environment_id ?? (await api.get(setup.id)).environment_id;
       if (!environment) throw new Error(`setup interaction ${setup.id} returned no environment_id`);

@@ -13,6 +13,8 @@
 //   notes_updated  { seat, text, truncated }               audience []       committed when a seat's reported notes (its private
 //                                                                            /notes.md) change; Narrator's View only, never sent
 //                                                                            to Agents or the Narrator (wl-rhpr)
+//   analysis       AnalysisEventData (core/analyst.ts)     audience []      committed once, after the result is settled, by the post-Match
+//                                                                            Analyst (a report, or a recorded failure); Narrator's View only
 
 import type { MatchCost, RatingChanges, RulesetEvent } from "./protocol";
 
@@ -32,6 +34,7 @@ export const RUNNER_EVENT_KINDS: ReadonlySet<string> = new Set([
   "ratings_settled",
   "match_cost",
   "notes_updated",
+  "analysis",
 ]);
 
 /** Notes longer than this many characters are cut (about 2 KB). */

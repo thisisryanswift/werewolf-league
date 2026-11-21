@@ -5,6 +5,7 @@
 // Ruleset interface (to check a drawn table can be dealt).
 
 import { DurableObject } from "cloudflare:workers";
+import { acquireSlot, DEFAULT_ANALYST_CONCURRENCY, type AnalystSlots } from "../core/analyst";
 import { drawTable } from "../core/draw";
 import type { MatchInit, MatchReport } from "../core/match";
 import { FeedCoalescer } from "../core/league-feed";
@@ -456,6 +457,28 @@ export class LeagueDO extends DurableObject<Env> {
   }
 
   /**
+   * A finished Match asks for one of the League's Analyst slots (at most
+   * `analystConcurrency` runs in flight). "wait" means retry later; "spend_cap" means
+   * the League is over its spend cap, so the analysis is skipped. Synchronous.
+   */
+  async acquireAnalystSlot(matchId: string, leaseMs: number): Promise<"granted" | "wait" | "spend_cap"> {
+    const slots = this.ctx.storage.kv.get<AnalystSlots>("analystSlots") ?? {};
+    if (!(matchId in slots) && this.capReached) return "spend_cap";
+    const cap = this.config.analystConcurrency ?? DEFAULT_ANALYST_CONCURRENCY;
+    const r = acquireSlot(slots, matchId, Date.now(), cap, leaseMs);
+    this.ctx.storage.kv.put("analystSlots", r.slots);
+    return r.granted ? "granted" : "wait";
+  }
+
+  /** A Match's Analyst run is over (reported, failed or timed out): free its slot. */
+  async releaseAnalystSlot(matchId: string): Promise<void> {
+    const slots = { ...this.ctx.storage.kv.get<AnalystSlots>("analystSlots") };
+    if (!(matchId in slots)) return;
+    delete slots[matchId];
+    this.ctx.storage.kv.put("analystSlots", slots);
+  }
+
+  /**
    * Settlement hook: runs exactly once per Match ID, synchronously, before the
    * settlement record is stored. Applies the Match's rating changes, computed
    * from the pre-Match snapshot, to the current ratings and returns them on the
@@ -555,6 +578,7 @@ export class LeagueDO extends DurableObject<Env> {
         config: config.rulesetConfig,
         deadlines: config.deadlines,
         narrator: config.narrator,
+        analyst: config.analyst,
         agents: draw.agents,
       });
       // Report back to this League (there is one in production; tests may run others).

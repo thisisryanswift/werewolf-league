@@ -5,6 +5,7 @@
 // Narrator's View off those events are dropped before anything else is derived, so no
 // role, Wolf Chat, Night choice, turn marker or secret Drama Flag can leak.
 import type { AgentRatingChange, MatchEvent } from "../../src/shared/protocol";
+import type { AnalysisEventData, AnalysisReport } from "../../src/shared/analysis";
 import { spectatorLabel } from "../../src/shared/seat-label";
 import { countTimeouts, thinkingSeats, type MatchCostData } from "../../src/shared/turn-events";
 
@@ -78,12 +79,22 @@ export interface EndScreen {
   ratings: (AgentRatingChange & { name: string })[] | null;
   /** Final measured cost in USD (the latest `match_cost` event); null if the Match reported none. */
   cost: EndCost | null;
+  /**
+   * The post-Match Analyst's report or recorded failure (the `analysis` event). Null until
+   * it arrives, and always with Narrator's View off: the event is Narrator's-View-only.
+   */
+  analysis: EndAnalysis | null;
 }
 
+export type EndAnalysis =
+  | { status: "ok"; model: string; seconds: number | null; report: AnalysisReport }
+  | { status: "failed"; model: string; seconds: number | null; reason: string };
+
 export interface EndCost {
-  /** Players plus Narrator. */
+  /** Players plus Narrator plus Analyst. */
   total: number;
   narrator: number;
+  analyst: number;
   /** Each Agent's share (the sum of its seats), in seat order of first appearance. */
   agents: { agentId: string; name: string; cost: number }[];
   tokens: { input: number; cached: number; thought: number; output: number };
@@ -194,7 +205,18 @@ function endScreen(log: MatchEvent[], seats: SeatView[]): EndScreen | null {
     roles: seats.map((s) => ({ seat: s.seat, label: playerLabel(s), role: roles[s.seat] ?? s.role ?? "?", alive: s.alive })),
     ratings: agents && agents.map((a) => ({ ...a, name: nameOf(a.agentId) })),
     cost: endCost(log, seats),
+    analysis: endAnalysis(log),
   };
+}
+
+function endAnalysis(log: MatchEvent[]): EndAnalysis | null {
+  const e = log.find((x) => x.kind === "analysis");
+  if (!e) return null;
+  const d = e.data as unknown as AnalysisEventData;
+  const seconds = d.startedAt != null ? Math.round((d.finishedAt - d.startedAt) / 1000) : null;
+  return d.status === "ok"
+    ? { status: "ok", model: d.model, seconds, report: d.report }
+    : { status: "failed", model: d.model, seconds, reason: d.reason };
 }
 
 function endCost(log: MatchEvent[], seats: SeatView[]): EndCost | null {
@@ -208,11 +230,11 @@ function endCost(log: MatchEvent[], seats: SeatView[]): EndCost | null {
     if (row) row.cost += usd;
     else agents.push({ agentId: s.agentId, name: agentName(s), cost: usd });
   }
-  return { total: Number(d.total), narrator: Number(d.narrator ?? 0), agents, tokens: d.tokens };
+  return { total: Number(d.total), narrator: Number(d.narrator ?? 0), analyst: Number(d.analyst ?? 0), agents, tokens: d.tokens };
 }
 
 /** Runner bookkeeping that is shown as seat markers (or on the end screen), never as feed lines. */
-const MARKER_KINDS = new Set(["turn_started", "step_resolved", "match_cost"]);
+const MARKER_KINDS = new Set(["turn_started", "step_resolved", "match_cost", "analysis"]);
 const VOTE_KINDS = new Set(["votes_revealed", "beliefs_recorded", "no_elimination"]);
 const RESULT_KINDS = new Set(["match_over", "ratings_settled"]);
 
