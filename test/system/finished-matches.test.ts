@@ -1,7 +1,7 @@
 import { exports } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 import type { LeagueSnapshot } from "../../src/shared/protocol";
-import { ADMIN, connect, decisions, fakeAgent, finished, startMatch, waitFor } from "./helpers";
+import { ADMIN, connect, decisions, fakeAgent, finished, startMatch, UNPACED, waitFor } from "./helpers";
 
 async function league(): Promise<LeagueSnapshot> {
   const res = await exports.default.fetch("http://test/api/league");
@@ -28,7 +28,7 @@ const table = (prefix: string, opts: Record<string, unknown> = { delayPolls: 1 }
 
 /** Run the League until at least `count` Matches have finished, then pause and drain. */
 async function runLeagueUntil(count: number): Promise<LeagueSnapshot> {
-  await ok(admin("config", { n: 2, roster: table("fm").slice(0, 3) }));
+  await ok(admin("config", { ...UNPACED, n: 2, roster: table("fm").slice(0, 3) }));
   await ok(admin("resume"));
   await waitFor(async () => (await league()).recent.length >= count);
   await ok(admin("pause"));

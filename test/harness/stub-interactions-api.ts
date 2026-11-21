@@ -22,6 +22,7 @@ interface StubInteraction {
 }
 
 let callSeq = 0;
+let interactionSeq = 0;
 
 export class StubInteractionsApi {
   requests: StubRequest[] = [];
@@ -86,7 +87,8 @@ export class StubInteractionsApi {
       }
     }
     this.n += 1;
-    const id = `int-${this.n}`;
+    // Unique across stub instances, like real IDs: a late read from an earlier test's Match never hits this stub's interactions.
+    const id = `int-${++interactionSeq}`;
     // "remote" or a config object ({ type: "remote", sources }) creates a new environment; a string ID reuses one.
     const fresh = body.environment === "remote" || typeof body.environment === "object";
     const environment_id = fresh ? `env-${this.n}` : body.environment;

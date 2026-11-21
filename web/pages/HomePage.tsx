@@ -1,84 +1,41 @@
-// Home page: a live grid of the League's Match tiles. Each tile links to its Match page.
-import type { MatchTile } from "../../src/shared/protocol";
+// Home page: the dense live grid of the League's Matches, with the Match modal
+// over it for #match=<id>. God View (on by default) is shared by the grid and
+// the modal. The full leaderboard and the finished Matches follow the grid.
+import { useState } from "react";
 import { Leaderboard } from "../components/Leaderboard";
-import { FeaturedMatchLink, FinishedMatchList } from "../components/FinishedMatches";
-import { spectatorLabel } from "../../src/shared/seat-label";
+import { FinishedMatchList } from "../components/FinishedMatches";
+import { LeagueGrid } from "../grid/LeagueGrid";
+import { MatchModal } from "../grid/MatchModal";
+import { useMatchRoute } from "../grid/useMatchRoute";
 import { useLeagueFeed } from "../useLeagueFeed";
 import { formatUsd } from "../cost";
 
-function phaseText(tile: MatchTile): string {
-  const s = tile.summary;
-  if (!s) return tile.status === "starting" ? "Starting…" : "Waiting…";
-  return s.round === null ? s.phase : `${s.phase} ${s.round}`;
-}
-
-function Tile({ tile }: { tile: MatchTile }) {
-  const alive = new Set(tile.summary?.alive ?? tile.seats.map((s) => s.seat));
-  const speech = tile.summary?.latestSpeech;
-  const speaker = speech && tile.seats.find((s) => s.seat === speech.seat);
-  return (
-    <li className="tile" data-testid="match-tile" data-match-id={tile.matchId}>
-      <a href={`/matches/${tile.matchId}`}>
-        <h2 className="tile-phase">{phaseText(tile)}</h2>
-        <p className="tile-alive">
-          {alive.size} of {tile.seats.length} alive
-        </p>
-        <ul className="tile-seats">
-          {tile.seats.map((s) => (
-            <li key={s.seat} className={alive.has(s.seat) ? "" : "dead"}>
-              {s.seat}. {spectatorLabel(s)}
-            </li>
-          ))}
-        </ul>
-        {tile.summary?.cost !== undefined && (
-          <p className="tile-cost" data-testid="tile-cost">
-            Cost so far {formatUsd(tile.summary.cost)}
-          </p>
-        )}
-        <p className="tile-speech">
-          {speech ? (
-            <>
-              <strong>{speaker ? spectatorLabel(speaker) : `Seat ${speech.seat}`}:</strong> {speech.text}
-            </>
-          ) : (
-            <span className="muted">No speeches yet</span>
-          )}
-        </p>
-      </a>
-    </li>
-  );
-}
-
 export function HomePage() {
-  const { league, status } = useLeagueFeed();
+  const { league, status, activity } = useLeagueFeed();
+  const [godView, setGodView] = useState(true);
+  const route = useMatchRoute();
   return (
-    <main>
-      <h1>Werewolf League</h1>
-      <p data-testid="feed-status">
-        Feed: {status}
-        {league && (
-          <>
-            {" · "}
-            {league.config.paused ? "Paused" : `${league.tiles.length} of ${league.config.n} Matches live`}
-            {" · "}
-            {league.stats.settled} finished
-            {league.spend && (
-              <span data-testid="league-spend">
-                {" · "}Spend {formatUsd(league.spend.total)} ({formatUsd(league.spend.sinceResume)} since resume)
-                {league.config.spendCap != null && ` · cap ${formatUsd(league.config.spendCap)}`}
-              </span>
-            )}
-          </>
-        )}
-      </p>
-      {league && <FeaturedMatchLink featured={league.featured} />}
-      {league?.blocked && <p className="blocked">League can't start Matches: {league.blocked}</p>}
-      {league && <Leaderboard data={league.leaderboard} />}
-      {league && league.tiles.length === 0 && <p className="muted">No live Matches.</p>}
-      <ul className="match-grid">
-        {league?.tiles.map((t) => <Tile key={t.matchId} tile={t} />)}
-      </ul>
-      {league && <FinishedMatchList recent={league.recent} />}
+    <main className="lg-page">
+      {league ? (
+        <LeagueGrid league={league} status={status} activity={activity} godView={godView} onGodViewChange={setGodView} />
+      ) : (
+        <p className="lg-loading" data-testid="feed-status">
+          Feed: {status}
+        </p>
+      )}
+      {league && (
+        <div className="lg-below">
+          {league.spend && (
+            <p className="lg-spend" data-testid="league-spend">
+              League spend {formatUsd(league.spend.total)} ({formatUsd(league.spend.sinceResume)} since resume)
+              {league.config.spendCap != null && ` · cap ${formatUsd(league.config.spendCap)}`}
+            </p>
+          )}
+          <Leaderboard data={league.leaderboard} />
+          <FinishedMatchList recent={league.recent} />
+        </div>
+      )}
+      {route.matchId && <MatchModal key={route.matchId} matchId={route.matchId} godView={godView} onGodViewChange={setGodView} onClose={route.close} />}
     </main>
   );
 }

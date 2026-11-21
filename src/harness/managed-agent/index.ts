@@ -139,13 +139,13 @@ export function managedAgentHarness(opts: ManagedAgentOptions): Harness {
   };
 
   /**
-   * Cancel an interaction, then read it again for its usage (its tokens were billed).
-   * The read after the cancel is preferred; the cancel response is the fallback. Bounded.
+   * Cancel an interaction; returns the cancel response, which may carry its usage (its tokens were billed).
+   * Never throws.
    */
-  async function cancelAndRead(id: string, timeoutMs?: number): Promise<Interaction | null> {
-    const response = await api.cancel(id, timeoutMs).catch(() => null);
-    const after = await api.get(id, CANCEL_READ_TIMEOUT_MS).catch(() => null);
-    return after?.usage ? after : (response ?? after);
+  async function cancelForUsage(id: string, timeoutMs?: number): Promise<Interaction | null> {
+    // No extra read here: it would lengthen every timed-out turn. Usage missing from the
+    // cancel response is read later (the next turn's reconcile, or close()).
+    return api.cancel(id, timeoutMs).catch(() => null);
   }
 
   /** Settle the previous in-flight interaction and fold its outcome into the chain. */
@@ -156,7 +156,7 @@ export function managedAgentHarness(opts: ManagedAgentOptions): Harness {
     let cancelled = !!f.cancelled;
     if (ACTIVE.has(it.status)) {
       // A new turn arrived while this one was still running: its turn is over.
-      it = (await cancelAndRead(f.id)) ?? it;
+      it = (await cancelForUsage(f.id)) ?? it;
       cancelled = true;
     }
     const usage = usageOf(ctx, it);
@@ -245,7 +245,7 @@ export function managedAgentHarness(opts: ManagedAgentOptions): Harness {
       if (chain.setupInteraction) {
         // Best effort and bounded: the setup interaction is never continued. It ran the model, so it is billed.
         const id = chain.setupInteraction;
-        const setup = await cancelAndRead(id, SETUP_CANCEL_TIMEOUT_MS);
+        const setup = await cancelForUsage(id, SETUP_CANCEL_TIMEOUT_MS);
         const read = setup ? usageOf(ctx, setup) : [];
         usage.push(...read);
         chain = { ...chain, setupInteraction: undefined };
@@ -307,7 +307,8 @@ export function managedAgentHarness(opts: ManagedAgentOptions): Harness {
       try {
         it = await api.get(id);
       } catch (err) {
-        if (err instanceof ApiError && (err.status >= 500 || err.status === 429)) return { status: "pending", handle };
+        if (err instanceof ApiError && err.status === 429) return { status: "pending", handle, rateLimited: true };
+        if (err instanceof ApiError && err.status >= 500) return { status: "pending", handle };
         throw err;
       }
       if (ACTIVE.has(it.status)) return { status: "pending", handle };
@@ -323,9 +324,9 @@ export function managedAgentHarness(opts: ManagedAgentOptions): Harness {
     async close(ctx) {
       const chain = ctx.chain as unknown as Chain;
       // The setup interaction (a seat that never took a turn), any settled interaction whose
-      // usage could not be read, and the seat's last interaction: read each one's final usage.
+      // usage could not be read, and a last interaction that was cancelled: read each one's final usage.
       const ids = [
-        ...new Set([chain.setupInteraction, ...(chain.unread ?? []), chain.inFlight?.id].filter((x): x is string => !!x)),
+        ...new Set([chain.setupInteraction, ...(chain.unread ?? []), chain.inFlight?.cancelled ? chain.inFlight.id : undefined].filter((x): x is string => !!x)),
       ];
       if (!ids.length) return;
       const usage: UsageReading[] = [];
@@ -348,7 +349,7 @@ export function managedAgentHarness(opts: ManagedAgentOptions): Harness {
       const chain = ctx.chain as unknown as Chain;
       const f = chain.inFlight;
       if (!f || f.id !== handle.interactionId) return;
-      const it = await cancelAndRead(f.id);
+      const it = await cancelForUsage(f.id);
       const usage = it ? usageOf(ctx, it) : [];
       return {
         chain: { ...chain, inFlight: { ...f, cancelled: true } } as unknown as Record<string, unknown>,

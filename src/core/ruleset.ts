@@ -119,7 +119,8 @@ export interface Ruleset<S = unknown> {
   renderObservation(state: S, seat: Seat, newEvents: RulesetEvent[], turn: TurnRequest): string;
   result(state: S): MatchResult | null;
   /**
-   * Public summary for the League grid tile. `publicEvents` is the committed
+   * Summary for the League grid tile: public fields, plus private ones only under
+   * `godView`. `publicEvents` is the committed
    * log filtered to the "all" audience (for the latest speech line).
    */
   summary(state: S, publicEvents: RulesetEvent[]): MatchSummary;

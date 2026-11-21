@@ -320,13 +320,21 @@ describe("Managed Agent harness: usage", () => {
     });
   });
 
-  it("reads a cancelled (timed-out) interaction's usage after the cancel, because its tokens were billed", async () => {
+  it("counts a cancelled (timed-out) interaction's usage, from the cancel response or else when the next turn reads it", async () => {
     const s = await seat();
     await s.act(input("BRIEFING-1", "vote", { firstTurn: true }), "vote", { target: 2 });
-    const h = await s.start(input("OBS", "speak"));
-    const id = String(h.interactionId);
-    s.api.billOnCancel.set(id, { total_input_tokens: 7000, total_cached_tokens: 4000, total_thought_tokens: 90, total_output_tokens: 25 });
-    expect(await s.cancel(h)).toEqual([{ id, model: "gemini-4-hydrogen", usage: U2 }]);
+    // Usage already on the cancel response.
+    const h1 = await s.start(input("OBS-1", "speak"));
+    const id1 = String(h1.interactionId);
+    s.api.bill(id1, U1);
+    expect(await s.cancel(h1)).toEqual([{ id: id1, model: "gemini-4-hydrogen", usage: U1 }]);
+    // Usage visible only after the cancel: the next turn's start reads it.
+    const h2 = await s.start(input("OBS-2", "speak"));
+    const id2 = String(h2.interactionId);
+    s.api.billOnCancel.set(id2, { total_input_tokens: 7000, total_cached_tokens: 4000, total_thought_tokens: 90, total_output_tokens: 25 });
+    expect(await s.cancel(h2)).toBeUndefined();
+    const next = await s.harness.startTurn(s.ctx, input("OBS-3"));
+    expect(next.usage).toContainEqual({ id: id2, model: "gemini-4-hydrogen", usage: U2 });
   });
 
   it("on close, cancels and bills the setup interaction of a seat that never took a turn, once", async () => {
@@ -364,7 +372,7 @@ describe("Managed Agent harness: usage", () => {
   it("reports the setup interaction's usage when the first turn cancels it", async () => {
     const s = await seat();
     const setupId = s.api.latest().id;
-    s.api.billOnCancel.set(setupId, { total_input_tokens: 900, total_cached_tokens: 0, total_thought_tokens: 10, total_output_tokens: 0 });
+    s.api.bill(setupId, { input: 900, cached: 0, thought: 10, output: 0 });
     const started = await s.harness.startTurn(s.ctx, input("BRIEFING-1", "vote", { firstTurn: true }));
     expect(started.usage).toEqual([{ id: setupId, model: "gemini-4-hydrogen", usage: { input: 900, cached: 0, thought: 10, output: 0 } }]);
   });

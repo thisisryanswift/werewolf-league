@@ -54,7 +54,14 @@ export type TurnHandle = Record<string, unknown>;
  * The same call may be read again later; readings share its ID (see UsageReading).
  */
 export type PollResult =
-  | { status: "pending"; handle: TurnHandle }
+  | {
+      status: "pending";
+      handle: TurnHandle;
+      /** True if the poll was refused with a 429; the Player DO reports it to the League. */
+      rateLimited?: boolean;
+      /** Poll no sooner than this (the Player DO still wakes for the deadline). */
+      retryAfterMs?: number;
+    }
   /** `call: null` means the turn ended without a custom function call. */
   | { status: "done"; call: ToolCall | null; usage?: UsageReading[] }
   | { status: "error"; message: string; usage?: UsageReading[] };
@@ -88,4 +95,12 @@ export interface Harness {
    * interaction of a seat that never took a turn, and return its usage. Optional.
    */
   close?(ctx: PlayerContext): Promise<CancelResult | void>;
+}
+
+/**
+ * True for an error a Harness threw because the model API refused with a 429
+ * (any error carrying `status: 429`, e.g. the managed-agent harness's ApiError).
+ */
+export function isRateLimited(err: unknown): boolean {
+  return typeof err === "object" && err !== null && (err as { status?: unknown }).status === 429;
 }

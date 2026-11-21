@@ -1,6 +1,6 @@
 ---
 id: wl-hozk
-status: in_progress
+status: closed
 deps: [wl-2qjw, wl-jb4x, wl-lvtw]
 links: []
 created: 2026-11-21T15:06:09Z
@@ -34,3 +34,7 @@ Narrator's View toggle (on by default) revealing roles, Wolf Chat and any Narrat
 **2026-11-21T17:12:23Z**
 
 Merged into integration/wl-xgp7 (impl/wl-hozk cf03270). The MatchPage conflict was resolved to hozk's MatchView wrapper; the old page's spectatorLabel use moves into the MatchView via the wl-e9tp follow-up. Verification on integration: pnpm test 166/166, typecheck clean. AC evidence: test/web/match-view.test.ts (buildMatchView with Narrator's View off drops non-'all' events, grouped feed titles and tallies, end screen waits for ratings_settled, generic panelsFor hiding); headless 1920x1080 checks in /tmp/wl-hozk-verify/ (Narrator's View off shows 0 roles, 0 Wolf Chat and 0 private rows; end screen with rating changes; dialog-sized box). Mounting contract for wl-gtil: <MatchView matchId godView? onGodViewChange? onClose? titleId?>, which opens its own WS on mount and fills its container. codex review P2 (handed to the wl-e9tp follow-up): the Claim truth badge checks only the role, so a true Seer role with fabricated inspection results shows TRUE.
+
+**2026-11-21T18:45:39Z**
+
+Closing: wl-gtil verified MatchView inside the real <dialog> modal, both from a tile and from a cold #match=<id> deep link (screenshots modal-from-tile.png and modal-cold-deep-link.png in /tmp/wl-gtil-verify/), with Narrator's View (God View) shared between the grid and the modal. All ACs met.

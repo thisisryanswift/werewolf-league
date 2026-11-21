@@ -7,10 +7,11 @@
 import { DurableObject } from "cloudflare:workers";
 import { drawTable } from "../core/draw";
 import type { MatchInit, MatchReport } from "../core/match";
-import { defaultLeagueConfig, patchConfig, type LeagueConfig } from "../core/roster";
+import { FeedCoalescer } from "../core/league-feed";
+import { defaultLeagueConfig, LEAGUE_NAME, patchConfig, type LeagueConfig } from "../core/roster";
 import { applyMatch, calibrationByAgent, rankStandings, ratePlayers, snapshotOf, standing, type AgentRecord, type RatingSnapshot } from "../core/ratings";
-import type { MatchSummary } from "../core/ruleset";
 import { buildMatchInit } from "../core/start-match";
+import { backoffUntil, recentStarts, startBudget } from "../core/start-pacer";
 import { getRuleset } from "../rulesets";
 import type {
   FeaturedMatch,
@@ -20,9 +21,11 @@ import type {
   LeagueSpend,
   MatchCost,
   MatchTile,
+  RateLimitEvent,
   RatingChanges,
   SettledMatch,
   TileSeat,
+  TileSummary,
 } from "../shared/protocol";
 
 /** Stored spend: settled Matches only. Live Matches add their tiles' cost so far. */
@@ -45,6 +48,8 @@ interface LiveMatch extends MatchTile {
   startFailures: number;
   /** The seated Agents' Side Ratings when the table was drawn: every Player is rated from this. */
   ratingsBefore?: RatingSnapshot;
+  /** True once a 429 backoff has held this reserved Match back; see releaseUnwanted. */
+  held?: boolean;
 }
 
 /**
@@ -73,12 +78,41 @@ export interface SettleAck {
 const MAX_START_FAILURES = 3;
 const SPEND_CAP_BLOCKED = "League spend has reached the spend cap; raise or clear spendCap to resume";
 const RECENT = 12;
+/** 429 reports kept on the League snapshot. */
+const RATE_LIMIT_EVENTS = 10;
+
+/** 429 backoff state: no new Matches start before `until`. */
+interface RateLimitState {
+  until: number;
+  count: number;
+  recent: RateLimitEvent[];
+}
 
 export class LeagueDO extends DurableObject<Env> {
+  /** The League's clock for start pacing and backoff. Tests replace it to drive time. */
+  now(): number {
+    return Date.now();
+  }
+
+  /** Coalesces every change into at most one feed message per feed interval. */
+  private feed = new FeedCoalescer({
+    intervalMs: () => this.config.feedIntervalMs,
+    now: () => Date.now(),
+    setTimer: (fn, ms) => setTimeout(fn, ms),
+    snapshot: () => this.snapshot(),
+    send: (msg) => this.send(msg),
+    nextRev: () => {
+      const rev = (this.ctx.storage.kv.get<number>("feedRev") ?? 0) + 1;
+      this.ctx.storage.kv.put("feedRev", rev);
+      return rev;
+    },
+  });
+
   // ---- storage ---------------------------------------------------------
 
   private get config(): LeagueConfig {
-    return this.ctx.storage.kv.get<LeagueConfig>("config") ?? defaultLeagueConfig();
+    // Stored configs from before a key existed get its default.
+    return { ...defaultLeagueConfig(), ...this.ctx.storage.kv.get<LeagueConfig>("config") };
   }
   private set config(c: LeagueConfig) {
     this.ctx.storage.kv.put("config", c);
@@ -166,6 +200,20 @@ export class LeagueDO extends DurableObject<Env> {
     this.blocked = SPEND_CAP_BLOCKED;
   }
 
+  /** Pacer start times (League clock) still inside the start window. */
+  private get starts(): number[] {
+    return this.ctx.storage.kv.get<number[]>("starts") ?? [];
+  }
+  private set starts(s: number[]) {
+    this.ctx.storage.kv.put("starts", s);
+  }
+  private get rateLimit(): RateLimitState {
+    return this.ctx.storage.kv.get<RateLimitState>("rateLimit") ?? { until: 0, count: 0, recent: [] };
+  }
+  private set rateLimit(r: RateLimitState) {
+    this.ctx.storage.kv.put("rateLimit", r);
+  }
+
   private get retryMs(): number {
     return Number(this.env.LEAGUE_RETRY_MS ?? 2000);
   }
@@ -181,6 +229,10 @@ export class LeagueDO extends DurableObject<Env> {
         seats: c.seats,
         rulesetId: c.rulesetId,
         spendCap: c.spendCap ?? null,
+        startsPerWindow: c.startsPerWindow,
+        startWindowMs: c.startWindowMs,
+        backoffMs: c.backoffMs,
+        feedIntervalMs: c.feedIntervalMs,
         roster: c.roster.map(({ id, name, harness, model }) => ({ id, name, harness, ...(model ? { model } : {}) })),
       },
       tiles: Object.values(this.live)
@@ -191,8 +243,14 @@ export class LeagueDO extends DurableObject<Env> {
       stats: this.stats,
       blocked: this.blocked,
       spend: this.spend,
+      rateLimit: this.rateLimitView(),
       leaderboard: this.leaderboard(),
     };
+  }
+
+  private rateLimitView(): LeagueSnapshot["rateLimit"] {
+    const r = this.rateLimit;
+    return { backoffUntil: r.until > this.now() ? r.until : null, count: r.count, recent: r.recent };
   }
 
   /** Every current roster Agent plus every Agent with a rated Match, ranked by Overall Rating. */
@@ -212,19 +270,15 @@ export class LeagueDO extends DurableObject<Env> {
 
   /** Push the leaderboard after a rated Match settles, as its own feed message. */
   private broadcastLeaderboard(matchId: string): void {
-    const msg: LeagueMessage = { type: "leaderboard", matchId, leaderboard: this.leaderboard() };
-    const text = JSON.stringify(msg);
-    for (const ws of this.ctx.getWebSockets()) {
-      try {
-        ws.send(text);
-      } catch {
-        // Closed socket; the runtime drops it.
-      }
-    }
+    this.send({ type: "leaderboard", matchId, leaderboard: this.leaderboard() });
   }
 
+  /** Something on the snapshot changed: grid clients get it in the next coalesced feed message. */
   private broadcast(): void {
-    const msg: LeagueMessage = { type: "league", league: this.snapshot() };
+    this.feed.changed();
+  }
+
+  private send(msg: LeagueMessage): void {
     const text = JSON.stringify(msg);
     for (const ws of this.ctx.getWebSockets()) {
       try {
@@ -239,6 +293,8 @@ export class LeagueDO extends DurableObject<Env> {
     if (request.headers.get("Upgrade") !== "websocket") return new Response("expected websocket", { status: 426 });
     const pair = new WebSocketPair();
     const [client, server] = [pair[0], pair[1]];
+    // Bring existing clients up to date first, so the feed's diff baseline is the snapshot this client gets.
+    this.feed.flushNow();
     // Subscribe and send the snapshot in one synchronous step.
     this.ctx.acceptWebSocket(server);
     const msg: LeagueMessage = { type: "league", league: this.snapshot() };
@@ -262,6 +318,7 @@ export class LeagueDO extends DurableObject<Env> {
 
   async pause(): Promise<LeagueSnapshot> {
     this.config = { ...this.config, paused: true };
+    this.releaseUnwanted();
     this.broadcast();
     return this.snapshot();
   }
@@ -287,6 +344,7 @@ export class LeagueDO extends DurableObject<Env> {
     this.config = r.config;
     this.blocked = null;
     this.enforceSpendCap(); // a new cap at or below current spend pauses before anything is scheduled
+    this.releaseUnwanted();
     await this.schedule();
     return { ok: true, league: this.snapshot() };
   }
@@ -311,7 +369,7 @@ export class LeagueDO extends DurableObject<Env> {
   // ---- from Match DOs ----------------------------------------------------
 
   /** A Match's latest public summary for its tile. Stale or unknown updates are ignored. */
-  async updateTile(matchId: string, summary: MatchSummary, seq: number): Promise<void> {
+  async updateTile(matchId: string, summary: TileSummary, seq: number): Promise<void> {
     const live = this.live;
     const m = live[matchId];
     if (!m || seq < m.summarySeq) return;
@@ -319,6 +377,23 @@ export class LeagueDO extends DurableObject<Env> {
     this.live = live;
     this.enforceSpendCap();
     this.broadcast();
+  }
+
+  /**
+   * A Player's model API call was refused with a 429: start no new Matches for
+   * the backoff period (extended by each report) and record the event.
+   */
+  async reportRateLimit(report: Omit<RateLimitEvent, "at">): Promise<void> {
+    const now = this.now();
+    const r = this.rateLimit;
+    this.rateLimit = {
+      until: backoffUntil(r.until, now, this.config.backoffMs),
+      count: r.count + 1,
+      recent: [{ ...report, at: now }, ...r.recent].slice(0, RATE_LIMIT_EVENTS),
+    };
+    this.holdStarting();
+    this.broadcast();
+    await this.armWake();
   }
 
   /**
@@ -391,15 +466,41 @@ export class LeagueDO extends DurableObject<Env> {
   private async schedule(): Promise<void> {
     this.reserve();
     this.broadcast();
-    if (Object.values(this.live).some((m) => m.status === "starting")) {
-      await this.ctx.storage.setAlarm(Date.now());
-    }
+    await this.armWake();
   }
 
   /**
-   * Fill free slots up to N with newly drawn tables. Synchronous, so two
-   * concurrent callers can never over-fill. Each table is drawn from a new
-   * match seed; a table the Ruleset can't deal is redrawn from the same seed.
+   * Arm the alarm for the earliest thing the League waits for: starting reserved
+   * Matches (now, after a retry delay, or when the backoff ends), or the next
+   * start slot while below N. Never pushes an earlier alarm later.
+   */
+  private async armWake(retry = false): Promise<void> {
+    const now = this.now();
+    const config = this.config;
+    const live = Object.values(this.live);
+    const until = this.rateLimit.until;
+    const wakes: number[] = [];
+    // After a failed start (whose slot may have been freed), try again after the retry delay.
+    if (retry) wakes.push(Math.max(now + this.retryMs, until));
+    else if (live.some((m) => m.status === "starting")) wakes.push(Math.max(now, until));
+    // Even with nothing to start, wake when a backoff ends so the feed publishes it.
+    if (now < until) wakes.push(until);
+    if (!config.paused && live.length < config.n) {
+      const { nextAt } = startBudget(this.starts, now, config, until);
+      if (nextAt !== null) wakes.push(nextAt);
+    }
+    if (!wakes.length) return;
+    // The League clock may differ from the runtime's (tests): arm by relative delay.
+    const at = Date.now() + Math.max(0, Math.min(...wakes) - now);
+    const current = await this.ctx.storage.getAlarm();
+    if (current === null || at < current) await this.ctx.storage.setAlarm(at);
+  }
+
+  /**
+   * Fill free slots up to N with newly drawn tables, as far as start pacing and
+   * any 429 backoff allow. Synchronous, so two concurrent callers can never
+   * over-fill. Each table is drawn from a new match seed; a table the Ruleset
+   * can't deal is redrawn from the same seed.
    */
   private reserve(): void {
     const config = this.config;
@@ -408,8 +509,11 @@ export class LeagueDO extends DurableObject<Env> {
     const ruleset = getRuleset(config.rulesetId);
     const records = this.agents;
     const seeds = [...(config.seeds ?? [])];
+    const now = this.now();
+    const starts = recentStarts(this.starts, now, config);
+    const { allowed } = startBudget(starts, now, config, this.rateLimit.until);
     let started = 0;
-    while (Object.keys(live).length < config.n) {
+    while (Object.keys(live).length < config.n && started < allowed) {
       const seed = seeds.shift() ?? crypto.randomUUID();
       const draw = drawTable({
         roster: config.roster,
@@ -432,6 +536,8 @@ export class LeagueDO extends DurableObject<Env> {
         narrator: config.narrator,
         agents: draw.agents,
       });
+      // Report back to this League (there is one in production; tests may run others).
+      init.league = this.ctx.id.name ?? LEAGUE_NAME;
       live[init.matchId] = {
         matchId: init.matchId,
         seed,
@@ -450,19 +556,84 @@ export class LeagueDO extends DurableObject<Env> {
     if (started) {
       this.live = live;
       this.stats = { ...this.stats, started: this.stats.started + started };
+      this.starts = [...starts, ...Array<number>(started).fill(now)];
     }
+  }
+
+  /** Matches whose `start` call is in flight; they may already exist, so they are never released. */
+  private launching = new Set<string>();
+
+  /**
+   * The backoff is over: held Matches start now. Their reservations' start times
+   * may have left the window during the backoff, so each counts as a start now,
+   * and they are no longer held (a new 429 holds them again).
+   */
+  private launchHeld(): void {
+    const live = this.live;
+    const held = Object.values(live).filter((m) => m.status === "starting" && m.held);
+    if (!held.length) return;
+    for (const m of held) live[m.matchId] = { ...m, held: false };
+    this.live = live;
+    const now = this.now();
+    this.starts = [...recentStarts(this.starts, now, this.config), ...Array<number>(held.length).fill(now)];
+  }
+
+  /** Mark every reserved, not-yet-started Match as held back by the backoff. */
+  private holdStarting(): void {
+    const live = this.live;
+    let changed = false;
+    for (const m of Object.values(live)) {
+      if (m.status === "starting" && !m.held) {
+        live[m.matchId] = { ...m, held: true };
+        changed = true;
+      }
+    }
+    if (changed) this.live = live;
+  }
+
+  /**
+   * Release Matches a backoff held back that the League no longer wants: all of
+   * them while paused, and the newest above N. (A Match reserved just before a
+   * pause, with no backoff, still starts, as before.) A reserved Match has
+   * persisted nothing until its start succeeds, so releasing it leaves nothing
+   * behind; it no longer counts as started.
+   */
+  private releaseUnwanted(): void {
+    const config = this.config;
+    const live = this.live;
+    const all = Object.values(live);
+    const excess = config.paused ? all.length : all.length - config.n;
+    if (excess <= 0) return;
+    const releasable = all
+      .filter((m) => m.status === "starting" && m.held && !this.launching.has(m.matchId))
+      .sort((a, b) => b.startedAt - a.startedAt)
+      .slice(0, excess);
+    if (!releasable.length) return;
+    for (const m of releasable) delete live[m.matchId];
+    this.live = live;
+    this.stats = { ...this.stats, started: this.stats.started - releasable.length };
   }
 
   /** Start reserved Matches. A start that fails is retried; after repeated failures its slot is freed. */
   async alarm(): Promise<void> {
-    this.reserve(); // refill any slot freed by a failed start
+    this.releaseUnwanted(); // paused or N lowered since they were reserved
+    if (this.now() < this.rateLimit.until) {
+      // Backing off after a 429: hold reserved Matches until it ends.
+      this.holdStarting();
+      this.broadcast();
+      return this.armWake();
+    }
+    this.launchHeld(); // held Matches start now, so they use up this window first
+    this.reserve(); // refill freed slots as pacing allows
     const starting = Object.values(this.live).filter((m) => m.status === "starting");
+    for (const m of starting) this.launching.add(m.matchId);
     const outcomes = await Promise.all(
       starting.map((m) =>
         this.env.MATCH.getByName(m.matchId)
           .start(m.init)
           .then(() => null)
-          .catch((err: unknown) => String(err)),
+          .catch((err: unknown) => String(err))
+          .finally(() => this.launching.delete(m.matchId)),
       ),
     );
     const live = this.live;
@@ -487,6 +658,6 @@ export class LeagueDO extends DurableObject<Env> {
     });
     this.live = live;
     this.broadcast();
-    if (retry) await this.ctx.storage.setAlarm(Date.now() + this.retryMs);
+    await this.armWake(retry);
   }
 }

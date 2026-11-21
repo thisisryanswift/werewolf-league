@@ -1,11 +1,21 @@
-// Subscribe to the League WebSocket. Every message is a full snapshot, so the
-// latest one wins and reconnects need no merging.
+// Subscribe to the League WebSocket. The join message (also on every reconnect)
+// is a full snapshot; coalesced "tiles" messages after it carry per-tile diffs,
+// folded into the snapshot with applyLeagueDiff. `activity` stamps each Match's
+// latest activity (see noteActivity) for the grid's promotion without Drama Scores.
 import { useEffect, useState } from "react";
+import { applyLeagueDiff } from "../src/shared/league-feed";
 import type { LeagueMessage, LeagueSnapshot } from "../src/shared/protocol";
+import { noteActivity } from "./grid/model";
 import type { FeedStatus } from "./useMatchFeed";
 
-export function useLeagueFeed(): { league: LeagueSnapshot | null; status: FeedStatus } {
-  const [league, setLeague] = useState<LeagueSnapshot | null>(null);
+interface LeagueFeed {
+  league: LeagueSnapshot | null;
+  status: FeedStatus;
+  activity: Record<string, number>;
+}
+
+export function useLeagueFeed(): LeagueFeed {
+  const [feed, setFeed] = useState<Omit<LeagueFeed, "status">>({ league: null, activity: {} });
   const [status, setStatus] = useState<FeedStatus>("connecting");
 
   useEffect(() => {
@@ -19,8 +29,10 @@ export function useLeagueFeed(): { league: LeagueSnapshot | null; status: FeedSt
       ws.onopen = () => setStatus("live");
       ws.onmessage = (m) => {
         const msg = JSON.parse(m.data as string) as LeagueMessage;
-        if (msg.type === "league") setLeague(msg.league);
-        else if (msg.type === "leaderboard") setLeague((l) => (l ? { ...l, leaderboard: msg.leaderboard } : l));
+        if (msg.type === "league") setFeed((f) => ({ ...f, league: msg.league }));
+        else if (msg.type === "tiles")
+          setFeed((f) => (f.league ? { league: applyLeagueDiff(f.league, msg), activity: noteActivity(f.activity, msg) } : f));
+        else if (msg.type === "leaderboard") setFeed((f) => (f.league ? { ...f, league: { ...f.league, leaderboard: msg.leaderboard } } : f));
       };
       ws.onclose = () => {
         if (stopped) return;
@@ -36,5 +48,5 @@ export function useLeagueFeed(): { league: LeagueSnapshot | null; status: FeedSt
     };
   }, []);
 
-  return { league, status };
+  return { ...feed, status };
 }

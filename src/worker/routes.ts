@@ -1,9 +1,10 @@
 // HTTP/WebSocket API. Admin routes require the shared-secret header.
 //   GET  /api/league                 League snapshot (config, live tiles, recent results)
-//   GET  /api/league/ws              League feed: the snapshot on join and on every change
+//   GET  /api/league/ws              League feed: the snapshot on join, then coalesced "tiles" diffs and "leaderboard" messages
 //   POST /api/admin/league/pause     running Matches finish, no new ones start
 //   POST /api/admin/league/resume
-//   POST /api/admin/league/config    partial { n, roster, seats, rulesetConfig }
+//   POST /api/admin/league/config    partial { n, roster, seats, rulesetConfig, deadlines, seeds,
+//                                    startsPerWindow, startWindowMs, backoffMs, feedIntervalMs }
 //   POST /api/admin/league/featured  { matchId } pins a finished Match on the grid; null unpins
 //   POST /api/admin/matches          start a one-off Match outside the League schedule
 //   GET  /api/matches/:id[/ws]       Match snapshot / Spectator feed

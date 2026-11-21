@@ -35,8 +35,8 @@ import { matchCost, type MatchUsage } from "../core/pricing";
 import { atLeast, ledgerUsage, mergeModelUsage, recordReadings, type ModelUsage } from "../core/usage";
 import { narratorFor } from "../narrator";
 import { getRuleset } from "../rulesets";
-import type { MatchCost, MatchEvent, RulesetEvent, ServerMessage } from "../shared/protocol";
-import { matchCostEvent, ratingsSettledEvent } from "../shared/turn-events";
+import type { MatchCost, MatchEvent, RulesetEvent, ServerMessage, TileSummary } from "../shared/protocol";
+import { matchCostEvent, ratingsSettledEvent, thinkingSeats } from "../shared/turn-events";
 import type { SettleAck } from "./league";
 
 /**
@@ -48,6 +48,9 @@ function seatInstructions(ruleset: Ruleset<unknown>, state: unknown, seat: Seat,
   if (!source) return undefined;
   return assembleInstructions(source, ruleset.instructions?.sections(state, seat) ?? []) || undefined;
 }
+
+/** Rounds of Player closes after the result before leftover usage is given up on. */
+const MAX_CLOSE_ATTEMPTS = 5;
 
 /** How soon the Match retries sending a turn to a Player DO that failed to accept it. */
 const DISPATCH_RETRY_MS = 1000;
@@ -68,6 +71,8 @@ interface MatchMeta extends Omit<MatchInit, "deadlines"> {
   closePending?: Seat[];
   /** True while the League's settled cost is older than the result's (late usage); retried on the alarm. */
   costDirty?: boolean;
+  /** Close rounds tried so far; closes still failing after MAX_CLOSE_ATTEMPTS are given up. */
+  closeAttempts?: number;
 }
 
 type EventRow = { seq: number; ts: number; kind: string; audience: string; data: string };
@@ -149,7 +154,7 @@ export class MatchDO extends DurableObject<Env> {
   /**
    * After the result: close every Player (so leftovers such as an unused setup
    * interaction are read and reported) and bring the League's settled cost up to
-   * date. Each is retried on the alarm until it succeeds.
+   * date. Each is retried on the alarm (closes at most MAX_CLOSE_ATTEMPTS times).
    */
   private async finishChores(): Promise<void> {
     const meta = this.meta!;
@@ -158,12 +163,17 @@ export class MatchDO extends DurableObject<Env> {
     if (!closing.length && !dirty) return;
     await this.ctx.storage.setAlarm(Date.now() + Number(this.env.LEAGUE_RETRY_MS ?? 2000));
     const closed = await Promise.allSettled(closing.map((seat) => this.env.PLAYER.getByName(`${meta.matchId}:${seat}`).close()));
-    const failed = closing.filter((_, i) => closed[i]!.status === "rejected");
-    this.meta = { ...this.meta!, closePending: failed };
+    const attempts = (meta.closeAttempts ?? 0) + 1;
+    let failed = closing.filter((_, i) => closed[i]!.status === "rejected");
+    if (failed.length && attempts >= MAX_CLOSE_ATTEMPTS) {
+      console.warn(`Match ${meta.matchId}: gave up closing seats ${failed.join(", ")}; their leftover usage is not counted`);
+      failed = [];
+    }
+    this.meta = { ...this.meta!, closePending: failed, closeAttempts: attempts };
     const latest = this.meta!;
     if (latest.costDirty && latest.resultAcked && latest.result?.cost) {
       const cost = latest.result.cost;
-      const sent = await this.env.LEAGUE.getByName(LEAGUE_NAME)
+      const sent = await this.env.LEAGUE.getByName(latest.league ?? LEAGUE_NAME)
         .updateMatchCost(latest.matchId, cost)
         .then(() => true)
         .catch(() => false);
@@ -247,6 +257,7 @@ export class MatchDO extends DurableObject<Env> {
           agent: init.agents[s.seat]!,
           tools: setup.tools[s.seat]!,
           instructions: seatInstructions(ruleset, setup.state, s.seat, init.agents[s.seat]!),
+          ...(init.league ? { league: init.league } : {}),
         }),
       ),
     );
@@ -355,7 +366,6 @@ export class MatchDO extends DurableObject<Env> {
         return;
       }
       this.resolve(meta, ruleset, pending);
-      this.pushSummary(ruleset);
       this.narrate();
     }
 
@@ -368,6 +378,7 @@ export class MatchDO extends DurableObject<Env> {
       const done: MatchMeta = { ...current, status: "finished", result, closePending: current.seats.map((s) => s.seat) };
       this.meta = done;
       this.commit([matchCostEvent(cost)]);
+      this.pushSummary(ruleset);
       await this.deliverResult(done);
       await this.finishChores();
       return;
@@ -399,7 +410,7 @@ export class MatchDO extends DurableObject<Env> {
     await this.ctx.storage.setAlarm(Date.now() + Number(this.env.LEAGUE_RETRY_MS ?? 2000));
     let ack: SettleAck;
     try {
-      ack = await this.env.LEAGUE.getByName(LEAGUE_NAME).reportMatchResult(meta.matchId, meta.result);
+      ack = await this.env.LEAGUE.getByName(meta.league ?? LEAGUE_NAME).reportMatchResult(meta.matchId, meta.result);
     } catch {
       return; // the armed alarm retries
     }
@@ -424,8 +435,16 @@ export class MatchDO extends DurableObject<Env> {
     // Runner events (turn markers, step_resolved) and narrations are not game events.
     const events = this.events();
     const publicEvents = events.filter((e) => e.audience === "all" && !isRunnerEvent(e) && !isNarrationEvent(e));
-    const summary = { ...ruleset.summary(this.rulesetState, publicEvents), ...latestDrama(events), cost: this.cost(meta).total };
-    const update = this.env.LEAGUE.getByName(LEAGUE_NAME)
+    const summary: TileSummary = {
+      ...ruleset.summary(this.rulesetState, publicEvents),
+      ...latestDrama(events),
+      // Counts only: the runner's turn events are seat-private, so naming seats could reveal roles.
+      thinking: thinkingSeats(events).length,
+      timeouts: events.filter((e) => e.kind === "turn_timed_out").length,
+      // Measured USD so far (Players and Narrator); only the total, so it never hints at roles.
+      cost: this.cost(meta).total,
+    };
+    const update = this.env.LEAGUE.getByName(meta.league ?? LEAGUE_NAME)
       .updateTile(meta.matchId, summary, this.lastSeq())
       .catch(() => {});
     this.ctx.waitUntil(update);
@@ -505,6 +524,8 @@ export class MatchDO extends DurableObject<Env> {
     this.meta = { ...meta, stepCount: stepNo, assigned: [...new Set([...assigned, ...turns.map((t) => t.seat)])] };
     this.step = step;
     this.commit(turnStartedEvents(step));
+    // One push per step, once its turns are marked: the League coalesces these for the grid.
+    this.pushSummary(ruleset);
     await this.sendTurns(meta, stepNo);
   }
 

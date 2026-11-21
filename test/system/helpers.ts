@@ -2,9 +2,13 @@ import { exports } from "cloudflare:workers";
 import { werewolf } from "../../src/rulesets/werewolf";
 import type { TimeoutCounts } from "../../src/core/deadlines";
 import type { AgentConfig } from "../../src/core/harness";
-import type { MatchCost, MatchEvent, ServerMessage } from "../../src/shared/protocol";
+import { applyLeagueDiff } from "../../src/shared/league-feed";
+import type { LeagueMessage, LeagueSnapshot, MatchCost, MatchEvent, ServerMessage } from "../../src/shared/protocol";
 
 export const ADMIN = { "x-admin-secret": "test-admin-secret" };
+
+/** League config for tests that aren't about pacing: starts as fast as Matches finish, short feed interval. */
+export const UNPACED = { startsPerWindow: 1000, startWindowMs: 1, feedIntervalMs: 20 };
 
 export function fakeAgent(id: string, options: Record<string, unknown> = {}): AgentConfig {
   return { id, name: id, harness: "fake", options };
@@ -59,6 +63,31 @@ export async function connect(matchId: string) {
   ws.addEventListener("message", (m) => messages.push(JSON.parse(m.data as string)));
   ws.accept();
   return { ws, messages, close: () => ws.close(1000, "bye") };
+}
+
+/**
+ * A League feed client: folds every message (join snapshot, then coalesced
+ * "tiles" diffs) into the snapshot a grid would show, one state per message.
+ */
+export async function connectLeague(
+  open: () => Promise<Response> = () => exports.default.fetch("http://test/api/league/ws", { headers: { Upgrade: "websocket" } }),
+) {
+  const res = await open();
+  const ws = res.webSocket;
+  if (!ws) throw new Error(`no websocket: ${res.status}`);
+  const messages: LeagueMessage[] = [];
+  const states: LeagueSnapshot[] = [];
+  ws.addEventListener("message", (m) => {
+    const msg = JSON.parse(m.data as string) as LeagueMessage;
+    messages.push(msg);
+    const last = states.at(-1);
+    if (msg.type === "league") states.push(msg.league);
+    else if (msg.type === "tiles" && last) states.push(applyLeagueDiff(last, msg));
+    else if (msg.type === "leaderboard" && last) states.push({ ...last, leaderboard: msg.leaderboard });
+  });
+  ws.accept();
+  await waitFor(async () => states.length > 0);
+  return { ws, messages, states, latest: () => states.at(-1)!, close: () => ws.close(1000, "bye") };
 }
 
 /** The game decisions of a log, without operational fields. */

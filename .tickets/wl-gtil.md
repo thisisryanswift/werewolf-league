@@ -1,6 +1,6 @@
 ---
 id: wl-gtil
-status: in_progress
+status: closed
 deps: [wl-qpvr, wl-kh5w, wl-lvtw, wl-d5wn]
 links: []
 created: 2026-11-21T16:34:58Z
@@ -60,3 +60,7 @@ Orchestrator: started at 12:17, based on impl/wl-d5wn (84c36a0, feed protocol fi
 **2026-11-21T18:02:15Z**
 
 Human design pass (13:00): variant E as built, with bigger tiles (--lg-tile-min 260px, --lg-tile-height 190px, pips 16/22; commit de60fd3), and a League feed interval of 2000 ms for a calmer grid. Design is LOCKED for now; further tweaks are frontend-only and come later. Implementer report: all 7 ACs evidenced (36 tiles at 60 fps with 0 long tasks, with and without the modal; sort/filter/degradation; promoted top 3 with speech; live leaderboard strip; modal via Esc/backdrop/Back and #match deep links; projector fit; featured link opens the modal). codex: no P0/P1. Open P2s: (a) on first load, promotion picks the 3 oldest Matches until speeches arrive, held for 10 s; (b) in wl-d5wn's league.ts, releasing a 'starting' reservation leaves its timestamp in starts and doesn't restore its seed. Choices to revisit: promotion is always the top 3 by Drama Score regardless of sort; flags clip on large tiles at 3+; cost slot reads a numeric 'cost' via costText(), so confirm the field name when wl-64dn merges. Merge after wl-d5wn (built on it).
+
+**2026-11-21T18:45:39Z**
+
+Merged into integration/wl-xgp7 (impl/wl-gtil de60fd3, including the human's tile sizes). Verification on integration: pnpm test 217/217, typecheck and build clean. codex self-review: no P0/P1; open P2s are recorded above.
