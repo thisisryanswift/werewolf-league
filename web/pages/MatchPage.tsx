@@ -7,6 +7,7 @@ import { HIDDEN_KINDS } from "../events/runner";
 import { Speech } from "../events/Speech";
 import { spectatorLabel } from "../../src/shared/seat-label";
 import { useMatchFeed } from "../useMatchFeed";
+import { TableSuspicion } from "../components/TableSuspicion";
 
 type SeatInfo = { seat: number; label: string; displayName?: string; agentId: string };
 
@@ -62,6 +63,7 @@ export function MatchPage({ matchId }: { matchId: string }) {
       <h1>Match {matchId.slice(0, 8)}</h1>
       <p data-testid="feed-status">Feed: {status}</p>
       <Seats events={events} />
+      <TableSuspicion events={events} />
       <ol className="event-log">
         {events
           .filter((e) => !HIDDEN_KINDS.has(e.kind))
