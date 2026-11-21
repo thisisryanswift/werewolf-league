@@ -3,7 +3,8 @@
 // blocks (no HTML injection): "# " title, "## " headings, paragraphs (each
 // source line its own line), "- " and "1. " lists, **bold** and bare https://
 // links. A paragraph preceded by <!-- Show only if wl-xxxx has landed --> is
-// left out unless that ticket's feature is in `landed`.
+// left out unless that ticket's feature is in `landed`; a gate inside a
+// paragraph leaves out just the next line, such as one list item.
 
 /** A run of inline text: plain, bold, or a link. */
 export type Inline = { text: string; bold?: true; href?: string };
@@ -29,7 +30,12 @@ export function helpDoc(markdown: string, landed: ReadonlySet<string>): HelpDoc 
       if (!landed.has(gate[1]!.toLowerCase())) continue;
       lines = lines.slice(1);
     }
-    lines = lines.filter((l) => !/^<!--.*-->$/.test(l));
+    // Inside a paragraph, a gate covers just the next line (e.g. one list item).
+    lines = lines.filter((l, i) => {
+      const prev = i > 0 ? GATE.exec(lines[i - 1]!) : null;
+      if (prev && !landed.has(prev[1]!.toLowerCase())) return false;
+      return !/^<!--.*-->$/.test(l);
+    });
     while (lines.length > 0) {
       const line = lines[0]!;
       if (line.startsWith("# ")) {

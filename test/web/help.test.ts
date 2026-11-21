@@ -15,6 +15,15 @@ describe("help copy", () => {
     expect(JSON.stringify(helpDoc(md, new Set(["wl-zst1"])).blocks)).toContain("Pi?");
   });
 
+  it("leaves out a single list item or line gated inside a paragraph", () => {
+    const md = "**Who?**\n- Hydrogen plays.\n<!-- Show only if wl-ofdn has landed -->\n- Neon analyzes.\n- Narrator narrates.";
+    expect(helpDoc(md, new Set()).blocks).toEqual([
+      { kind: "p", lines: [[{ text: "Who?", bold: true }]] },
+      { kind: "ul", items: [[{ text: "Hydrogen plays." }], [{ text: "Narrator narrates." }]] },
+    ]);
+    expect(JSON.stringify(helpDoc(md, new Set(["wl-ofdn"])).blocks)).toContain("Neon analyzes.");
+  });
+
   it("renders headings, lists, bold runs and bare links, one paragraph line per source line", () => {
     const md = "## Roles\n\n- **Seer:** inspects.\n- Doctor\n\n1. Night.\n2. Day.\n\n**Q?**\nSee https://example.com/x.";
     expect(helpDoc(md, new Set()).blocks).toEqual([
