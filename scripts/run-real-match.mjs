@@ -25,8 +25,13 @@ const UA = "werewolf-league-real-smoke/1.0";
 // Two Agents on the same model, so the dealer can put the Werewolves on different Agents.
 // No `instructions`: each seat gets its Ruleset-named sections of the Ruleset's Agent
 // Instructions (docs/agent-instructions/werewolf.md), mounted as /.agents/AGENTS.md.
+// PI_MODEL=<openrouter id> (e.g. anthropic/claude-haiku-5.5) puts seats 2, 4 and 6 on the pi
+// harness (OpenRouter model, Agent37 sandbox) instead: needs OPENROUTER_API_KEY and AGENT37_API_KEY.
+const piModel = process.env.PI_MODEL;
 const agents = Array.from({ length: 7 }, (_, i) =>
-  i % 2 === 0
+  piModel && i % 2 === 1
+    ? { id: `pi-${piModel.replace(/[^\w-]/g, "-")}`, name: `${piModel} · Pi`, harness: "pi", model: piModel }
+    : i % 2 === 0
     ? { id: "hydrogen-a", name: "Hydrogen A", harness: "managed-agent", model }
     : modelB === model
       ? { id: "hydrogen-b", name: "Hydrogen B", harness: "managed-agent", model }
