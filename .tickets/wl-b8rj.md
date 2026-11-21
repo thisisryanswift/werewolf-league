@@ -1,6 +1,6 @@
 ---
 id: wl-b8rj
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-11-21T15:06:09Z
@@ -29,3 +29,13 @@ Scaffold the TypeScript Worker (Wrangler, SQLite-backed Durable Objects), the Re
 - [ ] Opening the Match page locally (wrangler dev) shows the events of a fake Match live
 - [ ] A Match where every Agent returns only defaults still terminates via the 6-cycle cap
 - [ ] Committed events carry strictly increasing sequence numbers; a spectator reconnecting while a step is in progress ends up with every event exactly once
+
+## Notes
+
+**2026-11-21T15:59:33Z**
+
+Merged into integration/wl-xgp7 (f5a6c4f; impl/wl-b8rj 3e1887c). Verification on integration: pnpm test 39/39 passing; pnpm typecheck clean. AC evidence: test/system/match.test.ts (Village and Werewolf winners through real DOs and alarms); test/system/spectator.test.ts (mid-Match join gives the full log then live events; reconnect during a step gives seq 1..n exactly once); test/werewolf/*.test.ts (pure kill/vote/win rules and the 6-cycle cap); test/architecture.test.ts (no werewolf imports outside the Ruleset); wrangler dev smoke via scripts/watch-fake-match.mjs showed log=15 live=14 contiguous_exactly_once=true and the Match page rendered live; an all-defaults Match ends with reason cycle_cap. The codex review P1 (same-Agent wolf pair) and P2 (stuck Match after a failed provision) were fixed with tests before the merge.
+
+**2026-11-21T15:59:33Z**
+
+Known limits handed to follow-ons. wl-cpl1: the Player DO alarm can overwrite a turn that arrives while it awaits the Harness; a partial dispatch in the Match alarm is not re-sent. wl-kh5w: League result reporting is not retried. Nits: the Fake Harness mentions vote, abstain and beliefs; helper names aliveWolves and wolfSeats go against the glossary.

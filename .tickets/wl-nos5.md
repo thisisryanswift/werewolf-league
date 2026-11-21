@@ -1,6 +1,6 @@
 ---
 id: wl-nos5
-status: open
+status: in_progress
 deps: [wl-b8rj, wl-ewd7]
 links: []
 created: 2026-11-21T15:06:09Z

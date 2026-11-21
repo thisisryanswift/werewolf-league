@@ -1,6 +1,6 @@
 ---
 id: wl-jb4x
-status: open
+status: in_progress
 deps: [wl-b8rj]
 links: []
 created: 2026-11-21T15:06:09Z
