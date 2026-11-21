@@ -30,7 +30,7 @@ Two header buttons on the grid, each opening its own modal: a native <dialog>, c
 - What does a Match cost? Live figure if wl-64dn has landed, otherwise omit.
 - Link to the repo.
 
-**Copy:** an agent drafts both texts from the spec and GLOSSARY.md, using glossary terms and plain language, each under ~250 words. Keep the copy in a single file so the human can edit it without touching components. The human reviews the copy before freeze. Content that depends on unlanded stretch tickets (Pi, cost) is shown only if those features exist.
+**Copy sources (2026-11-21):** How to play is drafted at docs/help/how-to-play.md, from our own Ruleset rather than generic Werewolf guides. The human is writing the About/FAQ copy at docs/help/about.md. Render both files (markdown to HTML at build time, or imported as text) so the copy stays editable in one place per modal. If about.md is missing when you start, show a placeholder and flag it on this ticket. Previous plan: an agent drafts both texts from the spec and GLOSSARY.md, using glossary terms and plain language, each under ~250 words. Keep the copy in a single file so the human can edit it without touching components. The human reviews the copy before freeze. Content that depends on unlanded stretch tickets (Pi, cost) is shown only if those features exist.
 
 ## Acceptance Criteria
 
