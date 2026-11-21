@@ -1,9 +1,10 @@
 // Leaderboard panel: Agents ranked by Overall Rating, with sortable Side Rating
-// columns, Matches played, wins per Side, Calibration (Brier) and timeouts. It
+// columns, Matches played, wins out of Matches played per Side, Calibration (Brier) and timeouts. It
 // renders whatever the League feed last sent, so it updates live as Matches settle.
 import { useState } from "react";
 import type { AgentStanding, Leaderboard as LeaderboardData } from "../../src/shared/protocol";
 import { formatUsd } from "../cost";
+import { formatWinFraction } from "../leaderboard/win-fraction";
 
 /** Display names for Side keys; unknown Sides are capitalised. */
 const SIDE_NAMES: Record<string, string> = { wolf: "Wolf", village: "Village" };
@@ -33,8 +34,9 @@ function columns(sides: string[]): Column[] {
     ...sides.map((s) => ({
       key: `wins:${s}`,
       label: `${sideName(s)} wins`,
+      title: `Wins out of Matches played as ${sideName(s)}`,
       value: (r: AgentStanding) => r.wins[s] ?? 0,
-      render: (r: AgentStanding) => String(r.wins[s] ?? 0),
+      render: (r: AgentStanding) => formatWinFraction(r.wins[s] ?? 0, r.played?.[s] ?? 0),
     })),
     {
       key: "calibration",
