@@ -144,3 +144,49 @@ body {
   border-left: 4px solid #c0392b;
   background: #fdf2f0;
 }
+/* Leaderboard: beside the Match grid on wide screens, above it on narrow ones. */
+body:has(.leaderboard) {
+  max-width: 90rem;
+}
+.leaderboard {
+  overflow-x: auto;
+}
+@media (min-width: 64rem) {
+  .leaderboard {
+    float: right;
+    width: 34rem;
+    margin: 0 0 1rem 1.5rem;
+  }
+}
+.leaderboard h2 {
+  margin-top: 0;
+}
+.leaderboard table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+}
+.leaderboard th,
+.leaderboard td {
+  padding: 0.25rem 0.4rem;
+  text-align: right;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 15%, transparent);
+}
+.leaderboard tbody th {
+  text-align: left;
+  font-weight: 600;
+}
+.leaderboard thead button {
+  font: inherit;
+  font-weight: 600;
+  color: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+.leaderboard thead button:hover,
+.leaderboard thead button:focus-visible {
+  text-decoration: underline;
+}

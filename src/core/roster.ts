@@ -22,6 +22,11 @@ export interface LeagueConfig {
   deadlines?: Partial<DeadlineConfig>;
   /** Agents the League draws from. Copies may share a Match. */
   roster: AgentConfig[];
+  /**
+   * Match seeds to use for the next Matches, in order, before random ones.
+   * Lets the operator (or a test) replay or script a specific table.
+   */
+  seeds?: string[];
 }
 
 /** Scripted Agents that answer after a few polls: a local demo roster that never calls Gemini. */
@@ -86,6 +91,12 @@ export function patchConfig(
       Object.entries(d).every(([k, v]) => keys.includes(k) && typeof v === "number" && Number.isFinite(v) && v > 0);
     if (!valid) return { ok: false, error: "deadlines must be { turnMs?, firstTurnMs?, graceMs? } with positive numbers" };
     next.deadlines = d as Partial<DeadlineConfig>;
+  }
+  if (patch.seeds !== undefined) {
+    if (!Array.isArray(patch.seeds) || !patch.seeds.every((x) => typeof x === "string" && x.length > 0 && x.length <= 128)) {
+      return { ok: false, error: "seeds must be a list of non-empty strings (at most 128 characters)" };
+    }
+    next.seeds = patch.seeds as string[];
   }
   if (patch.roster !== undefined) {
     if (!Array.isArray(patch.roster) || !patch.roster.every(isAgent)) {

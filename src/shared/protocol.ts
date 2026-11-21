@@ -110,7 +110,75 @@ export interface LeagueSnapshot {
   stats: { started: number; settled: number };
   /** Why the League cannot start Matches right now (e.g. a roster that is too small), else null. */
   blocked: string | null;
+  leaderboard: Leaderboard;
 }
 
-/** Messages sent from the League WebSocket: the full snapshot, on join and on every change. */
-export type LeagueMessage = { type: "league"; league: LeagueSnapshot };
+// ---- Ratings ------------------------------------------------------------
+
+/** Every Side Rating starts here. */
+export const INITIAL_RATING = 1200;
+
+/**
+ * One Agent's League standing. Ratings and win counts are keyed by Side (the
+ * Ruleset's Side names, e.g. "wolf" and "village"); a Side never played reads
+ * INITIAL_RATING / 0. Ratings are unrounded; round for display.
+ */
+export interface AgentStanding {
+  agentId: string;
+  name: string;
+  /** Side Rating per Side. */
+  ratings: Record<string, number>;
+  /** Overall Rating: the mean of the Agent's Side Ratings. */
+  overall: number;
+  /** Rated Matches played (an Agent with several seats in one Match counts it once). */
+  matches: number;
+  /** Rated Matches won per Side (once per Match, on the Side that won). */
+  wins: Record<string, number>;
+  /** Turns that missed their deadline, summed from each Match result's per-Agent counts. */
+  timeouts: number;
+  // wl-bfo1: Calibration (Brier) belongs here, e.g. `calibration: number | null`.
+}
+
+/** The leaderboard: every current roster Agent plus every Agent with a rated Match. */
+export interface Leaderboard {
+  /** The Ruleset's Sides, in its order: the rating and win columns. */
+  sides: string[];
+  /** Ranked by Overall Rating, highest first. */
+  rows: AgentStanding[];
+}
+
+/** One Player's rating update, computed from the pre-Match rating snapshot. */
+export interface PlayerRatingChange {
+  seat: number;
+  agentId: string;
+  side: string;
+  won: boolean;
+  /** The Agent's Side Rating in the pre-Match snapshot. */
+  before: number;
+  delta: number;
+}
+
+/** One Agent's net change on one Side: the sum of its Players' deltas on that Side. */
+export interface AgentRatingChange {
+  agentId: string;
+  side: string;
+  /** Side Rating just before this settlement was applied. */
+  before: number;
+  delta: number;
+  after: number;
+}
+
+/**
+ * A Match's rating changes, stored with its settlement and returned unchanged
+ * on any redelivery. Also the data of the Match's `ratings_settled` event.
+ */
+export interface RatingChanges {
+  players: PlayerRatingChange[];
+  agents: AgentRatingChange[];
+}
+
+/** Messages sent from the League WebSocket: the full snapshot on join and on every change, plus a leaderboard message per rated settlement. */
+export type LeagueMessage =
+  | { type: "league"; league: LeagueSnapshot }
+  /** Sent once when a rated Match settles: the whole leaderboard after its rating changes. */
+  | { type: "leaderboard"; matchId: string; leaderboard: Leaderboard };
