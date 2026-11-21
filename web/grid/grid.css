@@ -237,6 +237,15 @@ body:has(.lg-page) {
 .lg-tile.starting {
   background: var(--lg-starting);
 }
+/* A recently finished Match filling an empty slot: muted "Over" style. */
+.lg-tile.finished {
+  background: var(--lg-starting);
+  color: var(--lg-muted);
+  box-shadow: none;
+}
+.lg-tile.finished:hover {
+  box-shadow: var(--lg-shadow);
+}
 .t-head {
   display: flex;
   align-items: flex-start;

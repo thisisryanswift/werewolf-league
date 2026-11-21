@@ -85,7 +85,7 @@ const SPEND_CAP_BLOCKED = "League spend has reached the spend cap; raise or clea
 
 /** `{ matchNumber }` if there is one, else nothing (older Matches have none). */
 const numbered = (n: number | undefined) => (n === undefined ? {} : { matchNumber: n });
-const RECENT = 12;
+const RECENT = 24;
 /** 429 reports kept on the League snapshot. */
 const RATE_LIMIT_EVENTS = 10;
 

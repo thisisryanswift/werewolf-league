@@ -3,13 +3,13 @@
 // three promoted large tiles and the rest. Each tile links to #match=<id>.
 import { memo, useMemo, useRef, useState } from "react";
 import { matchLabel } from "../../src/shared/match-label";
-import type { LeagueSnapshot, MatchTile } from "../../src/shared/protocol";
+import type { LeagueSnapshot, MatchTile, SettledMatch } from "../../src/shared/protocol";
 import { FeaturedMatchLink } from "../components/FinishedMatches";
 import { landedFeatures } from "../help/features";
 import { HelpButtons } from "../help/HelpButtons";
 import type { FeedStatus } from "../useMatchFeed";
 import { LeagueSwitcher } from "./LeagueSwitcher";
-import { arrangeGrid, tileView, topAgents, type GridFilter, type GridSort, type PromotionHold } from "./model";
+import { arrangeGrid, fillGrid, finishedView, tileView, topAgents, type GridCard, type GridFilter, type GridSort, type PromotionHold } from "./model";
 import { matchHash } from "./route";
 import "./grid.css";
 
@@ -39,6 +39,8 @@ export function LeagueGrid({ league, status, activity, narratorView, onNarratorV
     held.current = g.held;
     return g;
   }, [league.tiles, sort, filter, narratorView, activity]);
+  // Recently finished Matches fill the slots live Matches leave empty.
+  const cards = useMemo(() => fillGrid(grid, league.recent ?? []), [grid, league.recent]);
   // Keyed by content so the help dialogs re-render only when a feature lands.
   const landedKey = [...landedFeatures(league.tiles)].join(",");
   const landed = useMemo(() => new Set(landedKey.split(",").filter(Boolean)), [landedKey]);
@@ -101,19 +103,50 @@ export function LeagueGrid({ league, status, activity, narratorView, onNarratorV
       </header>
       {league.blocked && <p className="lg-blocked">League can't start Matches: {league.blocked}</p>}
       <section className="lg-grid" aria-label="Live Matches" data-testid="match-grid">
-        {grid.promoted.map((t) => (
-          <Tile key={t.matchId} tile={t} narratorView={narratorView} big />
+        {cards.large.map((c) => (
+          <Card key={c.kind === "live" ? c.tile.matchId : c.match.matchId} card={c} narratorView={narratorView} big />
         ))}
-        {grid.rest.map((t) => (
-          <Tile key={t.matchId} tile={t} narratorView={narratorView} big={false} />
+        {cards.small.map((c) => (
+          <Card key={c.kind === "live" ? c.tile.matchId : c.match.matchId} card={c} narratorView={narratorView} big={false} />
         ))}
-        {grid.promoted.length + grid.rest.length === 0 && (
+        {cards.large.length + cards.small.length === 0 && (
           <p className="lg-empty">{league.tiles.length === 0 ? "No live Matches." : "No Matches match this filter."}</p>
         )}
       </section>
     </div>
   );
 }
+
+function Card({ card, narratorView, big }: { card: GridCard; narratorView: boolean; big: boolean }) {
+  return card.kind === "live" ? <Tile tile={card.tile} narratorView={narratorView} big={big} /> : <FinishedTile match={card.match} big={big} />;
+}
+
+// A recently finished Match filling an empty slot: muted, "Match N" and the result.
+const FinishedTile = memo(function FinishedTile({ match, big }: { match: SettledMatch; big: boolean }) {
+  const v = finishedView(match);
+  return (
+    <a
+      className={`lg-tile finished${big ? " big" : ""}`}
+      href={matchHash(match.matchId)}
+      data-testid="finished-tile"
+      data-match-id={match.matchId}
+      aria-label={`Open ${v.match}`}
+    >
+      <span className="t-head">
+        <span className="t-main">
+          <span className="t-kick">
+            <span className="t-id">{v.match}</span>
+            <span aria-hidden="true">·</span>
+            <span className="t-chip">Over</span>
+          </span>
+          <span className="t-headline" title={v.headline}>
+            {v.headline}
+          </span>
+        </span>
+      </span>
+    </a>
+  );
+});
 
 // Unchanged tiles keep their object identity through applyLeagueDiff, so memo skips them.
 // The tile (wl-fuy2): a top line, a headline, a fixed Drama Score slot and the pips;
