@@ -1,6 +1,6 @@
 ---
 id: wl-t4no
-status: in_progress
+status: closed
 deps: [wl-nos5, wl-kh5w, wl-lvtw, wl-jb4x, wl-cizy, wl-e9tp, wl-64dn]
 links: []
 created: 2026-11-21T15:06:09Z
@@ -80,3 +80,7 @@ Not run: 16/24/36. Stop reason: repeated 429 backoffs at N=12, all from startTur
 TOTALS: 39 Matches, measured spend $13.71 of the $50 cap (Hydrogen $5.32, 3.6 Flash $3.95, 3.8 Flash $2.99, Flash-Lite $1.33). Match duration p50 184 s (117-393). Managed Agent launches over the 38 logged ramp Matches (19:24-19:45 UTC, 20.9 min): 266 environments plus setup interactions, and 1,772 turn interactions (lower bound; invalid-call retries and 429 re-creates are not logged).
 CHOSEN: demo N=8 (0 429s, 0 timeouts, ~$0.87/min, about $52/h); fallback N=4 (~$0.39/min). N=12 only after a quota increase or a longer poll interval (hypothesis: PLAYER_POLL_MS=1000 adds about 84 GET/s at N=12). ROSTER: keep all four Agents (Hydrogen, 3.8 Flash, 3.6 Flash, 3.5 Flash-Lite).
 Anomaly: Match 6553818a seat 5's D1 Round A speech was skipped without a turn_timed_out event (possibly a 429 or no-call path; follow up). Final state: League PAUSED with N=8 set, spendCap 49. Artifacts: /tmp/wl-t4no/ramp.{json,log}.
+
+**2026-11-21T19:56:43Z**
+
+429 ROOT CAUSE (from the human's AI Studio rate-limit dashboard, project 'Gemini 4 NYC Hack', Tier 3, Antigravity/Agents category): TPM peaked at 2.09M against a 2M limit; RPM 208/2K and RPD 2.3K/unlimited were fine. So the limit is tokens per minute, not requests, and the PLAYER_POLL_MS hypothesis is ruled out (GETs carry no tokens). Each chain re-reads its full context every turn, about 0.5M input tokens per Match (cached tokens still count toward TPM). Estimates: ~1.4M TPM at N=8 and ~2.0M at N=12, which matches the observed cutoff. Levers: a TPM quota increase (the human is asking the Google rep), shorter observations, dropping Speech Round B, trimming instructions. Demo stays at N=8 until the quota changes. Ramp script merged into integration (scripts/ramp.mjs, impl/wl-t4no 1ab9331); 250/250 tests. All ACs met.
