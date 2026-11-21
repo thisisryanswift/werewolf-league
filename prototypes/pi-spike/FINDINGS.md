@@ -1,6 +1,10 @@
 # PROTOTYPE findings: wl-zst1 Pi spike (2026-11-21)
 
-Throwaway spike on branch `prototype/pi-spike`. Code: `src/harness/pi-prototype/spike.ts` and `wrangler.pi-spike.jsonc`. I ran it under local `wrangler dev` only and never deployed it.
+Throwaway spike on branch `prototype/pi-spike`. Code: `prototypes/pi-spike/` (`spike.ts`, `wrangler.jsonc`). I ran it under local `wrangler dev` only and never deployed it.
+
+It lives outside `src/harness/` because `test/architecture.test.ts` bans harness code from naming the Werewolf Ruleset. The real adapter has to reach the Ruleset through the interface too.
+
+Run it with `pnpm exec wrangler dev -c prototypes/pi-spike/wrangler.jsonc --port 8799 --persist-to .wrangler/pi-spike-state`. It needs a gitignored `prototypes/pi-spike/.dev.vars` symlink to `../../.dev.vars`: Wrangler reads `.dev.vars` from the config's directory, and `--env-file` did not bind it.
 
 **Checkpoint: it works.** PiHarness ran in a Durable Object with an OpenRouter model, recorded a valid `speak` through a Pi ToolRegistration validated by the real Werewolf Ruleset, and completed an Agent37 exec round-trip. Each piece ran separately. The bash tool is not yet wired into Pi.
 
@@ -24,18 +28,25 @@ Throwaway spike on branch `prototype/pi-spike`. Code: `src/harness/pi-prototype/
 **Native pi-ai support works; no AI Gateway needed.** Use `openrouterProvider()` from `@earendil-works/pi-ai/providers/openrouter` on `createModels()`, with the model ref `{ provider: "openrouter", id }`.
 
 - **Key injection:** `createModels({ authContext: { env: async (n) => this.env[n], fileExists: async () => false } })`. It reads `OPENROUTER_API_KEY` from Worker env (.dev.vars locally, a Wrangler secret when deployed) and does not touch `process.env`.
-- **Model used:** `deepseek/deepseek-v4.1-flash`. It is cheap and called the tool correctly first time.
+- **Both OpenRouter wires work:**
+  - `deepseek/deepseek-v4.1-flash` (`openai-completions`): cheap, called the tool correctly first time.
+  - `anthropic/claude-haiku-5.5` (`anthropic-messages`): the rejected-first turn was recorded after 3.3 s and settled at 3.6 s.
 - **Gotcha: Pi's catalog is stale.** `google/gemini-2.5-flash-lite` is in pi-ai's OpenRouter catalog but returns 404 upstream ("no longer available to new users"). The account also has a Google BYOK key on OpenRouter (`is_byok: true`), so Gemini models bill against that key. Pick models that exist on OpenRouter today.
 - **Gotcha: a model error is not raised as an exception.** The run settles `unanswered` with reason `model_error`, after Pi's own retries (about 15 s). The adapter should map that to `poll → error`.
 - **Gotcha: a session's model and `maxTurns` are fixed when the session is first created.** My first attempt read the model from storage in the constructor before `setup()` wrote it, so the session got the default. The adapter must know the model when the DO is constructed (for example from the DO name or seating), or call `session.setModel`.
-- **Spend:** about 4 short turns. The key has a $100 limit.
+- **Spend:** about 5 short turns. The key has a $100 limit.
 
 ## 3. Game turn (seat 1, Day 1 Speech Round A, 7-player real Ruleset state)
+
+**Open design point:** the spike validated against a Ruleset state snapshot stored in `PiSeatDO`. In the real system the state lives in the Match, and the only Match RPC is `submitAction(turnId, seat, call)`, which validates and records in one step. There is no validate-only RPC.
+
+The real `execute()` should therefore call `submitAction` itself (through PlayerDO or directly). It then returns `terminate` on accepted and `isError` with the Match's error on invalid, and `poll` reports `done` without a second submit. Alternatively, the Match hands a frozen state or validator to the seat with each turn. Either way, decide who records the action so it is never submitted twice.
 
 | Case | Recorded call | Run settled | Model requests |
 | --- | --- | --- | --- |
 | Valid call | 1.3 s after submit | 1.5 s, `done` | 1 |
-| First call rejected | 1.7 s after submit | 2.0 s, `done` | 2 |
+| First call rejected (DeepSeek) | 1.7 s after submit | 2.0 s, `done` | 2 |
+| First call rejected (Claude Haiku 5.5) | 3.3 s after submit | 3.6 s, `done` | 2 |
 
 - **Setup:** the observation comes from `renderObservation` and the instructions from `briefing`, delivered as a Pi section (`agent_instructions`). The tools are the seat's real `ToolSpec[]` (`speak`, `vote`, `inspect`, since seat 1 is the Seer). `ToolSpec.parameters` (JSON Schema) passes straight into `ToolRegistration.parameters`, with no pi-schema conversion.
 - **Valid call:** `execute()` validates with `werewolf.validate`, records the call, and returns `control: { terminate: true }`. That ends the run without another model request, which answers the docs gap of how a tool ends the turn.
@@ -67,6 +78,11 @@ Template `agent37-base`, 2 vCPU / 4 GB / 2 GB disk, type `default`, `network: "d
   - `sandbox.agent37.app/v1/instances/{id}/exec`: `X-Agent37-Key`. Pre-instance errors there are flat `{ "error": "not_found" }`.
 - **Cost:** about $4.76 a month per running instance, metered per minute. Delete at Match end matters, and pause/stop bills disk only.
 - **Not done:** wiring the bash tool into Pi as a ToolRegistration that calls exec. It is the same pattern as `speak`, so the risk is low.
+
+## Verification
+
+- `pnpm typecheck` passes.
+- `pnpm test` passes (173 tests) after moving the spike out of `src/harness/`.
 
 ## Recommendation for the real ticket
 

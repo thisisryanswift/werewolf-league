@@ -2,8 +2,8 @@
 // PROTOTYPE — throwaway spike for wl-zst1 (branch prototype/pi-spike). Not production code.
 // Answers: can PiHarness run in a DO with an OpenRouter model, record a `speak` call through a
 // ToolRegistration validated by the real Ruleset, and can the Worker drive an Agent37 instance?
-// Run: pnpm exec wrangler dev -c wrangler.pi-spike.jsonc --port 8799 --persist-to .wrangler/pi-spike-state
-//   curl 'localhost:8799/spike/turn?rejectFirst=1'   curl 'localhost:8799/spike/agent37'
+// Run: pnpm exec wrangler dev -c prototypes/pi-spike/wrangler.jsonc --port 8799 --persist-to .wrangler/pi-spike-state
+//   curl "localhost:8799/spike/turn?rejectFirst=1"   curl 'localhost:8799/spike/agent37'
 
 import { DurableObject } from "cloudflare:workers";
 import { Lifecycle } from "agents/lifecycle";
@@ -11,10 +11,12 @@ import { PiHarness } from "agents/harness/pi";
 import { createRegistry, Harness } from "@earendil-works/pi-durable";
 import { createModels } from "@earendil-works/pi-ai/models";
 import { openrouterProvider } from "@earendil-works/pi-ai/providers/openrouter";
-import { werewolf } from "../../rulesets/werewolf";
-import { nightKill, seatsOf } from "../../../test/werewolf/helpers";
+import { werewolf } from "../../src/rulesets/werewolf";
+import { nightKill, seatsOf } from "../../test/werewolf/helpers";
 
-const DEFAULT_MODEL = "deepseek/deepseek-v4.1-flash"; // gemini-2.5-flash-lite: 404 upstream (retired)
+// Edit to switch models: ?model= does not work (a session's model is fixed at DO construction, before setup()).
+// Tried: deepseek/deepseek-v4.1-flash (ok), anthropic/claude-haiku-5.5, google/gemini-2.5-flash-lite (404 upstream).
+const DEFAULT_MODEL = "anthropic/claude-haiku-5.5";
 const SEAT = 1;
 
 /** A Day 1 Speech Round A state for a 7-seat table, plus seat 1's real tools and observation. */
