@@ -10,3 +10,5 @@ These are copied unchanged from the official upstream repos on 2026-11-21. To up
 Upstream also offers these, which aren't vendored here:
 - `gemini-api-cli` needs the `gemini-api` CLI.
 - `agents-sdk` isn't needed; we use plain Durable Objects, not the Agents SDK.
+
+| critiquing-designs | https://github.com/theycallmeswift/skills | 2c41ee9 |
