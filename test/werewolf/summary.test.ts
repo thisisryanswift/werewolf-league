@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { werewolf } from "../../src/rulesets/werewolf";
-import { dealt, kill } from "./helpers";
+import { dealt, nightKill } from "./helpers";
 
 describe("Werewolf tile summary", () => {
   it("starts at Night 1 with every seat alive and no speech", () => {
@@ -14,9 +14,9 @@ describe("Werewolf tile summary", () => {
   });
 
   it("moves to Day 1 without the Night victim after the kill", () => {
-    const { state, wolves, villagers } = dealt("summary");
-    const victim = villagers[0]!;
-    const r = werewolf.applyActions(state, Object.fromEntries(wolves.map((w) => [w, kill(victim)])));
+    const { state, villagers, doctor } = dealt("summary");
+    const victim = villagers.find((v) => v !== doctor)!;
+    const r = nightKill(state, victim);
     const s = werewolf.summary(r.state, []);
     expect(s).toMatchObject({ phase: "Day", round: 1 });
     expect(s.alive).not.toContain(victim);
