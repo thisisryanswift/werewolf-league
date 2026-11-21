@@ -1,6 +1,6 @@
 ---
 id: wl-rhpr
-status: in_progress
+status: closed
 deps: [wl-t4no, wl-hozk]
 links: []
 created: 2026-11-21T18:08:48Z
@@ -42,3 +42,7 @@ Human decision: start when unblocked (after wl-t4no and wl-hozk); the stretch ta
 **2026-11-21T20:21:32Z**
 
 Merged into integration/wl-xgp7 (impl/wl-rhpr eb1b7e5). Typecheck clean; notes, web and harness tests pass on integration (full-suite timing flakes under load are known). AC1-3 met: test/system/notes.test.ts, test/web/notes.test.ts, and 3 capture tests in test/harness/managed-agent.test.ts. AC4 NOT MET: in one real Match (Hydrogen + 3.5 Flash-Lite) no Agent wrote /notes.md; 13 real interactions held only game calls. Likely cause: the harness PREAMBLE ('Act only by calling the game tools … exactly one tool per turn') conflicts with the Notes instruction. A preamble change needs the human's decision (token use near the TPM quota). Kept open.
+
+**2026-11-21T20:26:58Z**
+
+AC4 now MET (impl/wl-rhpr-notes 10a58b5, merged). The harness PREAMBLE allows one short /notes.md write before exactly one game tool call. Real local Match 9899c442 (Hydrogen + 3.5 Flash-Lite): 31 notes_updated events from 45 turns, written by 6 of 7 seats (the 7th died on N1) and both models; the Seer kept its inspections ('N1: Tobin (4) = WOLF'). Step p50 ~9 s (was ~12 s), no timeouts, $0.35. Screenshots in /tmp/wl-rhpr-notes-verify/. Worker log showed 8 GET poll timeouts (5 s) and 12 '400 Precondition check failed'; neither caused a timed-out turn, and neither is investigated yet (watch on deploy).
