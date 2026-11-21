@@ -6,7 +6,7 @@
     "dev": "vite build && wrangler dev",
     "build": "vite build",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p web/tsconfig.json",
     "cf-typegen": "wrangler types"
   },
   "devDependencies": {
