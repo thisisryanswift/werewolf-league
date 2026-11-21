@@ -13,6 +13,7 @@ import { createContext, useContext, type ReactNode } from "react";
 import type { MatchEvent } from "../../src/shared/protocol";
 import { TableSuspicion } from "../components/TableSuspicion";
 import type { MatchView, SeatView } from "./model";
+import { SeatNotesDrawer } from "./SeatNotes";
 
 export const NarratorViewContext = createContext(true);
 
@@ -53,4 +54,7 @@ export const MATCH_PANELS: MatchPanel[] = [
 ];
 
 /** Extra lines inside each seat row (e.g. a Table Suspicion meter). */
-export const SEAT_SLOTS: SeatSlot[] = [];
+export const SEAT_SLOTS: SeatSlot[] = [
+  // wl-rhpr. Agent notes are private to the seat's sandbox: Narrator's View only.
+  { id: "notes", narratorViewOnly: true, Component: ({ events, seat }) => <SeatNotesDrawer events={events} seat={seat} /> },
+];

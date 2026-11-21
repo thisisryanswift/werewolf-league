@@ -285,6 +285,25 @@ body:has(.mv-page) {
   border: 2px solid var(--mv-ink);
   padding: 1px 6px;
 }
+/* Agent notes drawer (wl-rhpr), Narrator's View only. */
+.mv-notes {
+  justify-self: stretch;
+  font-size: 13px;
+  border: 2px dashed var(--mv-ink);
+  padding: 1px 6px;
+}
+.mv-notes summary {
+  cursor: pointer;
+  font-weight: 800;
+}
+.mv-notes pre {
+  margin: 4px 0;
+  max-height: 16em;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: inherit;
+}
 .mv-truth {
   margin-left: 6px;
   padding: 0 4px;
