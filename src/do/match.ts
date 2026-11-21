@@ -5,26 +5,44 @@
 
 import { DurableObject } from "cloudflare:workers";
 import {
+  countTimeouts,
+  expireOverdue,
+  isRunnerEvent,
+  nextMatchWake,
+  resolveDeadlines,
+  stepResolvedEvents,
+  turnDuration,
+  turnStartedEvents,
+  type DeadlineConfig,
+} from "../core/deadlines";
+import {
   actionsOf,
   stepComplete,
   type MatchInit,
+  type MatchReport,
   type MatchSnapshot,
   type MatchStatus,
   type PendingStep,
   type SubmitResult,
   type TurnAssignment,
 } from "../core/match";
-import type { MatchResult, Ruleset, Seat, ToolCall, ToolSpec } from "../core/ruleset";
+import type { Ruleset, Seat, ToolCall, ToolSpec, TurnRequest } from "../core/ruleset";
 import { getRuleset } from "../rulesets";
 import type { MatchEvent, RulesetEvent, ServerMessage } from "../shared/protocol";
 
-interface MatchMeta extends MatchInit {
+/** How soon the Match retries sending a turn to a Player DO that failed to accept it. */
+const DISPATCH_RETRY_MS = 1000;
+
+interface MatchMeta extends Omit<MatchInit, "deadlines"> {
   status: MatchStatus;
-  result: MatchResult | null;
+  result: MatchReport | null;
+  deadlines: DeadlineConfig;
   tools: Record<Seat, ToolSpec[]>;
   stepCount: number;
   /** Highest seq each seat has been shown in an observation. */
   lastSeen: Record<Seat, number>;
+  /** Seats that have been assigned a turn before; only a seat's first assignment gets the first-turn deadline. */
+  assigned?: Seat[];
 }
 
 type EventRow = { seq: number; ts: number; kind: string; audience: string; data: string };
@@ -141,7 +159,15 @@ export class MatchDO extends DurableObject<Env> {
       ),
     );
     // Persist and schedule together (no await between the writes).
-    this.meta = { ...init, status: "running", result: null, tools: setup.tools, stepCount: 0, lastSeen: {} };
+    this.meta = {
+      ...init,
+      deadlines: resolveDeadlines(init.deadlines),
+      status: "running",
+      result: null,
+      tools: setup.tools,
+      stepCount: 0,
+      lastSeen: {},
+    };
     this.rulesetState = setup.state;
     this.commit(setup.events);
     await this.ctx.storage.setAlarm(Date.now());
@@ -150,13 +176,15 @@ export class MatchDO extends DurableObject<Env> {
   snapshot(): (MatchSnapshot & { events: MatchEvent[] }) | null {
     const meta = this.meta;
     if (!meta) return null;
+    const events = this.events();
     return {
       matchId: meta.matchId,
       rulesetId: meta.rulesetId,
       status: meta.status,
       seats: meta.seats,
       result: meta.result,
-      events: this.events(),
+      stats: { timeouts: countTimeouts(events, meta.seats) },
+      events,
     };
   }
 
@@ -165,15 +193,42 @@ export class MatchDO extends DurableObject<Env> {
     const meta = this.meta;
     const step = this.step;
     const turn = step?.turns.find((t) => t.turnId === turnId && t.seat === seat);
+    // Results are tied to a turn ID: anything for a resolved or old turn is dropped.
     if (!meta || !step || !turn || turn.action !== undefined) return { status: "stale" };
+    if (Date.now() >= turn.deadlineAt) {
+      // Too late, even if the backstop hasn't fired yet: the default applies instead.
+      turn.action = null;
+      turn.timedOut = "late";
+      this.step = step;
+      await this.armAlarm(meta, step);
+      return { status: "stale" };
+    }
     if (call) {
       const v = this.ruleset(meta).validate(this.rulesetState, seat, call);
       if (!v.ok) return { status: "invalid", error: v.error };
     }
     turn.action = call;
     this.step = step;
-    if (stepComplete(step)) await this.ctx.storage.setAlarm(Date.now());
+    await this.armAlarm(meta, step);
     return { status: "accepted" };
+  }
+
+  /** A Player reports that its turn missed the deadline; the Ruleset's default applies. */
+  async reportTimeout(turnId: string, seat: Seat): Promise<SubmitResult> {
+    const meta = this.meta;
+    const step = this.step;
+    const turn = step?.turns.find((t) => t.turnId === turnId && t.seat === seat);
+    if (!meta || !step || !turn || turn.action !== undefined) return { status: "stale" };
+    turn.action = null;
+    turn.timedOut = "player";
+    this.step = step;
+    await this.armAlarm(meta, step);
+    return { status: "accepted" };
+  }
+
+  /** Wake when the step can resolve, a dispatch needs retrying, or the backstop is due. */
+  private armAlarm(meta: MatchMeta, step: PendingStep): Promise<void> {
+    return this.ctx.storage.setAlarm(nextMatchWake(step, Date.now(), meta.deadlines.graceMs, DISPATCH_RETRY_MS));
   }
 
   // ---- driving the Match ---------------------------------------------
@@ -185,58 +240,106 @@ export class MatchDO extends DurableObject<Env> {
 
     const pending = this.step;
     if (pending) {
-      if (!stepComplete(pending)) return; // Players will report; deadlines land here later.
-      const r = ruleset.applyActions(this.rulesetState, actionsOf(pending));
-      this.rulesetState = r.state;
-      this.step = undefined;
-      this.commit(r.events);
+      // Backstop: expire turns whose Player DO never reported by deadline + grace.
+      if (expireOverdue(pending, Date.now(), meta.deadlines.graceMs)) this.step = pending;
+      if (!stepComplete(pending)) {
+        await this.sendTurns(meta, pending.stepNo);
+        return;
+      }
+      this.resolve(meta, ruleset, pending);
     }
 
+    const current = this.meta!;
     const next = ruleset.nextStep(this.rulesetState);
     if (next.type === "finished") {
-      this.meta = { ...meta, status: "finished", result: next.result };
-      await this.env.LEAGUE.getByName("default").reportMatchResult(meta.matchId, next.result);
+      const result: MatchReport = { ...next.result, timeouts: countTimeouts(this.events(), current.seats) };
+      this.meta = { ...current, status: "finished", result };
+      await this.env.LEAGUE.getByName("default").reportMatchResult(current.matchId, result);
       return;
     }
-    await this.dispatch(meta, ruleset, next.turns);
+    await this.dispatch(current, ruleset, next.turns);
+  }
+
+  /** Apply a complete step: record timeouts, advance each answering seat's lastSeen, commit the Ruleset's events. */
+  private resolve(meta: MatchMeta, ruleset: Ruleset<unknown>, step: PendingStep): void {
+    const r = ruleset.applyActions(this.rulesetState, actionsOf(step));
+    // A seat that timed out never saw its observation, so its next turn repeats what it missed.
+    const lastSeen = { ...meta.lastSeen };
+    for (const t of step.turns) if (!t.timedOut) lastSeen[t.seat] = t.seenThrough;
+    this.meta = { ...meta, lastSeen };
+    this.rulesetState = r.state;
+    this.step = undefined;
+    this.commit([...stepResolvedEvents(step), ...r.events]);
   }
 
   /** Start a step: freeze each Player's observation and hand the turns to the Player DOs. */
-  private async dispatch(meta: MatchMeta, ruleset: Ruleset<unknown>, turns: import("../core/ruleset").TurnRequest[]) {
+  private async dispatch(meta: MatchMeta, ruleset: Ruleset<unknown>, turns: TurnRequest[]) {
     const state = this.rulesetState;
-    const all = this.events();
+    // Runner events (turn markers, timeouts) are for Spectators, never for Agents.
+    const all = this.events().filter((e) => !isRunnerEvent(e));
     const head = this.lastSeq();
     const stepNo = meta.stepCount + 1;
-    const lastSeen = { ...meta.lastSeen };
+    const startedAt = Date.now();
+    const assigned = new Set(meta.assigned ?? []);
     const step: PendingStep = {
       stepNo,
-      startedAt: Date.now(),
+      startedAt,
       turns: turns.map((request) => {
-        const seen = lastSeen[request.seat];
+        const seen = meta.lastSeen[request.seat];
         const firstTurn = seen === undefined;
         const fresh = ruleset.view(
           all.filter((e) => e.seq > (seen ?? 0)),
           { seat: request.seat },
         );
         const observation = ruleset.renderObservation(state, request.seat, fresh, request);
-        lastSeen[request.seat] = head;
         const text = firstTurn ? `${ruleset.briefing(state, request.seat)}\n\n${observation}` : observation;
+        // A seat whose first turn timed out is briefed again, but on the normal deadline.
+        const deadlineMs = turnDuration(meta.deadlines, !assigned.has(request.seat));
         return {
           turnId: `${meta.matchId}:${stepNo}:${request.seat}`,
           seat: request.seat,
           request,
           input: { text, turn: request, firstTurn },
+          deadlineMs,
+          deadlineAt: startedAt + deadlineMs,
+          seenThrough: head,
         };
       }),
     };
-    this.meta = { ...meta, stepCount: stepNo, lastSeen };
+    this.meta = { ...meta, stepCount: stepNo, assigned: [...new Set([...assigned, ...turns.map((t) => t.seat)])] };
     this.step = step;
-    await Promise.all(
-      step.turns.map((t) => {
-        const assignment: TurnAssignment = { matchId: meta.matchId, turnId: t.turnId, seat: t.seat, input: t.input };
+    this.commit(turnStartedEvents(step));
+    await this.sendTurns(meta, stepNo);
+  }
+
+  /**
+   * Hand every undispatched, unresolved turn of the step to its Player DO, then
+   * arm the alarm. A Player DO ignores a turn it already holds, so re-sending is safe.
+   */
+  private async sendTurns(meta: MatchMeta, stepNo: number): Promise<void> {
+    const step = this.step;
+    if (!step || step.stepNo !== stepNo) return;
+    const todo = step.turns.filter((t) => !t.dispatched && t.action === undefined);
+    const sent = await Promise.allSettled(
+      todo.map((t) => {
+        const assignment: TurnAssignment = {
+          matchId: meta.matchId,
+          turnId: t.turnId,
+          seat: t.seat,
+          input: t.input,
+          deadlineAt: t.deadlineAt,
+        };
         return this.env.PLAYER.getByName(`${meta.matchId}:${t.seat}`).takeTurn(assignment);
       }),
     );
+    // Players may have reported while we awaited: re-read before writing.
+    const latest = this.step;
+    if (!latest || latest.stepNo !== stepNo) return;
+    todo.forEach((t, i) => {
+      if (sent[i]!.status === "fulfilled") latest.turns.find((x) => x.turnId === t.turnId)!.dispatched = true;
+    });
+    this.step = latest;
+    await this.armAlarm(meta, latest);
   }
 
   // ---- Spectator WebSocket --------------------------------------------

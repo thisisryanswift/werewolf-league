@@ -1,6 +1,7 @@
 // Ruleset-agnostic Match types and pending-step bookkeeping shared by the
 // Match DO, the Player DO and whoever starts Matches (admin route, League).
 
+import type { DeadlineConfig, TimeoutCounts, TimeoutSource } from "./deadlines";
 import type { AgentConfig, TurnInput } from "./harness";
 import type { MatchResult, Seat, SeatAgent, ToolCall, TurnRequest } from "./ruleset";
 
@@ -13,6 +14,8 @@ export interface MatchInit {
   seats: SeatAgent[];
   /** The Agent playing each seat. */
   agents: Record<Seat, AgentConfig>;
+  /** Turn deadlines; missing values use DEFAULT_DEADLINES (60 s, first turn 90 s). */
+  deadlines?: Partial<DeadlineConfig>;
 }
 
 export type MatchStatus = "running" | "finished";
@@ -22,7 +25,18 @@ export interface MatchSnapshot {
   rulesetId: string;
   status: MatchStatus;
   seats: SeatAgent[];
-  result: MatchResult | null;
+  result: MatchReport | null;
+  stats: MatchStats;
+}
+
+/** Live Match statistics kept by the runner. */
+export interface MatchStats {
+  timeouts: TimeoutCounts;
+}
+
+/** The Ruleset's result plus the runner's per-Player and per-Agent timeout counts. Sent to the League. */
+export interface MatchReport extends MatchResult {
+  timeouts: TimeoutCounts;
 }
 
 /** One Player's turn within a step. The observation is frozen when the step starts. */
@@ -33,6 +47,15 @@ export interface PendingTurn {
   input: TurnInput;
   /** Recorded outcome: a valid call, or null for the default. Undefined while in flight. */
   action?: ToolCall | null;
+  /** Set when the turn missed its deadline (its action is then null). */
+  timedOut?: TimeoutSource;
+  /** Absolute deadline (epoch ms) and its length. */
+  deadlineAt: number;
+  deadlineMs: number;
+  /** Highest seq included in this turn's observation; becomes the seat's lastSeen only if it answered. */
+  seenThrough: number;
+  /** True once the Player DO has accepted the assignment. */
+  dispatched?: boolean;
 }
 
 export interface PendingStep {
@@ -52,6 +75,8 @@ export interface TurnAssignment {
   turnId: string;
   seat: Seat;
   input: TurnInput;
+  /** Absolute deadline (epoch ms). The Player cancels the turn and reports a timeout once it passes. */
+  deadlineAt: number;
 }
 
 /** The Match's answer when a Player reports an action. */

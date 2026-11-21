@@ -4,9 +4,10 @@ import type { MatchEvent } from "../../src/shared/protocol";
 import { commonEvents } from "./common";
 import { dayEvents } from "./day";
 import { nightEvents } from "./night";
+import { runnerEvents } from "./runner";
 import type { EventRenderer } from "./types";
 
-const RENDERERS: Record<string, EventRenderer> = { ...commonEvents, ...nightEvents, ...dayEvents };
+const RENDERERS: Record<string, EventRenderer> = { ...commonEvents, ...nightEvents, ...dayEvents, ...runnerEvents };
 
 export function describeEvent(e: MatchEvent, log: MatchEvent[]): string {
   const r = RENDERERS[e.kind];
