@@ -1,4 +1,4 @@
-// The Narrator interface: an observer that reads a Match's God View log and
+// The Narrator interface: an observer that reads a Match's Narrator's View log and
 // scores it for Spectators (Drama Score, Drama Flags). It never affects play,
 // observations, ratings, Calibration or Table Suspicion. Ruleset-agnostic: the
 // questions and the log text come from the Ruleset's `narration` hook.
@@ -30,7 +30,7 @@ export interface NarrationQuestions {
   flags: DramaFlagQuestion[];
 }
 
-/** One Narrator call: the God View log as text plus the Ruleset's questions. */
+/** One Narrator call: the Narrator's View log as text plus the Ruleset's questions. */
 export interface NarrationInput {
   matchId: string;
   log: string;
@@ -51,7 +51,7 @@ export interface Narration {
 }
 
 export interface Narrator {
-  /** Score a God View log. Should stop work when `signal` aborts. */
+  /** Score a Narrator's View log. Should stop work when `signal` aborts. */
   narrate(input: NarrationInput, signal: AbortSignal): Promise<Narration>;
 }
 
@@ -76,7 +76,7 @@ export const isNarrationEvent = (e: { kind: string }): boolean => NARRATION_EVEN
 
 /**
  * The events for one narration: Drama Score and public-safe flags for everyone,
- * secret flags for God View only (audience []).
+ * secret flags for Narrator's View only (audience []).
  */
 export function narrationEvents(n: Narration, threshold: number, throughSeq: number): RulesetEvent[] {
   const flags = n.flags.map((f) => ({ id: f.id, value: f.value, visibility: f.visibility, active: f.value >= threshold }));
@@ -164,7 +164,7 @@ export function withDeadline<T>(timeoutMs: number, call: (signal: AbortSignal) =
 }
 
 /**
- * One narration of a Match: render its God View log through the Ruleset's hook,
+ * One narration of a Match: render its Narrator's View log through the Ruleset's hook,
  * ask the Narrator under the deadline and return the events to commit. Rejects
  * on failure or timeout (the caller drops it and the tile keeps its last value).
  * `events` must already exclude runner and narration events.

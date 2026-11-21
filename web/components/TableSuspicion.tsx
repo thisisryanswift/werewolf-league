@@ -1,10 +1,10 @@
-// Table Suspicion meter (God View only): for each Player, the table's mean
+// Table Suspicion meter (Narrator's View only): for each Player, the table's mean
 // stated belief that they are on the guessed-at Side, over every ballot so far
 // that rates them, next to their true role. It recomputes from the event log,
 // so it moves after each vote commits its `beliefs_recorded` event.
 //
-// God View only: ballots and roles are private. The caller decides visibility;
-// this component never filters by God View itself.
+// Narrator's View only: ballots and roles are private. The caller decides visibility;
+// this component never filters by Narrator's View itself.
 import type { MatchEvent } from "../../src/shared/protocol";
 import { tableSuspicion, type Ballot } from "../../src/shared/beliefs";
 import { spectatorLabel } from "../../src/shared/seat-label";
@@ -19,7 +19,7 @@ export function TableSuspicion({ events }: { events: MatchEvent[] }) {
   const dead = new Set(events.filter((e) => e.kind === "player_died").map((e) => Number(e.data.seat)));
   const votes = recorded.length;
   return (
-    <section className="table-suspicion god-view-only" data-testid="table-suspicion" data-god-view-only data-votes={votes}>
+    <section className="table-suspicion narrator-view-only" data-testid="table-suspicion" data-narrator-view-only data-votes={votes}>
       <h2>Table Suspicion</h2>
       {votes === 0 ? (
         <p className="muted">No votes yet.</p>

@@ -14,14 +14,14 @@ function table() {
 }
 
 describe("Werewolf view and observations", () => {
-  it("hides other roles and the wolf team from villagers, but not from God View", () => {
+  it("hides other roles and the wolf team from villagers, but not from Narrator's View", () => {
     const { events, wolves, villager } = table();
     const seen = werewolf.view(events, { seat: villager }).map((e) => e.kind);
     expect(seen.filter((k) => k === "role_assigned")).toHaveLength(1);
     expect(seen).not.toContain("wolf_team");
     expect(werewolf.view(events, { seat: wolves[0]! }).map((e) => e.kind)).toContain("wolf_team");
-    expect(werewolf.view(events, { spectator: true, godView: true })).toHaveLength(events.length);
-    expect(werewolf.view(events, { spectator: true, godView: false }).map((e) => e.kind)).not.toContain("role_assigned");
+    expect(werewolf.view(events, { spectator: true, narratorView: true })).toHaveLength(events.length);
+    expect(werewolf.view(events, { spectator: true, narratorView: false }).map((e) => e.kind)).not.toContain("role_assigned");
   });
 
   it("briefs a Werewolf with rules, role, seats and partner", () => {

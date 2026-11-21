@@ -1,6 +1,6 @@
 // Events the Match runner adds to the event log alongside the Ruleset's events,
 // and what Spectators derive from them (thinking indicators, timeout counts).
-// Ruleset-agnostic. Per-seat events are private to that seat (God View sees
+// Ruleset-agnostic. Per-seat events are private to that seat (Narrator's View sees
 // them), so who is taking a turn never reveals a hidden role. Agents never see them.
 //
 //   turn_started   { step, seat, actionKind, deadlineMs }  audience [seat]   committed when a step is dispatched

@@ -1,4 +1,4 @@
-// The Match view's model: what a Spectator sees for a given event log and God View setting.
+// The Match view's model: what a Spectator sees for a given event log and Narrator's View setting.
 import { describe, expect, it } from "vitest";
 import type { MatchEvent, RulesetEvent } from "../../src/shared/protocol";
 import { agentName, buildMatchView, panelsFor, playerLabel } from "../../web/match/model";
@@ -64,9 +64,9 @@ const day1: RulesetEvent[] = [
 ];
 
 describe("Match view", () => {
-  it("God View off hides roles, Wolf Chat and private events; deaths still reveal the dead Player's role", () => {
+  it("Narrator's View off hides roles, Wolf Chat and private events; deaths still reveal the dead Player's role", () => {
     const log = logOf(night1);
-    const off = buildMatchView(log, { godView: false });
+    const off = buildMatchView(log, { narratorView: false });
     expect(off.seats.map((s) => s.role)).toEqual([null, null, null, null, "villager"]);
     const offKinds = off.feed.flatMap((g) => g.items.map((i) => i.event.kind));
     expect(offKinds).not.toContain("wolf_chat");
@@ -75,14 +75,14 @@ describe("Match view", () => {
     expect(offKinds).not.toContain("role_assigned");
     expect(offKinds).toContain("player_died");
 
-    const on = buildMatchView(log, { godView: true });
+    const on = buildMatchView(log, { narratorView: true });
     expect(on.seats.map((s) => s.role)).toEqual(["werewolf", "werewolf", "seer", "doctor", "villager"]);
     const wolfChat = on.feed.flatMap((g) => g.items).find((i) => i.event.kind === "wolf_chat");
-    expect(wolfChat?.godViewOnly).toBe(true);
+    expect(wolfChat?.narratorViewOnly).toBe(true);
   });
 
   it("groups the feed by Night / Round A / Round B / Right of Reply / Vote, and each vote has a tally", () => {
-    const view = buildMatchView(logOf([...night1, ...day1]), { godView: false });
+    const view = buildMatchView(logOf([...night1, ...day1]), { narratorView: false });
     expect(view.feed.map((g) => g.title)).toEqual([
       "Setup",
       "Night 1",
@@ -107,8 +107,8 @@ describe("Match view", () => {
     });
   });
 
-  it("puts a step's timeout markers in that step's group (God View only)", () => {
-    const on = buildMatchView(logOf([...night1, ...day1]), { godView: true });
+  it("puts a step's timeout markers in that step's group (Narrator's View only)", () => {
+    const on = buildMatchView(logOf([...night1, ...day1]), { narratorView: true });
     const roundA = on.feed.find((g) => g.title === "Day 1 · Round A")!;
     expect(roundA.items.map((i) => i.event.kind)).toContain("turn_timed_out");
   });
@@ -119,9 +119,9 @@ describe("Match view", () => {
       ...day1,
       pub("match_over", { winner: "wolf", reason: "parity", roles: { 1: "werewolf", 2: "werewolf", 3: "seer", 4: "doctor", 5: "villager" } }),
     ];
-    const before = buildMatchView(logOf(over), { godView: false }).end;
+    const before = buildMatchView(logOf(over), { narratorView: false }).end;
     expect(before).toMatchObject({ winner: "wolf", reason: "parity", ratings: null });
-    // Roles are public once the Match is over, even with God View off.
+    // Roles are public once the Match is over, even with Narrator's View off.
     expect(before!.roles.map((r) => [r.seat, r.role, r.alive])).toEqual([
       [1, "werewolf", false],
       [2, "werewolf", true],
@@ -141,33 +141,33 @@ describe("Match view", () => {
           ],
         }),
       ]),
-      { godView: false },
+      { narratorView: false },
     ).end!;
     expect(settled.ratings).toEqual([
       { agentId: "a1", name: "Agent1", side: "wolf", before: 1200, delta: 16, after: 1216 },
       { agentId: "a3", name: "Agent3", side: "village", before: 1200, delta: -16, after: 1184 },
     ]);
-    expect(buildMatchView(logOf(night1), { godView: true }).end).toBeNull();
-    // Once over, seats show every role and judge every Claim, God View or not.
-    const seats = buildMatchView(logOf(over), { godView: false }).seats;
+    expect(buildMatchView(logOf(night1), { narratorView: true }).end).toBeNull();
+    // Once over, seats show every role and judge every Claim, Narrator's View or not.
+    const seats = buildMatchView(logOf(over), { narratorView: false }).seats;
     expect(seats.map((s) => s.role)).toEqual(["werewolf", "werewolf", "seer", "doctor", "villager"]);
     expect(seats.find((s) => s.seat === 3)!.claim?.truth).toBe("true");
   });
 
   it("shows each seat's latest Claim, judged true or a lie only when the role is known", () => {
     const log = logOf([...night1, ...day1]);
-    const on = buildMatchView(log, { godView: true });
+    const on = buildMatchView(log, { narratorView: true });
     expect(on.seats.find((s) => s.seat === 3)!.claim).toEqual({ role: "seer", results: [{ seat: 1, side: "wolf" }], truth: "true" });
     expect(on.seats.find((s) => s.seat === 1)!.claim).toMatchObject({ role: "seer", truth: "lie" });
-    const off = buildMatchView(log, { godView: false });
+    const off = buildMatchView(log, { narratorView: false });
     expect(off.seats.find((s) => s.seat === 3)!.claim).toMatchObject({ role: "seer", truth: null });
-    // A dead Player's role is public, so their lie shows without God View.
+    // A dead Player's role is public, so their lie shows without Narrator's View.
     expect(off.seats.find((s) => s.seat === 1)!.claim).toMatchObject({ truth: "lie" });
     expect(off.seats.find((s) => s.seat === 4)!.claim).toBeNull();
   });
 
   it("links the latest Day's Accusations between Players", () => {
-    const view = buildMatchView(logOf([...night1, ...day1]), { godView: false });
+    const view = buildMatchView(logOf([...night1, ...day1]), { narratorView: false });
     expect(view.accusations).toEqual({
       cycle: 1,
       links: [
@@ -178,43 +178,43 @@ describe("Match view", () => {
         { from: 1, to: 3, round: "B" },
       ],
     });
-    expect(buildMatchView(logOf(night1), { godView: true }).accusations).toBeNull();
+    expect(buildMatchView(logOf(night1), { narratorView: true }).accusations).toBeNull();
   });
 
-  it("marks thinking seats and timeouts only in God View, since Night turns would reveal roles", () => {
+  it("marks thinking seats and timeouts only in Narrator's View, since Night turns would reveal roles", () => {
     const midStep = logOf([
       ...night1,
       ...day1.slice(0, 6),
       priv("turn_started", [3], { step: 6, seat: 3, actionKind: "speak", deadlineMs: 1000 }),
       priv("turn_started", [4], { step: 6, seat: 4, actionKind: "speak", deadlineMs: 1000 }),
     ]);
-    const on = buildMatchView(midStep, { godView: true });
+    const on = buildMatchView(midStep, { narratorView: true });
     expect(on.seats.filter((s) => s.thinking).map((s) => s.seat)).toEqual([3, 4]);
     expect(on.seats.map((s) => s.timeouts)).toEqual([0, 1, 0, 0, 0]);
-    const off = buildMatchView(midStep, { godView: false });
+    const off = buildMatchView(midStep, { narratorView: false });
     expect(off.seats.some((s) => s.thinking || s.timeouts > 0)).toBe(false);
   });
 
-  it("treats any event not addressed to everyone as God-View-only, whatever its kind", () => {
+  it("treats any event not addressed to everyone as Narrator's-View-only, whatever its kind", () => {
     // e.g. a Narrator result carrying a secret Drama Flag.
     const log = logOf([...night1, priv("drama_secret", [], { flags: ["a wolf is fooling the table"] })]);
-    const kinds = (godView: boolean) => buildMatchView(log, { godView }).feed.flatMap((g) => g.items.map((i) => i.event.kind));
+    const kinds = (narratorView: boolean) => buildMatchView(log, { narratorView }).feed.flatMap((g) => g.items.map((i) => i.event.kind));
     expect(kinds(false)).not.toContain("drama_secret");
     expect(kinds(true)).toContain("drama_secret");
   });
 
-  it("shows God-View-only panels only in God View", () => {
+  it("shows Narrator's-View-only panels only in Narrator's View", () => {
     const panels = [
-      { id: "suspicion", godViewOnly: true },
-      { id: "public", godViewOnly: false },
+      { id: "suspicion", narratorViewOnly: true },
+      { id: "public", narratorViewOnly: false },
     ];
     expect(panelsFor(panels, false).map((p) => p.id)).toEqual(["public"]);
     expect(panelsFor(panels, true).map((p) => p.id)).toEqual(["suspicion", "public"]);
   });
 
   it("reports the phase and alive count", () => {
-    expect(buildMatchView(logOf([...night1, ...day1]), { godView: false }).status).toEqual({ phase: "night", cycle: 2, alive: 3, total: 5 });
-    expect(buildMatchView(logOf([]), { godView: false }).status).toEqual({ phase: null, cycle: 0, alive: 0, total: 0 });
+    expect(buildMatchView(logOf([...night1, ...day1]), { narratorView: false }).status).toEqual({ phase: "night", cycle: 2, alive: 3, total: 5 });
+    expect(buildMatchView(logOf([]), { narratorView: false }).status).toEqual({ phase: null, cycle: 0, alive: 0, total: 0 });
   });
 });
 
@@ -223,23 +223,23 @@ describe("Match view Claims and labels", () => {
     logOf([...night1, speech(1, "A", 3, { claim: { role: "seer", results } })]);
 
   it("marks a true Seer's Claim a lie when a claimed inspection result is false", () => {
-    const view = buildMatchView(claimLog([{ seat: 1, side: "wolf" }, { seat: 4, side: "wolf" }]), { godView: true });
+    const view = buildMatchView(claimLog([{ seat: 1, side: "wolf" }, { seat: 4, side: "wolf" }]), { narratorView: true });
     expect(view.seats.find((s) => s.seat === 3)!.claim).toMatchObject({ role: "seer", truth: "lie" });
   });
 
   it("marks a Claim true only when the role and every claimed result's Side match", () => {
-    const view = buildMatchView(claimLog([{ seat: 1, side: "wolf" }, { seat: 4, side: "village" }]), { godView: true });
+    const view = buildMatchView(claimLog([{ seat: 1, side: "wolf" }, { seat: 4, side: "village" }]), { narratorView: true });
     expect(view.seats.find((s) => s.seat === 3)!.claim).toMatchObject({ truth: "true" });
   });
 
   it("does not judge a true role's Claim while a claimed seat's Side is hidden", () => {
-    // God View off: seat 3's role is hidden anyway; once seat 3 dies its role is public but seat 4's is not.
+    // Narrator's View off: seat 3's role is hidden anyway; once seat 3 dies its role is public but seat 4's is not.
     const log = logOf([
       ...night1,
       speech(1, "A", 3, { claim: { role: "seer", results: [{ seat: 4, side: "wolf" }] } }),
       pub("player_died", { seat: 3, role: "seer", cause: "vote", cycle: 1 }),
     ]);
-    expect(buildMatchView(log, { godView: false }).seats.find((s) => s.seat === 3)!.claim).toMatchObject({ truth: null });
+    expect(buildMatchView(log, { narratorView: false }).seats.find((s) => s.seat === 3)!.claim).toMatchObject({ truth: null });
   });
 
   it("names seats 'Display Name · Agent #n', and Agents by name alone", () => {

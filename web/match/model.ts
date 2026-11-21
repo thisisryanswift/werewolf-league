@@ -1,8 +1,8 @@
 // The Match view's model: everything a Spectator sees, derived from the event log
-// and the God View setting. Pure and DOM-free, so it is tested directly.
+// and the Narrator's View setting. Pure and DOM-free, so it is tested directly.
 //
-// God View rule: an event is God-View-only when its audience is not "all". With
-// God View off those events are dropped before anything else is derived, so no
+// Narrator's View rule: an event is Narrator's-View-only when its audience is not "all". With
+// Narrator's View off those events are dropped before anything else is derived, so no
 // role, Wolf Chat, Night choice, turn marker or secret Drama Flag can leak.
 import type { AgentRatingChange, MatchEvent } from "../../src/shared/protocol";
 import { spectatorLabel } from "../../src/shared/seat-label";
@@ -28,13 +28,13 @@ export function agentName(s: SeatInfo): string {
 
 export interface SeatView extends SeatInfo {
   alive: boolean;
-  /** Known role: always for the dead, and for everyone in God View. */
+  /** Known role: always for the dead, and for everyone in Narrator's View. */
   role: string | null;
   /** The seat's latest Claim. */
   claim: ClaimView | null;
-  /** A turn is in flight (God View only: who acts at Night would reveal roles). */
+  /** A turn is in flight (Narrator's View only: who acts at Night would reveal roles). */
   thinking: boolean;
-  /** Turns that missed their deadline (God View only). */
+  /** Turns that missed their deadline (Narrator's View only). */
   timeouts: number;
 }
 
@@ -47,7 +47,7 @@ export interface ClaimView {
 
 export interface FeedItem {
   event: MatchEvent;
-  godViewOnly: boolean;
+  narratorViewOnly: boolean;
 }
 
 export type FeedGroupKind = "setup" | "night" | "round" | "reply" | "vote" | "result";
@@ -88,16 +88,16 @@ export interface MatchView {
   accusations: { cycle: number; links: { from: number; to: number; round: string }[] } | null;
 }
 
-export const isGodViewOnly = (e: MatchEvent): boolean => e.audience !== "all";
+export const isNarratorViewOnly = (e: MatchEvent): boolean => e.audience !== "all";
 
-/** The panels to show: God-View-only ones only while God View is on. */
-export function panelsFor<P extends { godViewOnly: boolean }>(panels: readonly P[], godView: boolean): P[] {
-  return panels.filter((p) => godView || !p.godViewOnly);
+/** The panels to show: Narrator's-View-only ones only while Narrator's View is on. */
+export function panelsFor<P extends { narratorViewOnly: boolean }>(panels: readonly P[], narratorView: boolean): P[] {
+  return panels.filter((p) => narratorView || !p.narratorViewOnly);
 }
 
 /** The events a Spectator may see. */
-export function visibleEvents(events: MatchEvent[], godView: boolean): MatchEvent[] {
-  return godView ? events : events.filter((e) => !isGodViewOnly(e));
+export function visibleEvents(events: MatchEvent[], narratorView: boolean): MatchEvent[] {
+  return narratorView ? events : events.filter((e) => !isNarratorViewOnly(e));
 }
 
 const sideOfRole = (role: string) => (role === "werewolf" ? "wolf" : "village");
@@ -118,8 +118,8 @@ function claimTruth(claim: Omit<ClaimView, "truth">, role: string | null, roles:
   return unknown ? null : "true";
 }
 
-export function buildMatchView(events: MatchEvent[], opts: { godView: boolean }): MatchView {
-  const log = visibleEvents(events, opts.godView);
+export function buildMatchView(events: MatchEvent[], opts: { narratorView: boolean }): MatchView {
+  const log = visibleEvents(events, opts.narratorView);
   const setup = (log.find((e) => e.kind === "match_setup")?.data.seats ?? []) as SeatInfo[];
   const roles = new Map<number, string>();
   const dead = new Set<number>();
@@ -216,7 +216,7 @@ function groupFeed(log: MatchEvent[]): FeedGroup[] {
   let phase: { phase: string; cycle: number } | null = null;
   // A step's timeouts are committed just before its Ruleset events: hold them for that step's group.
   let held: MatchEvent[] = [];
-  const place = (g: FeedGroup, e: MatchEvent) => g.items.push({ event: e, godViewOnly: isGodViewOnly(e) });
+  const place = (g: FeedGroup, e: MatchEvent) => g.items.push({ event: e, narratorViewOnly: isNarratorViewOnly(e) });
   for (const e of log) {
     if (MARKER_KINDS.has(e.kind)) continue;
     if (e.kind === "turn_timed_out") {
