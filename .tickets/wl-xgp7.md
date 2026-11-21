@@ -113,7 +113,7 @@ The core is ruleset-agnostic: League, Elo, Player and the spectator plumbing tal
 ## Implementation Decisions
 
 **Durable Object topology (ADR-0001).**
-- **League DO** (one for the demo): holds roster, config, Side Ratings, Brier aggregates and timeout counts, runs scheduling (keep N Matches live, start a replacement on completion), offers pause/resume/set-N admin operations, and pushes the grid/leaderboard WebSocket feed. It keeps a lightweight summary per live Match, pushed to it by Match DOs.
+- **League DO** (one per League; two seeded, gemini-managed and pi-open, see wl-2lfo): holds roster, config, Side Ratings, Brier aggregates and timeout counts, runs scheduling (keep N Matches live, start a replacement on completion), offers pause/resume/set-N admin operations, and pushes the grid/leaderboard WebSocket feed. It keeps a lightweight summary per live Match, pushed to it by Match DOs.
 - **Match DO** (one per Match): holds the match seed, seat assignment, Ruleset state and an append-only event log (SQLite). It drives the Ruleset, dispatches turns to Player DOs, collects actions, applies deadlines/defaults and broadcasts events to spectators over hibernatable WebSockets. On connect it sends the full log; for finished Matches it serves replays. When the Match ends it reports the result (Sides, Player→Agent, winner, normalized beliefs, timeouts) to the League.
 - **PiSeatDO** (stretch, wl-zst1, ADR-0003): for seats on the `pi` Harness only, it hosts Pi Durable and is driven by that seat's Player DO through the Harness interface.
 - **Player DO** (one per seat per Match): owns the seat's environment ID and interaction chain. It receives "take a turn" requests (observation + expected action kind + deadline), starts a background interaction, saves the interaction ID first, polls on its own alarm, enforces the deadline (cancels and reports a timeout), and returns the first valid custom function call to the Match DO. Filesystem tool calls already carry results and are ignored when picking the pending call.
@@ -146,6 +146,8 @@ The core is ruleset-agnostic: League, Elo, Player and the spectator plumbing tal
 - **Speech limits** (≤3 sentences, ≤350 characters, plain text) are enforced by the instructions only; the rehearsal checks them.
 
 **Display Names (wl-e9tp).** Each seat gets a seeded fake Display Name. Players only ever see Display Names, and spectators see "Display Name · Agent #n".
+
+**Gemini 4 models and their jobs.** Hydrogen plays (with the Flash models on the gemini-managed roster), Neon analyzes finished Matches as a Managed Agent (wl-ofdn), and gemini-decision-1 narrates (wl-pbkx). Carbon as a second, sampled Analyst is a future follow-up.
 
 **Roster (initial).** One Agent each for Hydrogen, 3.8 Flash, 3.6 Flash and 3.5 Flash-Lite, on the Managed Agent harness with shared agents.md-style Agent Instructions and no personas. Carbon, Argon and Neon are excluded. 3.8 Flash is kept only if the M1 sanity check shows its game-sized turns aren't much slower than Hydrogen's.
 
@@ -192,7 +194,7 @@ The core is ruleset-agnostic: League, Elo, Player and the spectator plumbing tal
 - Direct-call (plain model) and self-hosted harnesses (stretch goal only if M5 is done by 15:30). Exception: a Pi Durable harness with Agent37 sandboxes and OpenRouter models is planned as stretch ticket wl-zst1, after the rehearsal passes.
 - Create-agent UI (stretch goal under the same condition).
 - Personas; Carbon, Argon and Neon Agents.
-- Multiple Leagues and cross-League ratings.
+- Cross-League Elo (Elo stays within a League; Leagues are compared on absolute metrics in wl-9u76).
 - Extra roles (Hunter, Witch, sheriff) and alternative Day formats beyond the configurable round/reply counts.
 - Streaming of agent output, live reasoning display and thought summaries.
 - Persistent cross-Match agent memory (environments are per Player per Match).

@@ -1,11 +1,11 @@
 ---
 id: wl-zst1
 status: open
-deps: [wl-t4no, wl-cizy]
+deps: [wl-t4no, wl-cizy, wl-2lfo]
 links: []
 created: 2026-11-21T17:26:10Z
 type: task
-priority: 3
+priority: 1
 assignee: Ryan Swift
 parent: wl-xgp7
 tags: [stretch, ready-for-human]
@@ -16,7 +16,9 @@ tags: [stretch, ready-for-human]
 Spec wl-xgp7 (Spec: Werewolf League on Durable Objects). Vocabulary: GLOSSARY.md. Architecture: docs/adr/0001, docs/adr/0002.
 
 ## What to build
-**Stretch.** Start only after the rehearsal (wl-t4no) passes and the human retags this ready-for-agent. Hard stop at the 16:30 freeze.
+**Stretch, priority right after the ramp test.** Start only after the rehearsal (wl-t4no) passes and the human retags this ready-for-agent. Hard stop at the 16:30 freeze.
+
+**Revised 2026-11-21:** pi Agents play in their own League, pi-open (wl-2lfo). The comparison with Managed Agents uses absolute metrics in the League comparison view (wl-9u76), not Elo. Seat Hydrogen on Pi through OpenRouter as the controlled comparison ('Hydrogen · Pi' vs 'Hydrogen · Managed'). It bills the Google key stored on OpenRouter; verify the model is listed. Then add several non-Gemini OpenRouter models for breadth.
 
 A second Harness, harness: "pi", so the League can field non-Gemini models running on a different sandbox provider. New Agents appear on the leaderboard as model + Agent Instructions + pi harness (e.g. 'Claude Opus 5.5 · Pi').
 
