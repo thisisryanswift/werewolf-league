@@ -516,3 +516,100 @@ body:has(.lg-page) {
   overflow: hidden;
   overscroll-behavior: contain;
 }
+
+/* ---- /leaderboard: Overall Rating history chart ---------------------- */
+.lg-board {
+  padding-top: 22px;
+}
+.lg-below .lg-chart-card {
+  flex: 1 1 100%;
+}
+.lg-chart {
+  position: relative;
+  margin: 0;
+}
+.lg-chart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  font-family: var(--lg-font);
+}
+.lg-chart .grid {
+  stroke: #e4e2dc;
+  stroke-width: 1;
+}
+.lg-chart .baseline {
+  stroke: var(--lg-muted);
+  stroke-width: 1.5;
+  stroke-dasharray: 6 5;
+}
+.lg-chart .tick {
+  font: 600 18px var(--lg-mono);
+  fill: var(--lg-muted);
+}
+.lg-chart .axis-title {
+  font-size: 18px;
+  font-weight: 700;
+  fill: var(--lg-muted);
+  text-transform: uppercase;
+}
+.lg-chart .series {
+  fill: none;
+  stroke-width: 3;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.lg-chart .end {
+  stroke: var(--lg-paper);
+  stroke-width: 2;
+}
+.lg-chart .leader {
+  stroke-width: 1.5;
+}
+.lg-chart .end-label {
+  font-size: 20px;
+  font-weight: 700;
+  fill: var(--lg-ink);
+}
+.lg-chart .end-value {
+  font-family: var(--lg-mono);
+  fill: var(--lg-muted);
+}
+.lg-chart .crosshair {
+  stroke: var(--lg-ink);
+  stroke-width: 1;
+}
+.lg-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 20px;
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+  font-size: 17px;
+  font-weight: 700;
+}
+.lg-chart-swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  margin-right: 6px;
+  border-radius: 3px;
+  vertical-align: -1px;
+}
+.lg-chart-tip {
+  position: absolute;
+  top: 48px;
+  transform: translateX(12px);
+  background: var(--lg-paper);
+  border: 3px solid var(--lg-ink);
+  box-shadow: 3px 3px 0 var(--lg-ink);
+  padding: 6px 10px;
+  font-size: 15px;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.lg-chart-empty {
+  font-size: 18px;
+  color: var(--lg-muted);
+}

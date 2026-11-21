@@ -10,6 +10,7 @@ import { landedFeatures } from "../help/features";
 import { HelpButtons } from "../help/HelpButtons";
 import type { FeedStatus } from "../useMatchFeed";
 import { LeagueSwitcher } from "./LeagueSwitcher";
+import { searchForLeague } from "../../src/shared/leagues";
 import { arrangeGrid, fillGrid, finishedView, tileView, type GridCard, type GridFilter, type GridSort, type PromotionHold } from "./model";
 import { matchHash } from "./route";
 import "./grid.css";
@@ -51,6 +52,9 @@ export function LeagueGrid({ league, status, activity, narratorView, onNarratorV
         <div className="lg-row">
           <h1>Werewolf League</h1>
           <LeagueSwitcher current={league.league.id} />
+          <a className="lg-chip" href={`/leaderboard${searchForLeague("", league.league.id)}`} data-testid="leaderboard-link">
+            Leaderboard
+          </a>
           <span className="lg-spacer" />
           {/* Shown only while the feed is down, so a stalled grid explains itself. */}
           {status !== "live" && (
