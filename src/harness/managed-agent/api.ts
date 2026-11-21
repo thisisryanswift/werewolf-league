@@ -96,3 +96,21 @@ export function pendingCalls(it: Interaction, toolNames: string[]): { id: string
     .filter((s) => s.type === "function_call" && s.id && s.name && toolNames.includes(s.name) && !answered.has(s.id))
     .map((s) => ({ id: s.id!, name: s.name!, args: s.arguments ?? {} }));
 }
+
+/** The seat's private scratchpad, as the Agent Instructions name it. */
+export const NOTES_FILE = "/notes.md";
+
+/**
+ * The last content the interaction wrote to /notes.md, read from its auto-run
+ * write_to_file steps (FINDINGS 5: `{ TargetFile, CodeContent }`); undefined if none.
+ */
+export function notesWritten(it: Interaction): string | undefined {
+  let notes: string | undefined;
+  for (const s of it.steps ?? []) {
+    if (s?.type !== "function_call" || s.name !== "write_to_file" || !s.arguments) continue;
+    const { TargetFile: file, CodeContent: content } = s.arguments;
+    if (typeof file !== "string" || typeof content !== "string") continue;
+    if (`/${file.replace(/^(\.?\/)+/, "")}` === NOTES_FILE) notes = content;
+  }
+  return notes;
+}

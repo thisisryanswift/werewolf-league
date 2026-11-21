@@ -407,3 +407,44 @@ describe("Managed Agent harness: usage", () => {
     expect(await s.poll(h)).toEqual({ status: "done", call: null });
   });
 });
+
+describe("Managed Agent harness: Agent notes (wl-rhpr)", () => {
+  /** The Agent rewrites a sandbox file before its game call (an auto-run filesystem call). */
+  function write(api: StubInteractionsApi, id: string, args: unknown) {
+    const it = api.interactions.get(id)!;
+    const callId = `fs_${it.steps.length}`;
+    it.steps.push({ type: "function_call", id: callId, name: "write_to_file", arguments: args }, { type: "function_result", call_id: callId, result: "ok" });
+  }
+
+  it("reports the latest /notes.md content the turn wrote, with the game call", async () => {
+    const s = await seat();
+    const h = await s.start(input("obs 1", "vote", { firstTurn: true }));
+    const id = s.api.latest().id;
+    write(s.api, id, { TargetFile: "/notes.md", CodeContent: "draft", Overwrite: true });
+    write(s.api, id, { TargetFile: "/scratch.txt", CodeContent: "not notes", Overwrite: true });
+    write(s.api, id, { TargetFile: "/notes.md", CodeContent: "P2 claimed Seer; P4 lied.", Overwrite: true });
+    s.api.callTool(id, "vote", { target: 2 });
+    expect(await s.poll(h)).toMatchObject({ status: "done", call: { name: "vote" }, notes: "P2 claimed Seer; P4 lied." });
+  });
+
+  it("reports no notes when the turn did not write /notes.md", async () => {
+    const s = await seat();
+    const h = await s.start(input("obs 1", "vote", { firstTurn: true }));
+    s.api.callTool(s.api.latest().id, "vote", { target: 2 }, { filesystemFirst: true });
+    const r = await s.poll(h);
+    expect(r).toMatchObject({ status: "done", call: { name: "vote" } });
+    expect(r).not.toHaveProperty("notes");
+  });
+
+  it("a malformed notes write never fails the turn: the call is still reported", async () => {
+    const s = await seat();
+    const h = await s.start(input("obs 1", "vote", { firstTurn: true }));
+    const id = s.api.latest().id;
+    write(s.api, id, { TargetFile: "/notes.md", CodeContent: 42 });
+    write(s.api, id, null);
+    s.api.callTool(id, "vote", { target: 2 });
+    const r = await s.poll(h);
+    expect(r).toMatchObject({ status: "done", call: { name: "vote", args: { target: 2 } } });
+    expect(r).not.toHaveProperty("notes");
+  });
+});
