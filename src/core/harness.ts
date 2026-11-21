@@ -1,6 +1,6 @@
 // The Harness interface: turns a game prompt into an Agent's action.
-// Implementations: Fake Harness (src/harness/fake.ts). The Managed Agent
-// harness lands in its own file. All values are JSON so the Player DO can
+// Implementations: Fake Harness (src/harness/fake.ts) and the Managed Agent
+// harness (src/harness/managed-agent/). All values are JSON so the Player DO can
 // persist them between alarms.
 
 import type { ToolCall, ToolSpec, TurnRequest } from "./ruleset";
@@ -10,6 +10,7 @@ export interface AgentConfig {
   id: string;
   name: string;
   harness: string; // "fake" | "managed-agent" | ...
+  /** Model for model-backed harnesses, e.g. "gemini-4-hydrogen" (managed-agent default). */
   model?: string;
   instructions?: string;
   /** Harness-specific options (e.g. a Fake Harness script). */
@@ -51,4 +52,11 @@ export interface Harness {
   /** Start a turn in the background. Returns the handle and updated chain state. */
   startTurn(ctx: PlayerContext, input: TurnInput): Promise<{ handle: TurnHandle; chain: Record<string, unknown> }>;
   poll(ctx: PlayerContext, handle: TurnHandle): Promise<PollResult>;
+  /**
+   * Abandon an in-flight turn (deadline passed). Returns updated chain state; after it,
+   * `poll` never returns that turn's call, and the seat's next `startTurn` recovers
+   * (carrying every observation the seat missed). Calling it is optional: `startTurn`
+   * also settles a turn that is still in flight.
+   */
+  cancel(ctx: PlayerContext, handle: TurnHandle): Promise<Record<string, unknown>>;
 }
