@@ -3,6 +3,7 @@
 // admin config route; these are the defaults for a fresh League.
 
 import { DEFAULT_RULESET_ID } from "../rulesets";
+import type { DeadlineConfig } from "./deadlines";
 import type { AgentConfig } from "./harness";
 
 /** The League every Match reports to (one League for the demo). */
@@ -17,6 +18,8 @@ export interface LeagueConfig {
   seats: number;
   rulesetId: string;
   rulesetConfig: Record<string, unknown>;
+  /** Turn deadlines for new Matches; missing values use the defaults (60 s, first turn 90 s). */
+  deadlines?: Partial<DeadlineConfig>;
   /** Agents the League draws from. Copies may share a Match. */
   roster: AgentConfig[];
 }
@@ -73,6 +76,16 @@ export function patchConfig(
       return { ok: false, error: "rulesetConfig must be an object" };
     }
     next.rulesetConfig = patch.rulesetConfig as Record<string, unknown>;
+  }
+  if (patch.deadlines !== undefined) {
+    const d = patch.deadlines as Record<string, unknown> | null;
+    const keys = ["turnMs", "firstTurnMs", "graceMs"];
+    const valid =
+      typeof d === "object" &&
+      d !== null &&
+      Object.entries(d).every(([k, v]) => keys.includes(k) && typeof v === "number" && Number.isFinite(v) && v > 0);
+    if (!valid) return { ok: false, error: "deadlines must be { turnMs?, firstTurnMs?, graceMs? } with positive numbers" };
+    next.deadlines = d as Partial<DeadlineConfig>;
   }
   if (patch.roster !== undefined) {
     if (!Array.isArray(patch.roster) || !patch.roster.every(isAgent)) {

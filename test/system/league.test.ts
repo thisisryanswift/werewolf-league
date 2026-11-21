@@ -1,7 +1,7 @@
 import { env, runInDurableObject } from "cloudflare:test";
 import { exports } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
-import type { MatchResult } from "../../src/core/ruleset";
+import type { MatchReport } from "../../src/core/match";
 import type { LeagueDO } from "../../src/do/league";
 import type { LeagueMessage, LeagueSnapshot } from "../../src/shared/protocol";
 import { ADMIN, fakeAgent, snapshot, waitFor } from "./helpers";
@@ -89,6 +89,20 @@ describe("League scheduling", () => {
     expect((await league()).config.roster).toEqual(before);
   });
 
+  it("starts Matches with the configured turn deadlines", async () => {
+    expect((await admin("config", { deadlines: { turnMs: -1 } })).status).toBe(400);
+    await ok(admin("config", { n: 1, roster: roster(3), deadlines: { turnMs: 45_000, firstTurnMs: 77_000 } }));
+    await ok(admin("resume"));
+    const matchId = (await waitFor(async () => (await league()).tiles.find((t) => t.status === "running"))).matchId;
+    const started = await waitFor(async () => {
+      const turns = (await snapshot(matchId)).events.filter((e) => e.kind === "turn_started");
+      return turns.length > 0 ? turns : null;
+    });
+    expect(started[0]!.data.deadlineMs).toBe(77_000);
+    await drain();
+    await ok(admin("config", { deadlines: {} }));
+  });
+
   it("never deals both Werewolf seats to one Agent, even from a 2-Agent roster", async () => {
     await ok(admin("config", { n: 3, roster: roster(2) }));
     await ok(admin("resume"));
@@ -122,7 +136,7 @@ describe("League scheduling", () => {
       };
       // Only League-scheduled Matches lose their first ack (other files' one-off Matches report here too).
       const lost = new Set<string>();
-      proto.reportMatchResult = async function (this: LeagueDO, matchId: string, result: MatchResult) {
+      proto.reportMatchResult = async function (this: LeagueDO, matchId: string, result: MatchReport) {
         const ack = await original.call(this, matchId, result);
         calls.push({ matchId, duplicate: ack.duplicate });
         if (ack.settlement.seats && !lost.has(matchId)) {

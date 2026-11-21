@@ -6,9 +6,9 @@
 
 import { DurableObject } from "cloudflare:workers";
 import { drawTable } from "../core/draw";
-import type { MatchInit } from "../core/match";
+import type { MatchInit, MatchReport } from "../core/match";
 import { defaultLeagueConfig, patchConfig, type LeagueConfig } from "../core/roster";
-import type { MatchResult, MatchSummary } from "../core/ruleset";
+import type { MatchSummary } from "../core/ruleset";
 import { buildMatchInit } from "../core/start-match";
 import { getRuleset } from "../rulesets";
 import type { LeagueMessage, LeagueSnapshot, MatchTile, SettledMatch, TileSeat } from "../shared/protocol";
@@ -28,7 +28,8 @@ interface LiveMatch extends MatchTile {
  */
 export interface Settlement {
   matchId: string;
-  result: MatchResult;
+  /** The Match's result as reported, including timeout counts. */
+  result: MatchReport;
   /** Seats of a League-scheduled Match; null for a Match the League did not start. */
   seats: TileSeat[] | null;
   settledAt: number;
@@ -178,7 +179,7 @@ export class LeagueDO extends DurableObject<Env> {
    * second replacement. Everything up to the ack is synchronous, so a
    * settlement and its replacement reservation commit together.
    */
-  async reportMatchResult(matchId: string, result: MatchResult): Promise<SettleAck> {
+  async reportMatchResult(matchId: string, result: MatchReport): Promise<SettleAck> {
     const existing = this.ctx.storage.kv.get<Settlement>(`settled:${matchId}`);
     if (existing) return { ok: true, duplicate: true, settlement: existing };
 
@@ -243,7 +244,13 @@ export class LeagueDO extends DurableObject<Env> {
         this.blocked = draw.error;
         break;
       }
-      const init = buildMatchInit({ seed, rulesetId: config.rulesetId, config: config.rulesetConfig, agents: draw.agents });
+      const init = buildMatchInit({
+        seed,
+        rulesetId: config.rulesetId,
+        config: config.rulesetConfig,
+        deadlines: config.deadlines,
+        agents: draw.agents,
+      });
       live[init.matchId] = {
         matchId: init.matchId,
         seed,

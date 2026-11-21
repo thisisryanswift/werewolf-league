@@ -2,6 +2,7 @@
 // and the League DO.
 
 import { DEFAULT_RULESET_ID } from "../rulesets";
+import type { DeadlineConfig } from "./deadlines";
 import type { AgentConfig } from "./harness";
 import type { MatchInit } from "./match";
 import type { SeatAgent } from "./ruleset";
@@ -23,6 +24,8 @@ export interface MatchOptions {
   rulesetId?: string;
   seed?: string;
   config?: Record<string, unknown>;
+  /** Turn deadlines; missing values use the defaults. */
+  deadlines?: Partial<DeadlineConfig>;
   agents: AgentConfig[];
 }
 
@@ -35,6 +38,7 @@ export function buildMatchInit(opts: MatchOptions): MatchInit {
     rulesetId: opts.rulesetId ?? DEFAULT_RULESET_ID,
     seed: opts.seed ?? crypto.randomUUID(),
     config: opts.config ?? {},
+    ...(opts.deadlines ? { deadlines: opts.deadlines } : {}),
     seats,
     agents: Object.fromEntries(opts.agents.map((a, i) => [i + 1, a])),
   };

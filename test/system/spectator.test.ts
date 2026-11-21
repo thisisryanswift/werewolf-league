@@ -44,7 +44,7 @@ describe("Spectator WebSocket", () => {
     first.close();
     const midStep = await snapshot(matchId);
     expect(midStep.status).toBe("running");
-    expect(midStep.events.at(-1)?.kind).toBe("phase_started"); // the Day vote step is in flight
+    expect(midStep.events.at(-1)?.kind).toBe("turn_started"); // the Day vote step is in flight
 
     const second = await connect(matchId);
     const done = await finished(matchId);
