@@ -18,7 +18,7 @@
   --lg-mono: ui-monospace, "JetBrains Mono", "DejaVu Sans Mono", monospace;
   /* grid */
   --lg-tile-min: 200px; /* narrowest small tile: 8 columns at 1920px */
-  --lg-tile-height: 150px;
+  --lg-tile-height: 158px;
   --lg-gap: 14px;
   --lg-pip: 14px;
   --lg-pip-big: 18px;
@@ -298,6 +298,7 @@ body:has(.lg-page) {
 }
 .dbar {
   flex: 1;
+  min-width: 50px;
   height: 10px;
   display: block;
   border: 2px solid var(--lg-ink);
@@ -318,10 +319,12 @@ body:has(.lg-page) {
 .t-flags {
   display: flex;
   gap: 6px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow: hidden;
 }
 .t-flags span,
 .lg-sticker {
+  white-space: nowrap;
   background: var(--lg-red);
   color: #fff;
   font-weight: 800;

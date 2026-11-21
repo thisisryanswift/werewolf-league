@@ -145,13 +145,13 @@ const Tile = memo(function Tile({ tile, godView, big }: { tile: MatchTile; godVi
             <i style={{ width: `${v.drama}%` }} />
           </span>
           <span className="dpct">{v.drama}% drama</span>
-        </span>
-      )}
-      {big && v.flags.length > 0 && (
-        <span className="t-flags">
-          {v.flags.map((f) => (
-            <span key={f}>⚑ {f}</span>
-          ))}
+          {big && v.flags.length > 0 && (
+            <span className="t-flags">
+              {v.flags.map((f) => (
+                <span key={f}>⚑ {f}</span>
+              ))}
+            </span>
+          )}
         </span>
       )}
       {big && (
