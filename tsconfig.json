@@ -9,7 +9,7 @@
     "skipLibCheck": true,
     "isolatedModules": true,
     "noEmit": true,
-    "types": ["@cloudflare/workers-types", "@cloudflare/vitest-plugin/types"]
+    "types": ["@cloudflare/workers-types", "@cloudflare/vitest-plugin/types", "vite/client"]
   },
   "include": ["src/**/*.ts", "test/**/*.ts", "vitest.config.ts", "worker-env.d.ts"]
 }
