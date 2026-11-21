@@ -332,6 +332,7 @@ export class LeagueDO extends DurableObject<Env> {
         rulesetId: config.rulesetId,
         config: config.rulesetConfig,
         deadlines: config.deadlines,
+        narrator: config.narrator,
         agents: draw.agents,
       });
       live[init.matchId] = {

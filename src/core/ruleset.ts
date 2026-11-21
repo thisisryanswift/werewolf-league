@@ -3,6 +3,7 @@
 // A Ruleset is pure: all randomness comes from the match seed.
 
 import type { EventAudience, MatchSummary, RulesetEvent } from "../shared/protocol";
+import type { NarrationQuestions } from "./narrator";
 
 export type { MatchSummary };
 
@@ -109,6 +110,15 @@ export interface Ruleset<S = unknown> {
    * log filtered to the "all" audience (for the latest speech line).
    */
   summary(state: S, publicEvents: RulesetEvent[]): MatchSummary;
+  /**
+   * Optional: what the Narrator asks about this Ruleset's Matches. Without it a
+   * Match is never narrated. `log` renders the God View log (every audience,
+   * secrets included) as text.
+   */
+  narration?: {
+    questions: NarrationQuestions;
+    log(state: S, events: RulesetEvent[]): string;
+  };
 }
 
 /** Default `view` for rulesets that use the shared audience field. */
