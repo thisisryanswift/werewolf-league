@@ -7,6 +7,8 @@ const RULESETS: Record<string, Ruleset<unknown>> = {
   werewolf: werewolf as Ruleset<unknown>,
 };
 
+export const DEFAULT_RULESET_ID = "werewolf";
+
 export function getRuleset(id: string): Ruleset<unknown> {
   const r = RULESETS[id];
   if (!r) throw new Error(`Unknown ruleset: ${id}`);

@@ -1,6 +1,7 @@
 // Start a Match from a list of Agents (one per seat). Used by the admin route
 // now and by the League DO later.
 
+import { DEFAULT_RULESET_ID } from "../rulesets";
 import type { AgentConfig } from "./harness";
 import type { MatchInit } from "./match";
 import type { SeatAgent } from "./ruleset";
@@ -25,7 +26,7 @@ export async function startMatch(
   const seats = labelSeats(opts.agents);
   const init: MatchInit = {
     matchId,
-    rulesetId: opts.rulesetId ?? "werewolf",
+    rulesetId: opts.rulesetId ?? DEFAULT_RULESET_ID,
     seed: opts.seed ?? crypto.randomUUID(),
     config: opts.config ?? {},
     seats,
