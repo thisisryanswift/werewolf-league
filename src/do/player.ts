@@ -139,13 +139,14 @@ export class PlayerDO extends DurableObject<Env> {
    * retried start provisions it afresh. Never throws.
    */
   async release(seating: Seating): Promise<void> {
+    // Forget the seat before awaiting, so a retried provision that lands meanwhile is kept.
+    const chain = this.ctx.storage.kv.get<Record<string, unknown>>("chain") ?? {};
+    for (const key of ["seating", "chain", "closed", "turn", "usage"]) this.ctx.storage.kv.delete(key);
     try {
-      const harness = harnessFor(seating.agent, this.env);
-      await harness.close?.({ ...seating, chain: this.ctx.storage.kv.get<Record<string, unknown>>("chain") ?? {} });
+      await harnessFor(seating.agent, this.env).close?.({ ...seating, chain });
     } catch (err) {
       console.warn(`player ${seating.matchId}:${seating.seat}: release failed: ${String(err)}`);
     }
-    for (const key of ["seating", "chain", "closed", "turn", "usage"]) this.ctx.storage.kv.delete(key);
   }
 
   async alarm(): Promise<void> {
