@@ -33,8 +33,8 @@ import { LEAGUE_NAME } from "../core/roster";
 import type { Ruleset, Seat, ToolCall, ToolSpec, TurnRequest } from "../core/ruleset";
 import { narratorFor } from "../narrator";
 import { getRuleset } from "../rulesets";
-import type { MatchEvent, RulesetEvent, ServerMessage } from "../shared/protocol";
-import { ratingsSettledEvent } from "../shared/turn-events";
+import type { MatchEvent, RulesetEvent, ServerMessage, TileSummary } from "../shared/protocol";
+import { ratingsSettledEvent, thinkingSeats } from "../shared/turn-events";
 import type { SettleAck } from "./league";
 
 /**
@@ -175,6 +175,7 @@ export class MatchDO extends DurableObject<Env> {
           agent: init.agents[s.seat]!,
           tools: setup.tools[s.seat]!,
           instructions: seatInstructions(ruleset, setup.state, s.seat, init.agents[s.seat]!),
+          ...(init.league ? { league: init.league } : {}),
         }),
       ),
     );
@@ -272,7 +273,6 @@ export class MatchDO extends DurableObject<Env> {
         return;
       }
       this.resolve(meta, ruleset, pending);
-      this.pushSummary(ruleset);
       this.narrate();
     }
 
@@ -282,6 +282,7 @@ export class MatchDO extends DurableObject<Env> {
       const result: MatchReport = { ...next.result, timeouts: countTimeouts(this.events(), current.seats) };
       const done: MatchMeta = { ...current, status: "finished", result };
       this.meta = done;
+      this.pushSummary(ruleset);
       await this.deliverResult(done);
       return;
     }
@@ -312,7 +313,7 @@ export class MatchDO extends DurableObject<Env> {
     await this.ctx.storage.setAlarm(Date.now() + Number(this.env.LEAGUE_RETRY_MS ?? 2000));
     let ack: SettleAck;
     try {
-      ack = await this.env.LEAGUE.getByName(LEAGUE_NAME).reportMatchResult(meta.matchId, meta.result);
+      ack = await this.env.LEAGUE.getByName(meta.league ?? LEAGUE_NAME).reportMatchResult(meta.matchId, meta.result);
     } catch {
       return; // the armed alarm retries
     }
@@ -334,8 +335,14 @@ export class MatchDO extends DurableObject<Env> {
     // Runner events (turn markers, step_resolved) and narrations are not game events.
     const events = this.events();
     const publicEvents = events.filter((e) => e.audience === "all" && !isRunnerEvent(e) && !isNarrationEvent(e));
-    const summary = { ...ruleset.summary(this.rulesetState, publicEvents), ...latestDrama(events) };
-    const update = this.env.LEAGUE.getByName(LEAGUE_NAME)
+    const summary: TileSummary = {
+      ...ruleset.summary(this.rulesetState, publicEvents),
+      ...latestDrama(events),
+      // Counts only: the runner's turn events are seat-private, so naming seats could reveal roles.
+      thinking: thinkingSeats(events).length,
+      timeouts: events.filter((e) => e.kind === "turn_timed_out").length,
+    };
+    const update = this.env.LEAGUE.getByName(meta.league ?? LEAGUE_NAME)
       .updateTile(meta.matchId, summary, this.lastSeq())
       .catch(() => {});
     this.ctx.waitUntil(update);
@@ -409,6 +416,8 @@ export class MatchDO extends DurableObject<Env> {
     this.meta = { ...meta, stepCount: stepNo, assigned: [...new Set([...assigned, ...turns.map((t) => t.seat)])] };
     this.step = step;
     this.commit(turnStartedEvents(step));
+    // One push per step, once its turns are marked: the League coalesces these for the grid.
+    this.pushSummary(ruleset);
     await this.sendTurns(meta, stepNo);
   }
 

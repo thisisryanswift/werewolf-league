@@ -10,7 +10,7 @@ import type { MatchReport } from "../../src/core/match";
 import type { LeagueDO } from "../../src/do/league";
 import { werewolf } from "../../src/rulesets/werewolf";
 import type { AgentStanding, LeagueMessage, LeagueSnapshot, MatchEvent, RatingChanges } from "../../src/shared/protocol";
-import { ADMIN, fakeAgent, snapshot, waitFor } from "./helpers";
+import { ADMIN, fakeAgent, snapshot, UNPACED, waitFor } from "./helpers";
 
 async function league(): Promise<LeagueSnapshot> {
   const res = await exports.default.fetch("http://test/api/league");
@@ -74,7 +74,7 @@ function seedWith(prefix: string, ids: string[], want: { wolves: string[]; villa
 
 /** Run exactly one League Match on the queued seed and wait for it to settle. */
 async function playOne(seed: string, roster: ReturnType<typeof fakeAgent>[]): Promise<string> {
-  await admin("config", { n: 1, roster, seeds: [seed] });
+  await admin("config", { ...UNPACED, n: 1, roster, seeds: [seed] });
   const started = await admin("resume");
   await admin("pause");
   const tile = started.tiles.find((t) => t.seed === seed);
@@ -148,7 +148,7 @@ describe("Side Ratings", () => {
     // snapshot, every Player moves exactly 16 and each Agent's Wolf Rating ends at 1200 + 2*16,
     // even though the second settlement happens after the first has moved the ratings.
     const roster = [wolvesWin("snap-x"), wolvesWin("snap-y")];
-    await admin("config", { n: 2, roster, seeds: ["snap-1", "snap-2"] });
+    await admin("config", { ...UNPACED, n: 2, roster, seeds: ["snap-1", "snap-2"] });
     const started = await admin("resume");
     await admin("pause");
     const ids = started.tiles.filter((t) => t.seed.startsWith("snap-")).map((t) => t.matchId);

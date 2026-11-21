@@ -4,8 +4,9 @@
 
 import { DurableObject } from "cloudflare:workers";
 import { nextPollDelay } from "../core/deadlines";
-import type { AgentConfig, PlayerContext, TurnHandle } from "../core/harness";
+import { isRateLimited, type AgentConfig, type PlayerContext, type TurnHandle } from "../core/harness";
 import type { TurnAssignment } from "../core/match";
+import { LEAGUE_NAME } from "../core/roster";
 import type { Seat, ToolCall, ToolSpec } from "../core/ruleset";
 import { harnessFor } from "../harness";
 
@@ -16,6 +17,8 @@ interface Seating {
   tools: ToolSpec[];
   /** Assembled Agent Instructions for this seat (see PlayerContext). */
   instructions?: string;
+  /** The League the Match reports to (429s go there too); absent means LEAGUE_NAME. */
+  league?: string;
 }
 
 interface CurrentTurn extends TurnAssignment {
@@ -23,6 +26,13 @@ interface CurrentTurn extends TurnAssignment {
   handle: TurnHandle | null;
   attempts: number;
 }
+
+/**
+ * A Player reports 429s to the League at most this often. Every report renews
+ * the League's backoff, so sustained 429s keep it backing off; the throttle only
+ * bounds the RPCs (the backoff is far longer than this).
+ */
+export const RATE_LIMIT_REPORT_MS = 2_000;
 
 export class PlayerDO extends DurableObject<Env> {
   private get pollMs(): number {
@@ -58,7 +68,11 @@ export class PlayerDO extends DurableObject<Env> {
     const existing = this.ctx.storage.kv.get<Seating>("seating");
     if (existing && JSON.stringify(existing) === JSON.stringify(seating)) return;
     const harness = harnessFor(seating.agent, this.env);
-    const chain = await harness.provision({ ...seating, chain: {} });
+    const chain = await harness.provision({ ...seating, chain: {} }).catch(async (err: unknown) => {
+      // Reported before the failure reaches the League's start, so the League is already backing off.
+      if (isRateLimited(err)) await this.reportRateLimit(seating, "provision");
+      throw err;
+    });
     this.ctx.storage.kv.put("chain", chain);
     this.ctx.storage.kv.put("seating", seating);
   }
@@ -84,7 +98,11 @@ export class PlayerDO extends DurableObject<Env> {
     const ctx = this.context(seating);
 
     if (!turn.handle) {
-      const started = await harness.startTurn(ctx, turn.input);
+      const started = await harness.startTurn(ctx, turn.input).catch((err: unknown) => {
+        // Rethrown: the alarm retries the same turn.
+        if (isRateLimited(err)) this.reportRateLimit(seating, "startTurn");
+        throw err;
+      });
       this.ctx.storage.kv.put("chain", started.chain);
       if (!this.updateTurn(turn.turnId, { ...turn, handle: started.handle, attempts: turn.attempts + 1 })) {
         return this.superseded(started.handle);
@@ -94,8 +112,9 @@ export class PlayerDO extends DurableObject<Env> {
 
     const polled = await harness.poll(ctx, turn.handle);
     if (polled.status === "pending") {
+      if (polled.rateLimited) this.reportRateLimit(seating, "poll");
       if (!this.updateTurn(turn.turnId, { ...turn, handle: polled.handle })) return this.superseded();
-      return this.sleep(turn);
+      return this.sleep(turn, polled.retryAfterMs);
     }
     // An answer that lands after the deadline is too late and counts as a timeout.
     if (Date.now() >= turn.deadlineAt) return this.timeOut(turn);
@@ -103,10 +122,27 @@ export class PlayerDO extends DurableObject<Env> {
     await this.report(turn, call);
   }
 
-  /** Poll again after the poll interval, or at the deadline if that is sooner. */
-  private sleep(turn: CurrentTurn): Promise<void> {
+  /** Poll again after the poll interval (or the Harness's longer hint), or at the deadline if that is sooner. */
+  private sleep(turn: CurrentTurn, retryAfterMs = 0): Promise<void> {
     const now = Date.now();
-    return this.ctx.storage.setAlarm(now + nextPollDelay(now, this.pollMs, turn.deadlineAt));
+    return this.ctx.storage.setAlarm(now + nextPollDelay(now, Math.max(this.pollMs, retryAfterMs), turn.deadlineAt));
+  }
+
+  /**
+   * Tell the League a model API call hit a 429, so it (re)starts its backoff.
+   * At most one report per RATE_LIMIT_REPORT_MS; best effort: turns don't wait for it,
+   * and the returned promise never rejects.
+   */
+  private reportRateLimit(seating: Seating, source: string): Promise<void> {
+    const now = Date.now();
+    const last = this.ctx.storage.kv.get<number>("rateLimitReportedAt") ?? 0;
+    if (now - last < RATE_LIMIT_REPORT_MS) return Promise.resolve();
+    this.ctx.storage.kv.put("rateLimitReportedAt", now);
+    const report = this.env.LEAGUE.getByName(seating.league ?? LEAGUE_NAME)
+      .reportRateLimit({ matchId: seating.matchId, seat: seating.seat, agentId: seating.agent.id, source })
+      .catch(() => {});
+    this.ctx.waitUntil(report);
+    return report;
   }
 
   /** A newer turn arrived while we awaited the Harness: drop this work and run the new turn. */

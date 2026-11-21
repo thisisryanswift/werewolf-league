@@ -35,14 +35,30 @@ console.log(`admin without secret: ${(await admin("resume", {}, "wrong")).status
 
 const ws = new WebSocket(`${base.replace(/^http/, "ws")}/api/league/ws`, { headers: { "user-agent": UA } });
 const snapshots = [];
+// Fold a coalesced "tiles" diff into the snapshot (same as applyLeagueDiff in src/shared/league-feed.ts).
+function fold(prev, msg) {
+  const tiles = new Map(prev.tiles.map((t) => [t.matchId, t]));
+  for (const id of msg.removed) tiles.delete(id);
+  for (const d of msg.tiles) {
+    const old = tiles.get(d.matchId);
+    const { summary, ...rest } = d;
+    const next = old ? { ...old, ...rest } : d;
+    if (old && summary !== undefined) next.summary = summary === null ? null : { ...(old.summary ?? {}), ...summary };
+    tiles.set(d.matchId, next);
+  }
+  return { ...prev, ...msg.league, tiles: [...tiles.values()].sort((a, b) => a.startedAt - b.startedAt) };
+}
 ws.on("message", (raw) => {
   const msg = JSON.parse(String(raw));
-  if (msg.type !== "league") return;
-  snapshots.push(msg.league);
-  const tiles = msg.league.tiles
+  let league;
+  if (msg.type === "league") league = msg.league;
+  else if (msg.type === "tiles" && snapshots.length) league = fold(snapshots.at(-1), msg);
+  else return;
+  snapshots.push(league);
+  const tiles = league.tiles
     .map((t) => `${t.matchId.slice(0, 8)}:${t.summary ? `${t.summary.phase} ${t.summary.round} alive=${t.summary.alive.length}` : t.status}`)
     .join(" | ");
-  console.log(`feed #${snapshots.length} paused=${msg.league.config.paused} settled=${msg.league.stats.settled} ${tiles}`);
+  console.log(`feed #${snapshots.length} ${msg.type} paused=${league.config.paused} settled=${league.stats.settled} ${tiles}`);
 });
 await new Promise((r) => ws.once("open", r));
 
