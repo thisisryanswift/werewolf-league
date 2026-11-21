@@ -1,0 +1,385 @@
+{
+  "model": "gemini-3.8-flash",
+  "max_total_tokens": 100000,
+  "env_source": "fresh remote",
+  "rows": [
+    {
+      "turn": "0",
+      "id": "v1_ChdYTG9CYTd2Vk9KWEV5dE1QOU1mQnlBNBIXWExvQmE3dlZPSlhFeXRNUDlNZkJ5QTQ",
+      "status": "requires_action",
+      "create_s": 2.6,
+      "total_s": 7.6,
+      "env": "6894e2721727d9b987cb9c93d7d370d6",
+      "steps": [
+        "thought",
+        "function_call:inspect"
+      ],
+      "call": {
+        "name": "inspect",
+        "arguments": {
+          "target": "P1"
+        }
+      },
+      "usage": {
+        "input": 4967,
+        "cached": 0,
+        "thought": 210,
+        "output": 15,
+        "total": 5192,
+        "raw": {
+          "total_tokens": 5192,
+          "total_input_tokens": 4967,
+          "input_tokens_by_modality": [
+            {
+              "modality": "text",
+              "tokens": 4967
+            }
+          ],
+          "total_cached_tokens": 0,
+          "total_output_tokens": 15,
+          "output_tokens_by_modality": [
+            {
+              "modality": "text",
+              "tokens": 15
+            }
+          ],
+          "total_tool_use_tokens": 0,
+          "total_thought_tokens": 210
+        }
+      },
+      "expect": "inspect",
+      "valid": true
+    },
+    {
+      "turn": "1",
+      "id": "v1_ChdYTG9CYTd2Vk9KWEV5dE1QOU1mQnlBNBIXWTdvQmE5dkFDUEhnMF9nUHJmcWg0UUk",
+      "status": "requires_action",
+      "create_s": 0.9,
+      "total_s": 14.3,
+      "env": "6894e2721727d9b987cb9c93d7d370d6",
+      "steps": [
+        "function_result:inspect",
+        "thought",
+        "function_call:speak"
+      ],
+      "call": {
+        "name": "speak",
+        "arguments": {
+          "accuse": [
+            "P7"
+          ],
+          "claim": {
+            "results": [
+              {
+                "seat": "P1",
+                "side": "village"
+              }
+            ],
+            "role": "seer"
+          },
+          "defend": [
+            "P1"
+          ],
+          "text": "I am the Seer. Last night I inspected P1 and learned that P1 is Village (not a Werewolf). Please do not vote for P1. P7 has been heavily pushing on P1, which makes P7 suspicious. Doctor, please protect me tonight."
+        }
+      },
+      "usage": {
+        "input": 6209,
+        "cached": 3753,
+        "thought": 1030,
+        "output": 109,
+        "total": 7348,
+        "raw": {
+          "total_tokens": 7348,
+          "total_input_tokens": 6209,
+          "input_tokens_by_modality": [
+            {
+              "modality": "text",
+              "tokens": 6209
+            }
+          ],
+          "total_cached_tokens": 3753,
+          "cached_tokens_by_modality": [
+            {
+              "modality": "text",
+              "tokens": 3753
+            }
+          ],
+          "total_output_tokens": 109,
+          "output_tokens_by_modality": [
+            {
+              "modality": "text",
+              "tokens": 109
+            }
+          ],
+          "total_tool_use_tokens": 0,
+          "total_thought_tokens": 1030
+        }
+      },
+      "expect": "speak",
+      "valid": true
+    },
+    {
+      "turn": "2",
+      "id": "v1_ChdYTG9CYTd2Vk9KWEV5dE1QOU1mQnlBNBIXY2JvQmE1ektIUHFzdU1ZUG1lS2s4QTA",
+      "status": "requires_action",
+      "create_s": 1,
+      "total_s": 11.4,
+      "env": "6894e2721727d9b987cb9c93d7d370d6",
+      "steps": [
+        "function_result:speak",
+        "thought",
+        "function_call:vote"
+      ],
+      "call": {
+        "name": "vote",
+        "arguments": {
+          "beliefs": {
+            "P1": 0,
+            "P2": 0.45,
+            "P3": 0,
+            "P4": 0.45,
+            "P5": 0.25,
+            "P6": 0.35,
+            "P7": 0.5,
+            "P8": 0
+          },
+          "reason": "P7 pushed heavily against confirmed innocent P1, suggesting they are trying to mislynch a villager.",
+          "target": "P7"
+        }
+      },
+      "usage": {
+        "input": 8314,
+        "cached": 7086,
+        "thought": 991,
+        "output": 98,
+        "total": 9403,
+        "raw": {
+          "total_tokens": 9403,
+          "total_input_tokens": 8314,
+          "input_tokens_by_modality": [
+            {
+              "modality": "text",
+              "tokens": 8314
+            }
+          ],
+          "total_cached_tokens": 7086,
+          "cached_tokens_by_modality": [
+            {
+              "modality": "text",
+              "tokens": 7086
+            }
+          ],
+          "total_output_tokens": 98,
+          "output_tokens_by_modality": [
+            {
+              "modality": "text",
+              "tokens": 98
+            }
+          ],
+          "total_tool_use_tokens": 0,
+          "total_thought_tokens": 991
+        }
+      },
+      "expect": "vote",
+      "valid": true,
+      "belief_sum": 2
+    },
+    {
+      "turn": "3",
+      "id": "v1_ChdYTG9CYTd2Vk9KWEV5dE1QOU1mQnlBNBIXZkxvQmEtam1OTkRaeXRNUGhfZUUyUXc",
+      "status": "requires_action",
+      "create_s": 1,
+      "total_s": 6.8,
+      "env": "6894e2721727d9b987cb9c93d7d370d6",
+      "steps": [
+        "function_result:vote",
+        "thought",
+        "function_call:inspect"
+      ],
+      "call": {
+        "name": "inspect",
+        "arguments": {
+          "target": "P7"
+        }
+      },
+      "usage": {
+        "input": 9427,
+        "cached": 8231,
+        "thought": 361,
+        "output": 15,
+        "total": 9803,
+        "raw": {
+          "total_tokens": 9803,
+          "total_input_tokens": 9427,
+          "input_tokens_by_modality": [
+            {
+              "modality": "text",
+              "tokens": 9427
+            }
+          ],
+          "total_cached_tokens": 8231,
+          "cached_tokens_by_modality": [
+            {
+              "modality": "text",
+              "tokens": 8231
+            }
+          ],
+          "total_output_tokens": 15,
+          "output_tokens_by_modality": [
+            {
+              "modality": "text",
+              "tokens": 15
+            }
+          ],
+          "total_tool_use_tokens": 0,
+          "total_thought_tokens": 361
+        }
+      },
+      "expect": "inspect",
+      "valid": true
+    },
+    {
+      "turn": "4",
+      "id": "v1_ChdYTG9CYTd2Vk9KWEV5dE1QOU1mQnlBNBIXZzdvQmE5V2tLb3lNeXRNUGpOaUhnQWM",
+      "status": "requires_action",
+      "create_s": 0.9,
+      "total_s": 13,
+      "env": "6894e2721727d9b987cb9c93d7d370d6",
+      "steps": [
+        "function_result:inspect",
+        "thought",
+        "function_call:speak"
+      ],
+      "call": {
+        "name": "speak",
+        "arguments": {
+          "accuse": [
+            "P2",
+            "P4",
+            "P5"
+          ],
+          "claim": {
+            "results": [
+              {
+                "seat": "P1",
+                "side": "village"
+              },
+              {
+                "seat": "P7",
+                "side": "village"
+              }
+            ],
+            "role": "seer"
+          },
+          "defend": [
+            "P1",
+            "P7"
+          ],
+          "text": "I inspected P7 last night: P7 is Village! P1, P3, and P7 are confirmed Village. Nobody died last night, so Doctor successfully protected someone. With 2 Werewolves alive, the 2 Werewolves MUST be among {P2, P4, P5}, and the third is the Doctor. P1 and P7, join me in voting for one of {P2, P4, P5}!"
+        }
+      },
+      "usage": {
+        "input": 10809,
+        "cached": 9242,
+        "thought": 953,
+        "output": 172,
+        "total": 11934,
+        "raw": {
+          "total_tokens": 11934,
+          "total_input_tokens": 10809,
+          "input_tokens_by_modality": [
+            {
+              "modality": "text",
+              "tokens": 10809
+            }
+          ],
+          "total_cached_tokens": 9242,
+          "cached_tokens_by_modality": [
+            {
+              "modality": "text",
+              "tokens": 9242
+            }
+          ],
+          "total_output_tokens": 172,
+          "output_tokens_by_modality": [
+            {
+              "modality": "text",
+              "tokens": 172
+            }
+          ],
+          "total_tool_use_tokens": 0,
+          "total_thought_tokens": 953
+        }
+      },
+      "expect": "speak",
+      "valid": true
+    },
+    {
+      "turn": "5",
+      "id": "v1_ChdYTG9CYTd2Vk9KWEV5dE1QOU1mQnlBNBIXa0xvQmEtcTBMYkNGeGRJUDNLLU1nUUU",
+      "status": "requires_action",
+      "create_s": 1.1,
+      "total_s": 7.1,
+      "env": "6894e2721727d9b987cb9c93d7d370d6",
+      "steps": [
+        "function_result:speak",
+        "thought",
+        "function_call:vote"
+      ],
+      "call": {
+        "name": "vote",
+        "arguments": {
+          "beliefs": {
+            "P1": 0,
+            "P2": 0.65,
+            "P3": 0,
+            "P4": 0.75,
+            "P5": 0.6,
+            "P6": 0,
+            "P7": 0,
+            "P8": 0
+          },
+          "reason": "P1, P3, and P7 are confirmed Village. The two Werewolves must be among {P2, P4, P5}. P1 and P7 both find P4 heavily suspicious, so voting P4 aligns the Village bloc.",
+          "target": "P4"
+        }
+      },
+      "usage": {
+        "input": 12879,
+        "cached": 11822,
+        "thought": 450,
+        "output": 121,
+        "total": 13450,
+        "raw": {
+          "total_tokens": 13450,
+          "total_input_tokens": 12879,
+          "input_tokens_by_modality": [
+            {
+              "modality": "text",
+              "tokens": 12879
+            }
+          ],
+          "total_cached_tokens": 11822,
+          "cached_tokens_by_modality": [
+            {
+              "modality": "text",
+              "tokens": 11822
+            }
+          ],
+          "total_output_tokens": 121,
+          "output_tokens_by_modality": [
+            {
+              "modality": "text",
+              "tokens": 121
+            }
+          ],
+          "total_tool_use_tokens": 0,
+          "total_thought_tokens": 450
+        }
+      },
+      "expect": "vote",
+      "valid": true,
+      "belief_sum": 2
+    }
+  ]
+}

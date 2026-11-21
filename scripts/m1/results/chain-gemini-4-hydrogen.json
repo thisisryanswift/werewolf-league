@@ -1,0 +1,372 @@
+{
+  "model": "gemini-4-hydrogen",
+  "max_total_tokens": 100000,
+  "env_source": "fresh remote",
+  "rows": [
+    {
+      "turn": "0",
+      "id": "v1_Chd3YmtCYTVHV0JiMkcxc2dQNlpiR29BcxIXd2JrQmE1R1dCYjJHMXNnUDZaYkdvQXM",
+      "status": "requires_action",
+      "create_s": 5.1,
+      "total_s": 10.4,
+      "env": "ea04af5405d8e686abebf5fac1e25ff3",
+      "steps": [
+        "function_call:inspect"
+      ],
+      "call": {
+        "name": "inspect",
+        "arguments": {
+          "target": "P5"
+        }
+      },
+      "usage": {
+        "input": 5756,
+        "cached": 0,
+        "thought": 156,
+        "output": 21,
+        "total": 5933,
+        "raw": {
+          "total_tokens": 5933,
+          "total_input_tokens": 5756,
+          "input_tokens_by_modality": [
+            {
+              "modality": "text",
+              "tokens": 5756
+            }
+          ],
+          "total_cached_tokens": 0,
+          "total_output_tokens": 21,
+          "output_tokens_by_modality": [
+            {
+              "modality": "text",
+              "tokens": 21
+            }
+          ],
+          "total_tool_use_tokens": 0,
+          "total_thought_tokens": 156
+        }
+      },
+      "expect": "inspect",
+      "valid": true
+    },
+    {
+      "turn": "1",
+      "id": "v1_Chd3YmtCYTVHV0JiMkcxc2dQNlpiR29BcxIXeDdrQmE0ZjZHZjJGeXRNUGc0T0dtQTQ",
+      "status": "requires_action",
+      "create_s": 1.3,
+      "total_s": 6.6,
+      "env": "ea04af5405d8e686abebf5fac1e25ff3",
+      "steps": [
+        "function_result:inspect",
+        "thought",
+        "function_call:speak"
+      ],
+      "call": {
+        "name": "speak",
+        "arguments": {
+          "accuse": [
+            "P5"
+          ],
+          "claim": {
+            "results": [
+              {
+                "seat": "P5",
+                "side": "werewolf"
+              }
+            ],
+            "role": "seer"
+          },
+          "text": "I am the Seer. On Night 1 I inspected P5, and P5 is a Werewolf. We should eliminate P5 today. Doctor, please protect me tonight."
+        }
+      },
+      "usage": {
+        "input": 6979,
+        "cached": 3702,
+        "thought": 297,
+        "output": 89,
+        "total": 7365,
+        "raw": {
+          "total_tokens": 7365,
+          "total_input_tokens": 6979,
+          "input_tokens_by_modality": [
+            {
+              "modality": "text",
+              "tokens": 6979
+            }
+          ],
+          "total_cached_tokens": 3702,
+          "cached_tokens_by_modality": [
+            {
+              "modality": "text",
+              "tokens": 3702
+            }
+          ],
+          "total_output_tokens": 89,
+          "output_tokens_by_modality": [
+            {
+              "modality": "text",
+              "tokens": 89
+            }
+          ],
+          "total_tool_use_tokens": 0,
+          "total_thought_tokens": 297
+        }
+      },
+      "expect": "speak",
+      "valid": true
+    },
+    {
+      "turn": "2",
+      "id": "v1_Chd3YmtCYTVHV0JiMkcxc2dQNlpiR29BcxIXemJrQmE1djZPNV9IeGRJUDVldTVrQU0",
+      "status": "requires_action",
+      "create_s": 1,
+      "total_s": 7.2,
+      "env": "ea04af5405d8e686abebf5fac1e25ff3",
+      "steps": [
+        "function_result:speak",
+        "thought",
+        "function_call:vote"
+      ],
+      "call": {
+        "name": "vote",
+        "arguments": {
+          "beliefs": {
+            "P1": 0.2,
+            "P2": 0.2,
+            "P4": 0.2,
+            "P5": 1,
+            "P6": 0.2,
+            "P7": 0.2
+          },
+          "reason": "I am the Seer and my Night 1 inspection confirmed P5 is a Werewolf.",
+          "target": "P5"
+        }
+      },
+      "usage": {
+        "input": 8376,
+        "cached": 5501,
+        "thought": 251,
+        "output": 88,
+        "total": 8715,
+        "raw": {
+          "total_tokens": 8715,
+          "total_input_tokens": 8376,
+          "input_tokens_by_modality": [
+            {
+              "modality": "text",
+              "tokens": 8376
+            }
+          ],
+          "total_cached_tokens": 5501,
+          "cached_tokens_by_modality": [
+            {
+              "modality": "text",
+              "tokens": 5501
+            }
+          ],
+          "total_output_tokens": 88,
+          "output_tokens_by_modality": [
+            {
+              "modality": "text",
+              "tokens": 88
+            }
+          ],
+          "total_tool_use_tokens": 0,
+          "total_thought_tokens": 251
+        }
+      },
+      "expect": "vote",
+      "valid": true,
+      "belief_sum": 2
+    },
+    {
+      "turn": "3",
+      "id": "v1_Chd3YmtCYTVHV0JiMkcxc2dQNlpiR29BcxIXMWJrQmE5eWRETUsweGRJUDlJaUF5UUk",
+      "status": "requires_action",
+      "create_s": 1.1,
+      "total_s": 10.6,
+      "env": "ea04af5405d8e686abebf5fac1e25ff3",
+      "steps": [
+        "function_result:vote",
+        "thought",
+        "function_call:inspect"
+      ],
+      "call": {
+        "name": "inspect",
+        "arguments": {
+          "target": "P1"
+        }
+      },
+      "usage": {
+        "input": 8782,
+        "cached": 6327,
+        "thought": 268,
+        "output": 21,
+        "total": 9071,
+        "raw": {
+          "total_tokens": 9071,
+          "total_input_tokens": 8782,
+          "input_tokens_by_modality": [
+            {
+              "modality": "text",
+              "tokens": 8782
+            }
+          ],
+          "total_cached_tokens": 6327,
+          "cached_tokens_by_modality": [
+            {
+              "modality": "text",
+              "tokens": 6327
+            }
+          ],
+          "total_output_tokens": 21,
+          "output_tokens_by_modality": [
+            {
+              "modality": "text",
+              "tokens": 21
+            }
+          ],
+          "total_tool_use_tokens": 0,
+          "total_thought_tokens": 268
+        }
+      },
+      "expect": "inspect",
+      "valid": true
+    },
+    {
+      "turn": "4",
+      "id": "v1_Chd3YmtCYTVHV0JiMkcxc2dQNlpiR29BcxIXMzdrQmFfbmNMOTJ1eXRNUDdJQ0FtUUU",
+      "status": "requires_action",
+      "create_s": 1.1,
+      "total_s": 8.6,
+      "env": "ea04af5405d8e686abebf5fac1e25ff3",
+      "steps": [
+        "function_result:inspect",
+        "thought",
+        "function_call:speak"
+      ],
+      "call": {
+        "name": "speak",
+        "arguments": {
+          "accuse": [
+            "P5"
+          ],
+          "claim": {
+            "results": [
+              {
+                "seat": "P5",
+                "side": "werewolf"
+              },
+              {
+                "seat": "P1",
+                "side": "village"
+              }
+            ],
+            "role": "seer"
+          },
+          "defend": [
+            "P1"
+          ],
+          "text": "I am the Seer. Night 1 I inspected P5 (Werewolf) and Night 2 I inspected P1 (Village). P1 is cleared, and P5 is a confirmed Werewolf. With 6 players left, if we do not eliminate P5 today, the Werewolves can win tonight. Everyone must vote for P5!"
+        }
+      },
+      "usage": {
+        "input": 10107,
+        "cached": 7366,
+        "thought": 277,
+        "output": 144,
+        "total": 10528,
+        "raw": {
+          "total_tokens": 10528,
+          "total_input_tokens": 10107,
+          "input_tokens_by_modality": [
+            {
+              "modality": "text",
+              "tokens": 10107
+            }
+          ],
+          "total_cached_tokens": 7366,
+          "cached_tokens_by_modality": [
+            {
+              "modality": "text",
+              "tokens": 7366
+            }
+          ],
+          "total_output_tokens": 144,
+          "output_tokens_by_modality": [
+            {
+              "modality": "text",
+              "tokens": 144
+            }
+          ],
+          "total_tool_use_tokens": 0,
+          "total_thought_tokens": 277
+        }
+      },
+      "expect": "speak",
+      "valid": true
+    },
+    {
+      "turn": "5",
+      "id": "v1_Chd3YmtCYTVHV0JiMkcxc2dQNlpiR29BcxIXNkxrQmEtM0ZHWlhneXRNUDB1R2EtQW8",
+      "status": "requires_action",
+      "create_s": 1,
+      "total_s": 5.5,
+      "env": "ea04af5405d8e686abebf5fac1e25ff3",
+      "steps": [
+        "function_result:speak",
+        "function_call:vote"
+      ],
+      "call": {
+        "name": "vote",
+        "arguments": {
+          "beliefs": {
+            "P1": 0,
+            "P2": 0.33,
+            "P4": 0.33,
+            "P5": 1,
+            "P7": 0.34
+          },
+          "reason": "P5 is confirmed Werewolf from Night 1 inspection; P1 is confirmed Village from Night 2 inspection.",
+          "target": "P5"
+        }
+      },
+      "usage": {
+        "input": 11535,
+        "cached": 9072,
+        "thought": 144,
+        "output": 86,
+        "total": 11765,
+        "raw": {
+          "total_tokens": 11765,
+          "total_input_tokens": 11535,
+          "input_tokens_by_modality": [
+            {
+              "modality": "text",
+              "tokens": 11535
+            }
+          ],
+          "total_cached_tokens": 9072,
+          "cached_tokens_by_modality": [
+            {
+              "modality": "text",
+              "tokens": 9072
+            }
+          ],
+          "total_output_tokens": 86,
+          "output_tokens_by_modality": [
+            {
+              "modality": "text",
+              "tokens": 86
+            }
+          ],
+          "total_tool_use_tokens": 0,
+          "total_thought_tokens": 144
+        }
+      },
+      "expect": "vote",
+      "valid": true,
+      "belief_sum": 2
+    }
+  ]
+}
