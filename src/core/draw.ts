@@ -47,7 +47,7 @@ export function drawTable({ roster, seats, seed, check }: DrawOptions): DrawResu
       const others = pool.filter((a) => a.id !== agents[0]!.id);
       agents[rng.int(seats)] = others[rng.int(others.length)]!;
     }
-    const labelled = labelSeats(agents);
+    const labelled = labelSeats(agents, seed);
     const error = check(labelled);
     if (error === null) return { ok: true, agents, seats: labelled, attempt };
     lastError = error;

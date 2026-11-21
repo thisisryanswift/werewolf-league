@@ -12,7 +12,7 @@ const adminStart = (body: Record<string, unknown>) =>
 
 /** The deal the Ruleset makes for a 7-seat table of distinct Agents with this seed. */
 function dealFor(seed: string) {
-  const seats = Array.from({ length: 7 }, (_, i) => ({ seat: i + 1, agentId: `x${i}`, label: "x" }));
+  const seats = Array.from({ length: 7 }, (_, i) => ({ seat: i + 1, agentId: `x${i}`, label: "x", displayName: `N${i + 1}` }));
   const r = werewolf.setup({}, seed, seats);
   if (!r.ok) throw new Error(r.error);
   const roles = Object.fromEntries(r.state.players.map((p) => [p.seat, p.role as string]));

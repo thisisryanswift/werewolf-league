@@ -53,7 +53,7 @@ function install(stallSeat: number, stallTurn: number, opts: { late?: boolean } 
       if (typeof body.input === "string" && body.input.includes("Setup only")) continue;
       const seat = body.previous_interaction_id
         ? seatOf.get(body.previous_interaction_id)!
-        : Number(/You are seat (\d+)\./.exec(body.input)?.[1]);
+        : Number(/You are \w+ \(seat (\d+)\)\./.exec(body.input)?.[1]);
       seatOf.set(it.id, seat);
       turns.push({ seat, id: it.id, body });
       if (seat === stallSeat && turns.filter((t) => t.seat === seat).length === stallTurn) {
@@ -137,7 +137,7 @@ describe("managed-agent timeout recovery through real Match and Player DOs", () 
     const input: string = next.body.input;
     // Briefing: rules, role and seats.
     expect(input).toContain("You are playing Werewolf.");
-    expect(input).toContain(`You are seat ${wolf}. Your secret role: Werewolf.`);
+    expect(input).toContain(`(seat ${wolf}). Your secret role: Werewolf.`);
     expect(input).toContain("Seats:");
     expect(input).toContain("Stub instructions.");
     // Missed events: everything the stalled first turn showed, plus the partner's Wolf Chat it missed.

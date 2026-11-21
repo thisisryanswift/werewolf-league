@@ -9,7 +9,7 @@ import { rngFrom } from "../../core/rng";
 import type { RulesetEvent } from "../../shared/protocol";
 import { normalizeBeliefs } from "./beliefs";
 import { startNight } from "./night";
-import { alive, asSeat, killPlayer, player } from "./players";
+import { alive, asSeat, killPlayer, player, who } from "./players";
 import { VOTE } from "./tools";
 import type { DayState, PhaseModule, WerewolfState } from "./types";
 import { targetOf, validateTargeted } from "./validation";
@@ -284,22 +284,17 @@ function apply(s: WerewolfState, actions: Record<Seat, ToolCall | null>): Applie
 
 // ---- observation text -------------------------------------------------
 
-const seatName = (s: WerewolfState, seat: unknown) => {
-  const p = player(s, Number(seat));
-  return p ? `Seat ${p.seat} (${p.label})` : `Seat ${String(seat)}`;
-};
-
 function describeSpeech(d: Record<string, unknown>, s: WerewolfState): string {
-  const who = `${seatName(s, d.seat)} [${d.round === "reply" ? "Right of Reply" : `Round ${d.round}`}]`;
-  if (d.skipped) return `${who} said nothing.`;
-  const parts = [`${who}: "${d.text}"`];
+  const speaker = `${who(s, d.seat)} [${d.round === "reply" ? "Right of Reply" : `Round ${d.round}`}]`;
+  if (d.skipped) return `${speaker} said nothing.`;
+  const parts = [`${speaker}: "${d.text}"`];
   const accuse = d.accuse as Seat[];
   const defend = d.defend as Seat[];
   const claim = d.claim as Speech["claim"];
-  if (accuse.length) parts.push(`accuses ${accuse.map((x) => `seat ${x}`).join(", ")}`);
-  if (defend.length) parts.push(`defends ${defend.map((x) => `seat ${x}`).join(", ")}`);
+  if (accuse.length) parts.push(`accuses ${accuse.map((x) => who(s, x)).join(", ")}`);
+  if (defend.length) parts.push(`defends ${defend.map((x) => who(s, x)).join(", ")}`);
   if (claim) {
-    const results = claim.results.map((r) => `seat ${r.seat} is ${r.side}`).join(", ");
+    const results = claim.results.map((r) => `${who(s, r.seat)} is ${r.side}`).join(", ");
     parts.push(`claims to be ${claim.role}${results ? ` (${results})` : ""}`);
   }
   return parts.join(" — ");
@@ -308,12 +303,15 @@ function describeSpeech(d: Record<string, unknown>, s: WerewolfState): string {
 /** Observation text for Day events (see text.ts). */
 export const dayText: Record<string, (d: Record<string, unknown>, s: WerewolfState) => string | null> = {
   speech: describeSpeech,
-  replier_chosen: (d, s) => `${seatName(s, d.seat)} gets a Right of Reply (accusation score ${d.score}).`,
+  replier_chosen: (d, s) => `${who(s, d.seat)} gets a Right of Reply (accusation score ${d.score}).`,
   no_right_of_reply: (d) => `Day ${d.cycle}: nobody was accused, so there is no Right of Reply.`,
-  votes_revealed: (d) =>
+  votes_revealed: (d, s) =>
     `Day ${d.cycle} votes: ` +
     (d.votes as { seat: number; target: unknown; reason: string | null }[])
-      .map((v) => `${v.seat}→${String(v.target)}${v.reason ? ` ("${v.reason}")` : ""}`)
+      .map((v) => {
+        const target = typeof v.target === "number" ? who(s, v.target) : String(v.target);
+        return `${who(s, v.seat)} → ${target}${v.reason ? ` ("${v.reason}")` : ""}`;
+      })
       .join(", "),
   beliefs_recorded: () => null,
   no_elimination: (d) => `Day ${d.cycle}: nobody was eliminated (${d.reason === "tie" ? "tie" : "everyone abstained"}).`,

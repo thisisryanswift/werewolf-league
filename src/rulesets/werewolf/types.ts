@@ -18,7 +18,10 @@ export const DEFAULT_CONFIG: WerewolfConfig = { seats: 7, allowAbstain: true, ma
 export interface PlayerState {
   seat: Seat;
   agentId: string;
+  /** Agent and copy label, for Spectator events only. Never put it in Player-facing text. */
   label: string;
+  /** What other Players call this seat. */
+  displayName: string;
   role: Role;
   alive: boolean;
 }
