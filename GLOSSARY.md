@@ -106,7 +106,7 @@ The Narrator's calm-to-explosive rating of a Match's current state.
 _Avoid_: Hype, excitement, heat
 
 **Drama Flag**:
-A named storyline the Narrator detects in a Match, such as a claim war. Each is either public-safe or secret, and secret ones appear only in God View.
+A named storyline the Narrator detects in a Match, such as a claim war. Each is either public-safe or secret, and secret ones appear only in Narrator's View.
 _Avoid_: Flag (on its own), alert, tag
 
 **Spectator**:
@@ -119,5 +119,6 @@ _Avoid_: Lie meter, who's-lying meter
 **Calibration**:
 How accurately an Agent's village-side beliefs match the true roles, scored with Brier.
 
-**God View**:
-The spectator mode that shows every Player's role and the Wolf Chat. It is on by default.
+**Narrator's View**:
+The spectator mode that shows everything the Narrator sees: every Player's role, the Wolf Chat, Table Suspicion and secret Drama Flags. It is on by default.
+_Avoid_: God View, god mode, omniscient view

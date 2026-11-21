@@ -17,7 +17,7 @@ Spec wl-xgp7 (Spec: Werewolf League on Durable Objects). Vocabulary: GLOSSARY.md
 
 ## What to build
 Replace the basic grid with a dense grid built and tested for up to 36 live Matches.
-- **Tiles:** small, showing seat pips (alive or dead, roles in God View), phase, Day/Night number, step tag, alive count, Drama Score bar, a count of Players thinking, and timeouts.
+- **Tiles:** small, showing seat pips (alive or dead, roles in Narrator's View), phase, Day/Night number, step tag, alive count, Drama Score bar, a count of Players thinking, and timeouts.
 - **Sort:** by Drama Score, alive count or Match number.
 - **Filter:** all, flagged, voting or Night.
 - **Promoted tiles:** the top 3 by Drama Score become large tiles showing the latest speech line.
@@ -25,7 +25,7 @@ Replace the basic grid with a dense grid built and tested for up to 36 live Matc
 - **Match view:** opens as a modal over the live grid, and the grid keeps updating underneath. Esc, a backdrop click or the browser back button closes it. The URL carries the Match (e.g. #match=<id>), so links open straight into it.
 - **Without the Narrator:** the grid must work fully before the Narrator ticket lands. Drama sorting falls back to Match number, there's no drama bar, the flagged filter is hidden, and promoted tiles are chosen by most recent activity.
 - **Data:** tiles consume the League's coalesced per-tile diffs (wl-d5wn).
-- **Scope boundary:** the modal content (seats, feed, God View panels) is wl-hozk's. This ticket owns the grid, the modal shell and the routing.
+- **Scope boundary:** the modal content (seats, feed, Narrator's View panels) is wl-hozk's. This ticket owns the grid, the modal shell and the routing.
 - **Design reference:** variant E on prototype/spectator-ui, from the prototype ticket this depends on. Use its recorded verdict.
 
 ## Acceptance Criteria
@@ -51,11 +51,11 @@ Human decision 2026-11-21: the human wants to be involved in the final design pa
 
 **2026-11-21T17:01:52Z**
 
-From wl-pbkx: tile dramaFlags include secret flags tagged visibility:'secret'. The grid MUST filter them through visibleDramaFlags(flags, godView) so they are hidden when God View is off. dramaScore/dramaFlags are optional MatchSummary fields.
+From wl-pbkx: tile dramaFlags include secret flags tagged visibility:'secret'. The grid MUST filter them through visibleDramaFlags(flags, godView) so they are hidden when Narrator's View is off. dramaScore/dramaFlags are optional MatchSummary fields.
 
 **2026-11-21T17:17:25Z**
 
-Orchestrator: started at 12:17, based on impl/wl-d5wn (84c36a0, feed protocol final; P1 fixes in progress) merged with integration. Night thinking-count decision: show it only in God View at Night, because it reveals roles. Per the human, stop for their design pass before merge.
+Orchestrator: started at 12:17, based on impl/wl-d5wn (84c36a0, feed protocol final; P1 fixes in progress) merged with integration. Night thinking-count decision: show it only in Narrator's View at Night, because it reveals roles. Per the human, stop for their design pass before merge.
 
 **2026-11-21T18:02:15Z**
 

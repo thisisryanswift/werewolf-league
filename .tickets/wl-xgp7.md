@@ -19,7 +19,7 @@ It's 9:22 at a hackathon that ends at 17:00, and I want to show how differently-
 
 A Cloudflare Worker web app built around Durable Objects, with three kinds: a **League** DO, one **Match** DO per Match, and one **Player** DO per seat (ADR-0001). The League keeps a configurable number of Matches running at once with randomly drawn Agents. Each Match plays the Werewolf Ruleset. Each Player DO runs its seat's Gemini Managed Agent interaction chain, polling on its own alarm and enforcing turn deadlines. When a Match ends, the League updates each Agent's Wolf and Village Side Ratings (Elo) and their village Calibration (Brier) score.
 
-Spectators open a grid of live Match tiles and click into any Match. On joining they receive the full event log, so they can drop in mid-Match, and then watch live. God View (on by default) reveals roles, Wolf Chat and a "who's lying" suspicion meter. A leaderboard ranks Agents by Overall Rating, and finished Matches can be replayed.
+Spectators open a grid of live Match tiles and click into any Match. On joining they receive the full event log, so they can drop in mid-Match, and then watch live. Narrator's View (on by default) reveals roles, Wolf Chat and a "who's lying" suspicion meter. A leaderboard ranks Agents by Overall Rating, and finished Matches can be replayed.
 
 The core is ruleset-agnostic: League, Elo, Player and the spectator plumbing talk to a narrow Ruleset interface, and Werewolf is its only implementation.
 
@@ -33,14 +33,14 @@ The core is ruleset-agnostic: League, Elo, Player and the spectator plumbing tal
 5. As a Spectator, I want to receive the complete event log when I open a Match mid-way, so that I can catch up on what already happened.
 6. As a Spectator, I want new events to stream in live after I join, so that I can watch the Match unfold.
 7. As a Spectator, I want to close the Match modal (Esc, a backdrop click or the back button) at any time without affecting the Match, while the grid keeps updating underneath, so that I can drop in and out freely.
-8. As a Spectator, I want God View on by default, showing every Player's role and the Wolf Chat, so that I can enjoy the dramatic irony.
-9. As a Spectator, I want to turn God View off, so that I can play along with only the public information.
+8. As a Spectator, I want Narrator's View on by default, showing every Player's role and the Wolf Chat, so that I can enjoy the dramatic irony.
+9. As a Spectator, I want to turn Narrator's View off, so that I can play along with only the public information.
 10. As a Spectator, I want each Player shown with its Display Name, Agent and copy number (e.g. "Mara · Hydrogen #2"), so that I can tell copies apart. Players see only Display Names, so that model identity never biases play.
 11. As a Spectator, I want speeches in a Speech Round shown in the same order the agents were shown them, so that what I see matches what they saw.
 12. As a Spectator, I want Accusations shown as visual links between Players, so that I can see who suspects whom.
-13. As a Spectator, I want Claims (e.g. "I am the Seer; P3 is a Werewolf") shown as badges, so that I can follow claim wars and spot lies in God View.
+13. As a Spectator, I want Claims (e.g. "I am the Seer; P3 is a Werewolf") shown as badges, so that I can follow claim wars and spot lies in Narrator's View.
 14. As a Spectator, I want each vote shown with the voter's target (or Abstain) and short reason, so that I understand why someone was eliminated.
-15. As a Spectator in God View, I want a Table Suspicion meter showing the table's average stated suspicion of each Player next to their true role, so that I can see who is fooling the table.
+15. As a Spectator in Narrator's View, I want a Table Suspicion meter showing the table's average stated suspicion of each Player next to their true role, so that I can see who is fooling the table.
 16. As a Spectator, I want deaths to reveal the dead Player's role, so that I know what was lost.
 17. As a Spectator, I want a clear end-of-Match screen with the winning Side, all roles, and each Agent's rating changes, so that the result lands.
 18. As a Spectator, I want to see when a Player timed out and received a default action, so that a strange move isn't mistaken for strategy.
@@ -106,7 +106,7 @@ The core is ruleset-agnostic: League, Elo, Player and the spectator plumbing tal
 65. As a Spectator, I want the top 3 Matches by Drama Score promoted to large tiles showing the latest speech line, so that the best Matches are readable at a glance.
 66. As a Spectator, I want a header strip showing the top Agents by Overall Rating, so that rankings stay visible from the grid.
 67. As a Spectator, I want each tile to show a Drama Score and its active Drama Flags, so that I can tell which Matches are heating up.
-68. As a Spectator with God View off, I want to see only public-safe Drama Flags, so that the Narrator never reveals secrets.
+68. As a Spectator with Narrator's View off, I want to see only public-safe Drama Flags, so that the Narrator never reveals secrets.
 69. As the operator, I want the League to stagger Match starts and back off when Players hit rate limits (429), so that ramping up to N doesn't exhaust the Gemini quota.
 70. As the operator, I want the Narrator never to block a Match or affect play, ratings, Calibration or Table Suspicion, so that a spectator feature can't break the game.
 
@@ -122,7 +122,7 @@ The core is ruleset-agnostic: League, Elo, Player and the spectator plumbing tal
 
 **Werewolf Ruleset.**
 - Seats 7 (default) or 8: 2 Werewolves, 1 Seer, 1 Doctor, 3–4 Villagers. Sides: wolf, village.
-- Night: Wolf Chat (2 exchanges, visible to wolves and God View only) → each wolf proposes a target; if they differ, that Night's Pack Leader (alternating) decides. Seer inspect and Doctor protect run in parallel with the final wolf choice. Doctor cannot protect the same player on consecutive Nights; self-protect allowed.
+- Night: Wolf Chat (2 exchanges, visible to wolves and Narrator's View only) → each wolf proposes a target; if they differ, that Night's Pack Leader (alternating) decides. Seer inspect and Doctor protect run in parallel with the final wolf choice. Doctor cannot protect the same player on consecutive Nights; self-protect allowed.
 - Day: Speech Round A (all living players simultaneously) → Speech Round B (simultaneously, having seen A) → Right of Reply (1–2 slots; score = Accusations in A ×1 + in B ×2; ties broken by the match seed; skip players who already replied this Day) → one simultaneous plurality vote; Abstain allowed (configurable); a tie or all-Abstain means no elimination.
 - Presentation order: a round's speeches are collected in parallel but listed in seat order from a starting seat that rotates each Day; the UI uses the same order.
 - Win: Village wins when all wolves are dead; wolves win at parity; after the 6th cycle, wolves win if any remain alive. Dead roles are revealed.
@@ -137,7 +137,7 @@ The core is ruleset-agnostic: League, Elo, Player and the spectator plumbing tal
 
 **Deadlines.** Per-turn deadline 60 s, first turn 90 s, both configurable. Simultaneous steps wait for every Player or its deadline. Timeouts are recorded per Player/Agent.
 
-**Ratings.** Side Ratings start at 1200, team-average Elo, K=32, one update per Player to its Agent's Side Rating, dead Players share their team's result; Overall Rating = mean of the two Side Ratings. Beliefs are normalized to sum to the number of living wolves (clamped to [0,1]); Brier is averaged over village Players' vote-time beliefs about the other living players' true wolf status. The God View suspicion meter is the table's mean normalized belief per Player.
+**Ratings.** Side Ratings start at 1200, team-average Elo, K=32, one update per Player to its Agent's Side Rating, dead Players share their team's result; Overall Rating = mean of the two Side Ratings. Beliefs are normalized to sum to the number of living wolves (clamped to [0,1]); Brier is averaged over village Players' vote-time beliefs about the other living players' true wolf status. The Narrator's View suspicion meter is the table's mean normalized belief per Player.
 
 **Agent Instructions (wl-cizy).**
 - **Source:** `docs/agent-instructions/werewolf.md`. Its sections are shared, village, seer, doctor and werewolf; the text is strategy only, and the rules stay in the Ruleset briefing.
@@ -158,14 +158,14 @@ The core is ruleset-agnostic: League, Elo, Player and the spectator plumbing tal
 - **Owners:** wl-d5wn owns scheduling at scale and the feed (follow-up to the closed wl-kh5w); wl-gtil owns the dense grid and the Match modal (design: variant E, wl-qpvr).
 
 **Narrator (stretch, go/no-go ~13:30, wl-pbkx).** `narrate(godViewLog) → { dramaScore, flags[{ id, value, visibility }] }`, with a `gemini-decision-1` implementation and a scripted fake.
-- **When:** after each published step (dawn, each Speech Round, Right of Reply, vote), the Match DO sends the God View log to the Narrator. The Narrator sees roles, Wolf Chat and Seer results, because drama depends on what the wolves are doing.
+- **When:** after each published step (dawn, each Speech Round, Right of Reply, vote), the Match DO sends the Narrator's View log to the Narrator. The Narrator sees roles, Wolf Chat and Seer results, because drama depends on what the wolves are doing.
 - **Questions:** one score question (drama, calm to explosive) plus yes/no Drama Flags, each tagged public-safe or secret. Public-safe: claim war; vote on a knife edge; table split on who the wolves are; village eliminated its own power role. Secret: a wolf is fooling the table; wolves split in Wolf Chat.
 - **Flags:** a flag is active at or above a threshold (default 0.7). Answers are never summed.
-- **Output:** the result is stored as a Match event; secret flags are God-View-only, filtered like other private events. The Drama Score and active flags go into the tile summary. The bare Drama Score is shown even with God View off.
+- **Output:** the result is stored as a Match event; secret flags are Narrator's-View-only, filtered like other private events. The Drama Score and active flags go into the tile summary. The bare Drama Score is shown even with Narrator's View off.
 - **Throttling:** at most one call per Match is in flight, and a newer step supersedes a pending one. A failed or slow call (over ~5 s) is dropped, and the tile keeps its last value.
 - **Isolation:** the Narrator never feeds play, observations, ratings, Calibration or Table Suspicion.
 
-**HTTP/WebSocket surface (shape, not final paths).** Get the League snapshot (live Matches, leaderboard, config); a League WebSocket feed of coalesced per-tile diffs and leaderboard updates; get a Match's snapshot/event log; a Match WebSocket that sends the full log then live events, with God View filtering done client-side from a spectator view that includes private events; admin: pause/resume, set N, set config.
+**HTTP/WebSocket surface (shape, not final paths).** Get the League snapshot (live Matches, leaderboard, config); a League WebSocket feed of coalesced per-tile diffs and leaderboard updates; get a Match's snapshot/event log; a Match WebSocket that sends the full log then live events, with Narrator's View filtering done client-side from a spectator view that includes private events; admin: pause/resume, set N, set config.
 
 **Milestones.**
 - M1 (~10:30): sanity check. One short game-sized chain each on Hydrogen and 3.8 Flash.
@@ -173,7 +173,7 @@ The core is ruleset-agnostic: League, Elo, Player and the spectator plumbing tal
 - M3 (~13:30): League scheduling + Elo/Brier.
 - M4 (~15:00): dense grid with Match modal, Match view, leaderboard.
 - Narrator: stretch, with a go/no-go call at ~13:30 based on wave 2.
-- M5 (~16:00): deploy, God View toggle, replays, polish.
+- M5 (~16:00): deploy, Narrator's View toggle, replays, polish.
 - Freeze 16:30. If behind at 14:00, cut replays and admin controls first.
 
 ## Testing Decisions
@@ -181,7 +181,7 @@ The core is ruleset-agnostic: League, Elo, Player and the spectator plumbing tal
 - Good tests exercise external behaviour only: what a Spectator or the League can observe (event log, WebSocket messages, leaderboard values), never internal DO storage layout or private helpers.
 - **Seam 1: Harness.** A scripted Fake Harness replaces Gemini. Whole-system tests run in the Workers runtime with `@cloudflare/vitest-pool-workers`. They create a League with scripted Agents, drive real League/Match/Player DOs and alarms, and check: a Match runs to a correct result; the event log and WebSocket feed (full log on join, then live); rating changes and Overall Rating; normalized Brier; timeout defaults and per-Agent timeout counts (a fake that never answers); invalid-call error feedback; pause and N behaviour; no same-Agent wolf pairs; deterministic replay from the seed.
 - **Seam 2: Ruleset interface.** Pure tests of the Werewolf Ruleset with hand-written actions: night resolution (wolf split → Pack Leader, Doctor save, consecutive-protect rule), Right of Reply scoring/ties/repeat-skip, presentation order rotation, plurality/tie/all-Abstain, win conditions and the 6-cycle cap, defaults on timeout, out-of-phase validation messages.
-- **Seam 3: Narrator.** A scripted fake Narrator in the same whole-system tests checks that: results become events and reach tile summaries; God View tagging hides secret flags; a failing or slow Narrator never blocks a Match; at most one call per Match is in flight.
+- **Seam 3: Narrator.** A scripted fake Narrator in the same whole-system tests checks that: results become events and reach tile summaries; Narrator's View tagging hides secret flags; a failing or slow Narrator never blocks a Match; at most one call per Match is in flight.
 - Elo, normalization, reply selection, feed coalescing and start staggering are tested only through these seams.
 - Real Gemini calls happen only in the M1 sanity check and a manual smoke test before the demo, never in CI.
 - Prior art: none (greenfield repo). The M1 probes in `~/dev/personal/managed-agents-testing` show working request shapes.
@@ -218,6 +218,6 @@ Revisions after review (2026-11-21); the child tickets carry the details:
 - The 6-cycle cap moved to the walking skeleton. Committed events have sequence numbers; observations are frozen when a step starts; a round is published in presentation order only after it fully resolves. An identical event log means the same game decisions in the same order.
 - Timeout recovery: a seat that times out once acts normally on its next turn (continuation timeout: answer the pending parent call; first-turn timeout: fresh chain on the same environment with a catch-up observation). Late results are dropped by turn ID. A Match backstop alarm expires turns that are never reported. wl-cpl1 owns timeout counting.
 - Settlement is idempotent by Match ID: rating changes come from a pre-Match snapshot and are persisted, and a retry returns the same deltas and starts no second replacement.
-- Beliefs: each ballot is normalized to the wolves among the voter's other living seats (village voter W, wolf voter W-1), capped at 1 with the excess redistributed; all-zero or missing becomes uniform; a timeout has no ballot; Brier uses village ballots only. The meter is renamed Table Suspicion and includes wolf ballots; wl-bfo1 owns it, and God View only toggles it.
+- Beliefs: each ballot is normalized to the wolves among the voter's other living seats (village voter W, wolf voter W-1), capped at 1 with the excess redistributed; all-zero or missing becomes uniform; a timeout has no ballot; Brier uses village ballots only. The meter is renamed Table Suspicion and includes wolf ballots; wl-bfo1 owns it, and Narrator's View only toggles it.
 - Dealing: the Ruleset owns the deal (wolves on different Agents, or a setup error); the League draws at least 2 distinct Agents, redraws deterministically on rejection, and refuses rosters of fewer than 2. If only one wolf submits a kill, that is the kill. No Accusations means no Right of Reply. A timed-out vote is always an Abstain.
 - New edges: wl-t4no depends on wl-lvtw and wl-jb4x; wl-lvtw depends on wl-cpl1.
