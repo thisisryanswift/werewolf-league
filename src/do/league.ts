@@ -8,7 +8,7 @@ import { DurableObject } from "cloudflare:workers";
 import { drawTable } from "../core/draw";
 import type { MatchInit, MatchReport } from "../core/match";
 import { defaultLeagueConfig, patchConfig, type LeagueConfig } from "../core/roster";
-import { applyMatch, rankStandings, ratePlayers, snapshotOf, standing, type AgentRecord, type RatingSnapshot } from "../core/ratings";
+import { applyMatch, calibrationByAgent, rankStandings, ratePlayers, snapshotOf, standing, type AgentRecord, type RatingSnapshot } from "../core/ratings";
 import type { MatchSummary } from "../core/ruleset";
 import { buildMatchInit } from "../core/start-match";
 import { getRuleset } from "../rulesets";
@@ -283,6 +283,7 @@ export class LeagueDO extends DurableObject<Env> {
       sideOrder: getRuleset(entry.init.rulesetId).sides,
       names,
       timeoutsByAgent: s.result.timeouts?.byAgent ?? {},
+      calibrationByAgent: calibrationByAgent(seats, s.result),
     });
     this.agents = applied.records;
     return { ...s, ratings: applied.changes };

@@ -51,6 +51,8 @@ export interface MatchResult {
   sides: Record<Seat, string>;
   /** Normalized belief ballots, for Rulesets that collect them (Calibration, Table Suspicion). */
   ballots?: BeliefBallot[];
+  /** The Side the ballots guess at. Ballots from Players on other Sides are scored for Calibration. */
+  beliefSide?: string;
 }
 
 /**
