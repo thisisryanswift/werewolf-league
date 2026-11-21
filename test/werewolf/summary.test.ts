@@ -58,4 +58,11 @@ describe("Werewolf tile summary", () => {
     ];
     expect(werewolf.summary(state, events).latestSpeech).toEqual({ seat: 5, text: "I trust seat 3." });
   });
+
+  it("names the winning Side once the Match is over, and not before", () => {
+    const { state } = dealt("summary");
+    expect(werewolf.summary(state, []).result).toBeUndefined();
+    expect(werewolf.summary({ ...state, phase: "over", winner: "wolf" }, []).result).toBe("Werewolves");
+    expect(werewolf.summary({ ...state, phase: "over", winner: "village" }, []).result).toBe("Village");
+  });
 });

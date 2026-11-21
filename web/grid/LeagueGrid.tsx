@@ -20,8 +20,6 @@ const SORTS: { key: GridSort; label: string }[] = [
 ];
 const FILTER_LABELS: Record<GridFilter, string> = { all: "All", flagged: "⚑ Flagged", voting: "Voting", night: "Night" };
 const STRIP_AGENTS = 5;
-/** Narrator's View pip letters for living seats; Villagers stay blank. */
-const ROLE_MARK: Record<string, string> = { werewolf: "W", seer: "S", doctor: "D" };
 
 export interface LeagueGridProps {
   league: LeagueSnapshot;
@@ -118,81 +116,85 @@ export function LeagueGrid({ league, status, activity, narratorView, onNarratorV
 }
 
 // Unchanged tiles keep their object identity through applyLeagueDiff, so memo skips them.
+// The tile (wl-fuy2): a top line, a headline, a fixed Drama Score slot and the pips;
+// large (promoted) tiles add the latest quote, an "Also:" flag line and the thinking count.
 const Tile = memo(function Tile({ tile, narratorView, big }: { tile: MatchTile; narratorView: boolean; big: boolean }) {
   const v = tileView(tile, narratorView);
-  const cls = ["lg-tile", big && "big", big && !v.night && "hot", v.night && "night", v.flags.length > 0 && "flagged", !tile.summary && "starting"]
-    .filter(Boolean)
-    .join(" ");
+  const k = v.kicker;
+  const step = big ? k.step : k.stepShort;
   return (
-    <a className={cls} href={matchHash(tile.matchId)} data-testid="match-tile" data-match-id={tile.matchId} aria-label={`Open ${matchLabel(tile)}`}>
-      {v.flags.length > 0 && !big && (
-        <span className="lg-sticker" title={v.flags.join(" · ")}>
-          ⚑ {v.flags.length}
+    <a
+      className={`lg-tile ${v.fill}${big ? " big" : ""}`}
+      href={matchHash(tile.matchId)}
+      data-testid="match-tile"
+      data-match-id={tile.matchId}
+      aria-label={`Open ${matchLabel(tile)}`}
+    >
+      <span className="t-head">
+        <span className="t-main">
+          <span className="t-kick">
+            <span className="t-id">{k.match}</span>
+            {k.chip && (
+              <>
+                <span aria-hidden="true">·</span>
+                <span className="t-chip">{k.chip}</span>
+              </>
+            )}
+            {step && (
+              <>
+                <span aria-hidden="true">·</span>
+                <span className="t-step">{step}</span>
+              </>
+            )}
+          </span>
+          <span className="t-headline" title={v.headline}>
+            {v.headline}
+          </span>
         </span>
-      )}
-      <span className="t-top">
-        <span className="t-id">{matchLabel(tile)}</span>
-        <span className="t-phase">
-          {v.night ? "☾ " : v.phase.startsWith("Day") ? "☀ " : ""}
-          {v.phase}
+        <span className="t-score" title={v.drama === null ? "No Drama Score yet" : "Drama Score"}>
+          <b>{v.dramaText}</b>
+          {big && <small>drama</small>}
         </span>
       </span>
-      <span className="t-pa">
+      {big && (
+        <span className="t-quote" data-testid="latest-speech">
+          {v.speech ? (
+            <>
+              <q>{v.speech.text}</q>
+              <cite>{v.speech.name}</cite>
+            </>
+          ) : (
+            <i>No one has spoken yet.</i>
+          )}
+        </span>
+      )}
+      {big && v.also && (
+        <span className="t-also">
+          Also: <span className={`t-flag${v.also.flag.secret ? " secret" : ""}`}>{v.also.flag.name}</span>
+          {v.also.more > 0 && <span className="t-more">+{v.also.more}</span>}
+        </span>
+      )}
+      <span className="t-foot">
         <span className="pips">
           {v.pips.map((p) => (
             <span
               key={p.seat}
-              className={["pip", !p.alive && "dead", p.role === "werewolf" && "wolf", p.role && `role-${p.role}`].filter(Boolean).join(" ")}
-              title={`P${p.seat}${p.role ? ` · ${p.role}` : ""}${p.alive ? "" : " · dead"}`}
+              className={["pip", !p.alive && "dead", p.role && `role-${p.role}`, p.speaking && "speaking"].filter(Boolean).join(" ")}
+              title={`P${p.seat}${p.role ? ` · ${p.role}` : ""}${p.alive ? "" : " · dead"}${p.speaking ? " · spoke last" : ""}`}
             >
-              {!p.alive ? "✕" : (p.role && ROLE_MARK[p.role]) || ""}
+              {p.mark}
             </span>
           ))}
         </span>
-        <span className="t-alive">
-          {v.alive}/{v.total} alive
-          {v.timeouts > 0 && <span title="Turns timed out"> · ⏱{v.timeouts}</span>}
-        </span>
-      </span>
-      {v.drama !== null && (
-        <span className="t-drama" title="Drama Score">
-          <span className="dbar">
-            <i style={{ width: `${v.drama}%` }} />
-          </span>
-          <span className="dpct">{v.drama}% drama</span>
-          {big && v.flags.length > 0 && (
-            <span className="t-flags">
-              {v.flags.map((f) => (
-                <span key={f}>⚑ {f}</span>
-              ))}
-            </span>
-          )}
-        </span>
-      )}
-      {big && (
-        <span className="t-line" data-testid="latest-speech">
-          {v.speech ? (
-            <>
-              <b>
-                P{v.speech.seat} · {v.speech.speaker}
-              </b>{" "}
-              “{v.speech.text}”
-            </>
-          ) : (
-            <i>No speeches yet.</i>
-          )}
-        </span>
-      )}
-      <span className="t-foot">
-        <span className={`tag${v.voting ? " vote" : ""}`}>{v.step ?? (tile.summary ? v.phase : "Starting")}</span>
-        {v.cost !== null && (
-          <span className="t-cost" title="Model cost so far">
-            {v.cost}
+        {v.timeouts > 0 && (
+          <span className="t-timeouts" title="Turns timed out">
+            ⏱ {v.timeouts}
           </span>
         )}
-        {v.thinking !== null && v.thinking > 0 && (
+        {big && v.thinking !== null && v.thinking > 0 && (
           <span className="think" title="Players thinking">
-            <span className="spin" aria-hidden="true" />×{v.thinking}
+            <span className="spin" aria-hidden="true" />
+            {v.thinking} thinking
           </span>
         )}
       </span>

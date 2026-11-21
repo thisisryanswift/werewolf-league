@@ -7,6 +7,8 @@ import { alive } from "./players";
 import type { WerewolfState } from "./types";
 
 const PHASE_NAME = { night: "Night", day: "Day", over: "Over" } as const;
+/** Each Side's display name, for a finished tile's result. */
+const SIDE_NAME = { wolf: "Werewolves", village: "Village" } as const;
 
 /** Event kinds that carry a public speech line as `{ seat, text }`. */
 const SPEECH_KINDS = new Set(["speech", "reply"]);
@@ -42,5 +44,6 @@ export function summary(s: WerewolfState, publicEvents: RulesetEvent[]): MatchSu
       roles: Object.fromEntries(s.players.map((p) => [p.seat, p.role])),
       step: stepTag(s, true),
     },
+    ...(s.phase === "over" && s.winner ? { result: SIDE_NAME[s.winner] } : {}),
   };
 }

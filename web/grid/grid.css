@@ -6,11 +6,15 @@
   --lg-header: #ff8de6;
   --lg-paper: #fff;
   --lg-ink: #111;
-  --lg-yellow: #ffe600;
-  --lg-lilac: #d9c2ff;
-  --lg-teal: #1d9a8a;
+  --lg-yellow: #ffe500;
+  --lg-teal: #1f9e8a; /* Villager pips: #111 letters (5.68:1) */
+  --lg-night: #1d1b3a;
+  --lg-night-ink: #fff;
+  --lg-night-muted: #d2d1d8; /* 10.91:1 on --lg-night */
+  --lg-muted: #555; /* the lightest grey text on white or yellow */
   --lg-red: #e8213b;
   --lg-pale-red: #f6b3bd;
+  --lg-wolf: #e01f38; /* Narrator's View pips: W (white letter 4.75:1; --lg-red is 4.46:1) */
   --lg-seer: #6a3fd0; /* Narrator's View pips: S */
   --lg-doctor: #1f6fd1; /* Narrator's View pips: D */
   --lg-starting: #ecebe6;
@@ -18,11 +22,13 @@
   --lg-shadow: 6px 6px 0 var(--lg-ink);
   --lg-font: "Space Grotesk", "Helvetica Neue", Arial, "Liberation Sans", sans-serif;
   --lg-mono: ui-monospace, "JetBrains Mono", "DejaVu Sans Mono", monospace;
-  /* grid */
-  --lg-tile-min: 260px; /* narrowest small tile: ~6 columns at 1920px */
-  --lg-tile-height: 190px;
-  --lg-gap: 14px;
-  --lg-pip: 16px;
+  --lg-quote-font: Inter, "Helvetica Neue", Arial, "Liberation Sans", sans-serif;
+  /* grid (wl-fuy2): 6 columns of ~300px small tiles at 1920px; large tiles span 2 */
+  --lg-tile-min: 290px;
+  --lg-tile-height: 120px;
+  --lg-tile-height-big: 200px;
+  --lg-gap: 12px;
+  --lg-pip: 20px;
   --lg-pip-big: 22px;
   /* modal */
   --lg-dialog-width: min(1600px, 96vw);
@@ -47,11 +53,7 @@ body:has(.lg-page) {
   padding: 0;
 }
 .lg-page .lg-mono,
-.lg-page .t-id,
-.lg-page .lg-lbl,
-.lg-page .tag,
-.lg-page .t-alive,
-.lg-page .dpct {
+.lg-page .lg-lbl {
   font-family: var(--lg-mono);
 }
 .lg-loading {
@@ -188,26 +190,29 @@ body:has(.lg-page) {
 }
 
 /* ---- grid ---- */
+/* Tiles (wl-fuy2): large (promoted) ~600x200 spanning two columns, small ~300x120.
+   Fill: white; yellow when Drama Score >= 0.70 and not Over; navy at Night. */
 .lg-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(var(--lg-tile-min), 1fr));
-  grid-auto-rows: var(--lg-tile-height);
   grid-auto-flow: dense;
-  gap: var(--lg-gap) calc(var(--lg-gap) + 2px);
-  padding: 16px 22px 24px;
+  align-items: start;
+  gap: var(--lg-gap);
+  padding: 14px 22px 24px;
 }
 .lg-tile {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 4px;
   min-width: 0;
+  height: var(--lg-tile-height);
   overflow: hidden;
-  padding: 8px 10px;
+  padding: 7px 10px 8px;
   background: var(--lg-paper);
   border: var(--lg-border) solid var(--lg-ink);
   box-shadow: var(--lg-shadow);
-  color: inherit;
+  color: var(--lg-ink);
   text-decoration: none;
 }
 .lg-tile > * {
@@ -219,56 +224,133 @@ body:has(.lg-page) {
 }
 .lg-tile.big {
   grid-column: span 2;
-  gap: 4px;
-  padding: 7px 10px;
+  height: var(--lg-tile-height-big);
+  padding: 8px 14px 10px;
 }
 .lg-tile.hot {
   background: var(--lg-yellow);
 }
 .lg-tile.night {
-  background: var(--lg-lilac);
+  background: var(--lg-night);
+  color: var(--lg-night-ink);
 }
 .lg-tile.starting {
   background: var(--lg-starting);
 }
-.t-top {
+.t-head {
   display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 6px;
+  align-items: flex-start;
+  gap: 8px;
+}
+.t-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.t-kick {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  font: 700 14px/1.2 var(--lg-mono);
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 .t-id {
   font-weight: 800;
-  font-size: 15px;
-  text-transform: uppercase;
 }
-.t-phase {
-  font-weight: 800;
-  font-size: 14px;
+.t-chip {
+  padding: 0 4px;
+  background: var(--lg-ink);
+  color: var(--lg-paper);
+}
+.lg-tile.night .t-chip {
+  background: var(--lg-night-ink);
+  color: var(--lg-night);
+}
+.t-step {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.t-headline {
+  font: 900 20px/1.15 var(--lg-font);
+  text-transform: uppercase;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lg-tile.big .t-headline {
+  font-size: 34px;
+  letter-spacing: -0.5px;
+}
+/* The Drama Score's fixed slot: "—" before the first narration, so nothing shifts. */
+.t-score {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  min-width: 2.3em;
+  font: 900 24px/1 var(--lg-font);
+  white-space: nowrap;
+}
+.lg-tile.big .t-score {
+  font-size: 40px;
+}
+.t-score small {
+  font: 700 14px/1.2 var(--lg-mono);
   text-transform: uppercase;
 }
-.lg-tile.big .t-id,
-.lg-tile.big .t-phase {
-  font-size: 17px;
-}
-.lg-tile.flagged:not(.big) .t-top {
-  padding-right: 34px;
-}
-.t-pa {
+.t-quote {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 10px;
-}
-.lg-tile:not(.big) .t-pa {
   flex-direction: column;
-  align-items: flex-start;
+  gap: 2px;
+  min-height: 0;
+  flex-shrink: 1;
+}
+.t-quote q {
+  font: 500 18px/1.3 var(--lg-quote-font);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+.t-quote cite,
+.t-also {
+  font: 700 14px/1.2 var(--lg-mono);
+  font-style: normal;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.t-quote i {
+  font: italic 500 18px/1.3 var(--lg-quote-font);
+  color: var(--lg-muted);
+}
+.lg-tile.night .t-quote i {
+  color: var(--lg-night-muted);
+}
+.t-flag {
+  padding: 0 5px;
+  border: 2px solid currentColor;
+}
+.t-flag.secret {
+  border-style: dashed;
+}
+.t-more {
+  margin-left: 6px;
+}
+.t-foot {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 .pips {
   display: flex;
-  flex-wrap: wrap;
-  gap: 3px;
+  gap: 5px;
 }
 .pip {
   width: var(--lg-pip);
@@ -277,123 +359,69 @@ body:has(.lg-page) {
   place-items: center;
   border: 2px solid var(--lg-ink);
   background: var(--lg-teal);
-  color: #fff;
-  font: 900 10px/1 sans-serif;
+  color: var(--lg-ink);
+  font: 900 14px/1 var(--lg-mono);
+}
+.lg-tile.big .pip {
+  width: var(--lg-pip-big);
+  height: var(--lg-pip-big);
+  font-size: 14px;
 }
 .pip.dead {
   background: var(--lg-paper);
   color: var(--lg-ink);
 }
-.pip.wolf {
-  background: var(--lg-red);
+.pip.role-werewolf {
+  background: var(--lg-wolf);
+  color: #fff;
 }
 .pip.role-seer {
   background: var(--lg-seer);
+  color: #fff;
 }
 .pip.role-doctor {
   background: var(--lg-doctor);
+  color: #fff;
 }
-.pip.wolf.dead {
+.pip.dead.role-werewolf {
   background: var(--lg-pale-red);
   color: var(--lg-ink);
 }
-.lg-tile.big .pip {
-  width: var(--lg-pip-big);
-  height: var(--lg-pip-big);
-  font-size: 12px;
-}
-.t-alive {
-  font-size: 12px;
-  font-weight: 700;
-}
-.t-drama {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.dbar {
-  flex: 1;
-  min-width: 50px;
-  height: 10px;
-  display: block;
-  border: 2px solid var(--lg-ink);
+.pip.dead.role-seer,
+.pip.dead.role-doctor {
   background: var(--lg-paper);
+  color: var(--lg-ink);
 }
-.dbar i {
-  display: block;
-  height: 100%;
+/* The latest speaker: a 3px ring with a 2px gap (white ring on Night tiles). */
+.pip.speaking {
+  box-shadow:
+    0 0 0 2px var(--lg-paper),
+    0 0 0 5px var(--lg-ink);
+}
+.lg-tile.night .pip.speaking {
+  box-shadow:
+    0 0 0 2px var(--lg-night),
+    0 0 0 5px var(--lg-paper);
+}
+.t-timeouts {
+  font: 700 14px/1 var(--lg-mono);
+  padding: 2px 5px;
   background: var(--lg-ink);
-}
-.lg-tile.big .dbar i {
-  background: var(--lg-red);
-}
-.dpct {
-  font-size: 12px;
+  color: var(--lg-paper);
   white-space: nowrap;
 }
-.t-flags {
-  display: flex;
-  gap: 6px;
-  flex-wrap: nowrap;
-  overflow: hidden;
-}
-.t-flags span,
-.lg-sticker {
-  white-space: nowrap;
-  background: var(--lg-red);
-  color: #fff;
-  font-weight: 800;
-  font-size: 12px;
-  padding: 1px 6px;
-  border: 2px solid var(--lg-ink);
-}
-.lg-sticker {
-  position: absolute;
-  top: 0;
-  right: 0;
-  border-width: 0 0 3px 3px;
-  z-index: 1;
-}
-.t-line {
-  font-size: 14px;
-  line-height: 1.25;
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  flex-shrink: 1;
-}
-.t-foot {
-  margin-top: auto;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-}
-.tag {
-  font-size: 12px;
-  font-weight: 800;
-  padding: 1px 6px;
-  background: var(--lg-paper);
-  border: 2px solid var(--lg-ink);
-  text-transform: uppercase;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.tag.vote {
-  background: var(--lg-ink);
-  color: var(--lg-yellow);
+.lg-tile.night .t-timeouts {
+  outline: 2px solid var(--lg-paper);
 }
 .think {
+  margin-left: auto;
   display: flex;
   align-items: center;
-  gap: 3px;
-  font-size: 12px;
-  font-weight: 800;
+  gap: 5px;
+  font: 700 14px/1 var(--lg-mono);
+  white-space: nowrap;
 }
-/* A plain rotating ring: one compositor animation per tile, cheap at 36 tiles. */
+/* A plain rotating ring: one compositor animation per large tile. */
 .spin {
   width: 14px;
   height: 14px;
@@ -401,6 +429,10 @@ body:has(.lg-page) {
   border-top-color: var(--lg-ink);
   border-radius: 50%;
   animation: lg-spin 1s linear infinite;
+}
+.lg-tile.night .spin {
+  border-color: var(--lg-night-muted);
+  border-top-color: var(--lg-night);
 }
 @keyframes lg-spin {
   to {
@@ -414,11 +446,6 @@ body:has(.lg-page) {
   .lg-board li {
     animation: none;
   }
-}
-/* Model cost so far (wl-64dn); only rendered when the summary has it. */
-.t-cost {
-  margin-left: auto;
-  font: 700 12px/1 var(--lg-mono);
 }
 .lg-empty {
   grid-column: 1 / -1;
