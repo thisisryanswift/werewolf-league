@@ -56,3 +56,7 @@ From wl-pbkx: tile dramaFlags include secret flags tagged visibility:'secret'. T
 **2026-11-21T17:17:25Z**
 
 Orchestrator: started at 12:17, based on impl/wl-d5wn (84c36a0, feed protocol final; P1 fixes in progress) merged with integration. Night thinking-count decision: show it only in God View at Night, because it reveals roles. Per the human, stop for their design pass before merge.
+
+**2026-11-21T18:02:15Z**
+
+Human design pass (13:00): variant E as built, with bigger tiles (--lg-tile-min 260px, --lg-tile-height 190px, pips 16/22; commit de60fd3), and a League feed interval of 2000 ms for a calmer grid. Design is LOCKED for now; further tweaks are frontend-only and come later. Implementer report: all 7 ACs evidenced (36 tiles at 60 fps with 0 long tasks, with and without the modal; sort/filter/degradation; promoted top 3 with speech; live leaderboard strip; modal via Esc/backdrop/Back and #match deep links; projector fit; featured link opens the modal). codex: no P0/P1. Open P2s: (a) on first load, promotion picks the 3 oldest Matches until speeches arrive, held for 10 s; (b) in wl-d5wn's league.ts, releasing a 'starting' reservation leaves its timestamp in starts and doesn't restore its seed. Choices to revisit: promotion is always the top 3 by Drama Score regardless of sort; flags clip on large tiles at 3+; cost slot reads a numeric 'cost' via costText(), so confirm the field name when wl-64dn merges. Merge after wl-d5wn (built on it).
