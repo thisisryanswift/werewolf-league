@@ -1,0 +1,125 @@
+{
+  "model": "gemini-4-hydrogen",
+  "env_source": "existing",
+  "create_s": 1,
+  "env_on_create": "ea04af5405d8e686abebf5fac1e25ff3",
+  "status_on_create": "in_progress",
+  "cancelled": {
+    "id": "v1_ChdNTG9CYThQd0Y2ZkR4ZElQMjlEcnNRSRIXTUxvQmE4UHdGNmZEeGRJUDI5RHJzUUk",
+    "status_before_cancel": "in_progress",
+    "cancel_response_status": "cancelled",
+    "status_after": "cancelled",
+    "env_after": "ea04af5405d8e686abebf5fac1e25ff3",
+    "steps_after": []
+  },
+  "fresh": {
+    "turn": "fresh-0",
+    "id": "v1_ChdOcm9CYTgzdklQRGUwX2dQdHBUbXFBMBIXTnJvQmE4M3ZJUERlMF9nUHRwVG1xQTA",
+    "status": "requires_action",
+    "create_s": 0.8,
+    "total_s": 4.4,
+    "env": "ea04af5405d8e686abebf5fac1e25ff3",
+    "steps": [
+      "function_call:inspect"
+    ],
+    "call": {
+      "name": "inspect",
+      "arguments": {
+        "target": "P5"
+      }
+    },
+    "usage": {
+      "input": 5756,
+      "cached": 0,
+      "thought": 131,
+      "output": 21,
+      "total": 5908,
+      "raw": {
+        "total_tokens": 5908,
+        "total_input_tokens": 5756,
+        "input_tokens_by_modality": [
+          {
+            "modality": "text",
+            "tokens": 5756
+          }
+        ],
+        "total_cached_tokens": 0,
+        "total_output_tokens": 21,
+        "output_tokens_by_modality": [
+          {
+            "modality": "text",
+            "tokens": 21
+          }
+        ],
+        "total_tool_use_tokens": 0,
+        "total_thought_tokens": 131
+      }
+    }
+  },
+  "next": {
+    "turn": "fresh-1",
+    "id": "v1_ChdOcm9CYTgzdklQRGUwX2dQdHBUbXFBMBIXT3JvQmE3TGlPTUdyeXRNUDZ0VHhpQXM",
+    "status": "requires_action",
+    "create_s": 0.9,
+    "total_s": 6.8,
+    "env": "ea04af5405d8e686abebf5fac1e25ff3",
+    "steps": [
+      "function_result:inspect",
+      "thought",
+      "function_call:speak"
+    ],
+    "call": {
+      "name": "speak",
+      "arguments": {
+        "accuse": [
+          "P5"
+        ],
+        "claim": {
+          "results": [
+            {
+              "seat": "P5",
+              "side": "werewolf"
+            }
+          ],
+          "role": "seer"
+        },
+        "text": "I am the Seer. On Night 1, I inspected P5, and P5 is a Werewolf. We should all vote to eliminate P5 today. Doctor, please protect me tonight."
+      }
+    },
+    "usage": {
+      "input": 6954,
+      "cached": 3702,
+      "thought": 329,
+      "output": 93,
+      "total": 7376,
+      "raw": {
+        "total_tokens": 7376,
+        "total_input_tokens": 6954,
+        "input_tokens_by_modality": [
+          {
+            "modality": "text",
+            "tokens": 6954
+          }
+        ],
+        "total_cached_tokens": 3702,
+        "cached_tokens_by_modality": [
+          {
+            "modality": "text",
+            "tokens": 3702
+          }
+        ],
+        "total_output_tokens": 93,
+        "output_tokens_by_modality": [
+          {
+            "modality": "text",
+            "tokens": 93
+          }
+        ],
+        "total_tool_use_tokens": 0,
+        "total_thought_tokens": 329
+      }
+    }
+  },
+  "same_env": true,
+  "confirmed": true
+}
