@@ -7,6 +7,8 @@
 //   prefer: seat[]      — for targeted actions, pick the first preferred seat that is legal
 //   invalidFirst: bool  — answer every turn with an illegal call first, then a legal one on retry
 //   delayPolls: number  — report "pending" this many polls before answering
+//   silentTurns: number[] — never finish these turns (1-based count of turns started on this seat)
+//   requireText: string[] — end the turn with no call unless the observation contains every string
 
 import type { Harness, PollResult, TurnInput } from "../core/harness";
 import type { ToolCall } from "../core/ruleset";
@@ -16,11 +18,14 @@ interface FakeOptions {
   prefer?: number[];
   invalidFirst?: boolean;
   delayPolls?: number;
+  silentTurns?: number[];
+  requireText?: string[];
 }
 
-function decide(opts: FakeOptions, input: TurnInput): ToolCall | null | "never" {
+function decide(opts: FakeOptions, input: TurnInput, turnNo: number): ToolCall | null | "never" {
   const { turn } = input;
-  if (opts.script === "silent") return "never";
+  if (opts.script === "silent" || opts.silentTurns?.includes(turnNo)) return "never";
+  if (opts.requireText?.some((t) => !input.text.includes(t))) return null;
   if (opts.script === "no-call") return null;
   if (opts.invalidFirst && !input.error) return { name: turn.actionKind, args: { target: "not-a-seat" } };
   const preferred = opts.prefer?.find((s) => turn.legalTargets.includes(s));
@@ -43,7 +48,7 @@ export const fakeHarness: Harness = {
     const opts = (ctx.agent.options ?? {}) as FakeOptions;
     const turns = Number(ctx.chain.turns ?? 0) + 1;
     return {
-      handle: { decision: decide(opts, input), pollsLeft: opts.delayPolls ?? 0 },
+      handle: { decision: decide(opts, input, turns), pollsLeft: opts.delayPolls ?? 0 },
       chain: { ...ctx.chain, turns },
     };
   },

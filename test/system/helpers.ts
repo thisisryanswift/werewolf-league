@@ -1,4 +1,5 @@
 import { exports } from "cloudflare:workers";
+import { werewolf } from "../../src/rulesets/werewolf";
 import type { TimeoutCounts } from "../../src/core/deadlines";
 import type { AgentConfig } from "../../src/core/harness";
 import type { MatchEvent, ServerMessage } from "../../src/shared/protocol";
@@ -62,3 +63,11 @@ export async function connect(matchId: string) {
 
 /** The game decisions of a log, without operational fields. */
 export const decisions = (events: MatchEvent[]) => events.map(({ kind, audience, data }) => ({ kind, audience, data }));
+
+/** Wolf seats the Werewolf Ruleset deals for a 7-seat table of distinct Agents with this seed. */
+export function dealtWolves(seed: string): number[] {
+  const seats = Array.from({ length: 7 }, (_, i) => ({ seat: i + 1, agentId: `x${i}`, label: "x" }));
+  const r = werewolf.setup({}, seed, seats);
+  if (!r.ok) throw new Error(r.error);
+  return r.events.find((e) => e.kind === "wolf_team")!.data.wolves as number[];
+}
