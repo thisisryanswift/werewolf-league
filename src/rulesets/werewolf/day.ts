@@ -8,6 +8,7 @@ import type { Seat, ToolCall, TurnRequest, Validation } from "../../core/ruleset
 import { rngFrom } from "../../core/rng";
 import type { RulesetEvent } from "../../shared/protocol";
 import { normalizeBeliefs } from "./beliefs";
+import { startNight } from "./night";
 import { alive, asSeat, killPlayer, player } from "./players";
 import type { DayState, PhaseModule, WerewolfState } from "./types";
 import { targetOf, validateTargeted } from "./validation";
@@ -253,7 +254,7 @@ function applyVote(s: WerewolfState, actions: Record<Seat, ToolCall | null>): Ap
     events.push({ kind: "no_elimination", audience: "all", data: { cycle: s.cycle, reason: top === 0 ? "all_abstain" : "tie" } });
   }
   const cycle = s.cycle + 1;
-  state = { ...state, phase: "night", cycle, night: { step: "kill" } };
+  state = { ...state, phase: "night", cycle, night: startNight(state.players, state.night) };
   events.push({ kind: "phase_started", audience: "all", data: { phase: "night", cycle } });
   return { state, events };
 }

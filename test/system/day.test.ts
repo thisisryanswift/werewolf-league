@@ -26,7 +26,7 @@ describe("Day through real Match and Player DOs", () => {
 
     // Each round is committed contiguously, in seat order from that Day's starting seat.
     const roundA = speechesOf(sa.events, 1, "A");
-    const killed = sa.events.find((e) => e.kind === "player_died" && e.data.cycle === 1)?.data.seat;
+    const killed = sa.events.find((e) => e.kind === "player_died" && e.data.cycle === 1 && e.data.cause === "night_kill")?.data.seat;
     const living = [1, 2, 3, 4, 5, 6, 7].filter((s) => s !== killed);
     expect(roundA).toHaveLength(living.length);
     expect(roundA.map((e) => e.seq)).toEqual(roundA.map((_, i) => roundA[0]!.seq + i));

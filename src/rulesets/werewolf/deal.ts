@@ -4,6 +4,7 @@ import type { Seat, SeatAgent, SetupResult } from "../../core/ruleset";
 import { rngFrom } from "../../core/rng";
 import type { RulesetEvent } from "../../shared/protocol";
 import { startDay } from "./day";
+import { startNight } from "./night";
 import { TOOLS_BY_ROLE } from "./tools";
 import { DEFAULT_CONFIG, type Role, type WerewolfConfig, type WerewolfState } from "./types";
 
@@ -13,7 +14,7 @@ export function parseConfig(raw: Record<string, unknown>): WerewolfConfig {
 
 /** Roles for a table of `n` seats, before shuffling. */
 export function roleList(n: number): Role[] {
-  return ["werewolf", "werewolf", ...Array<Role>(n - 2).fill("villager")];
+  return ["werewolf", "werewolf", "seer", "doctor", ...Array<Role>(n - 4).fill("villager")];
 }
 
 /**
@@ -46,7 +47,7 @@ export function setup(rawConfig: Record<string, unknown>, seed: string, seats: S
     players,
     cycle: 1,
     phase: "night",
-    night: { step: "kill" },
+    night: startNight(players, null),
     day: startDay(1),
     ballots: [],
     winner: null,

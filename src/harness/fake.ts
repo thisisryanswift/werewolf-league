@@ -7,6 +7,7 @@
 //   prefer: seat[]      — for targeted actions, pick the first preferred seat that is legal
 //   invalidFirst: bool  — answer every turn with an illegal call first, then a legal one on retry
 //   delayPolls: number  — report "pending" this many polls before answering
+//   say: string         — for actions without legal targets (e.g. a chat), call the tool with { text: say }
 //   args: { [actionKind]: object } — extra call arguments per action kind, over the defaults below
 //   echo: string        — put a digest of the observation into this argument (tests compare observations)
 
@@ -18,6 +19,7 @@ interface FakeOptions {
   prefer?: number[];
   invalidFirst?: boolean;
   delayPolls?: number;
+  say?: string;
   args?: Record<string, Record<string, unknown>>;
   echo?: string;
 }
@@ -40,6 +42,7 @@ function decide(opts: FakeOptions, input: TurnInput): ToolCall | null | "never" 
   if (opts.script === "silent") return "never";
   if (opts.script === "no-call") return null;
   if (opts.invalidFirst && !input.error) return { name: turn.actionKind, args: { target: "not-a-seat" } };
+  if (opts.say !== undefined && turn.legalTargets.length === 0) return { name: turn.actionKind, args: { text: opts.say } };
   const preferred = opts.prefer?.find((s) => turn.legalTargets.includes(s));
   const extra: Record<string, unknown> = { ...DEFAULT_ARGS[turn.actionKind], ...opts.args?.[turn.actionKind] };
   if (opts.echo) extra[opts.echo] = `${String(extra[opts.echo] ?? "")} [obs ${digest(input.text)}]`.trim();
