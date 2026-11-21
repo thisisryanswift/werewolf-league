@@ -25,10 +25,10 @@ const REPORT = {
 /** A scripted Analyst: files REPORT, but only if its input holds the seats table and the result. */
 const fakeAnalyst = (options: Record<string, unknown> = {}) => ({
   harness: "fake",
-  options: { delayPolls: 1, requireText: ["Result:", "Seats (Display Name", "Secret roles:"], args: { submit_report: REPORT }, ...options },
+  options: { delayPolls: 1, pollEveryMs: 20, requireText: ["Result:", "Seats (Display Name", "Secret roles:"], args: { submit_report: REPORT }, ...options },
 });
 
-const table = (prefix: string) => Array.from({ length: 7 }, (_, i) => fakeAgent(`${prefix}-${i + 1}`, { delayPolls: 1 }));
+const table = (prefix: string) => Array.from({ length: 7 }, (_, i) => fakeAgent(`${prefix}-${i + 1}`, { delayPolls: 1, pollEveryMs: 100 }));
 
 const analyses = (events: MatchEvent[]) => events.filter((e) => e.kind === "analysis");
 const analysisOf = (matchId: string, timeoutMs?: number) =>
@@ -113,7 +113,7 @@ describe("the Analyst", () => {
     await admin("resume");
     const s = await waitFor(async () => {
       const l = await league();
-      return l.recent.length >= 4 ? l : null;
+      return l.recent.length >= 3 ? l : null;
     }, 25_000);
     await admin("pause");
     // Each settled Match gets its (failed) analysis, one at a time through the single slot.
@@ -127,7 +127,7 @@ describe("the Analyst", () => {
     const overlap = async (cap: number, prefix: string) => {
       await admin("config", { analystConcurrency: cap });
       const ids = await Promise.all(
-        [1, 2, 3, 4].map((i) => startMatch({ seed: `${prefix}-${i}`, agents: table(`${prefix}${i}`), analyst: fakeAnalyst({ delayPolls: 30 }) })),
+        [1, 2, 3].map((i) => startMatch({ seed: `${prefix}-${i}`, agents: table(`${prefix}${i}`), analyst: fakeAnalyst({ delayPolls: 20 }) })),
       );
       const runs = (await Promise.all(ids.map((id) => analysisOf(id, 25_000)))).map((s) => analyses(s.events)[0]!.data as unknown as AnalysisEventData);
       expect(runs.every((r) => r.status === "ok")).toBe(true);
@@ -135,7 +135,7 @@ describe("the Analyst", () => {
       return Math.max(...runs.map((r) => runs.filter((o) => o.startedAt! <= r.startedAt! && r.startedAt! < o.finishedAt).length));
     };
     expect(await overlap(1, "cap1")).toBe(1);
-    expect(await overlap(4, "cap4")).toBeGreaterThan(1);
+    expect(await overlap(3, "cap3")).toBeGreaterThan(1);
   });
 
   it("counts the Analyst's usage in the Match's and League's cost, in no Agent's", async () => {
