@@ -13,7 +13,7 @@ import { leagueIdOf } from "../core/leagues";
 import { defaultLeagueConfig, patchConfig, type LeagueConfig } from "../core/roster";
 import { findLeague } from "../shared/leagues";
 import { ratingsHistory, type RatingsHistory } from "../core/ratings-history";
-import { applyMatch, backfillPlayed, calibrationByAgent, needsPlayedBackfill, rankStandings, ratePlayers, snapshotOf, standing, type AgentRecord, type RatingSnapshot } from "../core/ratings";
+import { addSettlementRoles, applyMatch, backfillPlayed, calibrationByAgent, needsPlayedBackfill, rankStandings, ratePlayers, snapshotOf, standing, type AgentRecord, type RatingSnapshot } from "../core/ratings";
 import { buildMatchInit } from "../core/start-match";
 import { backoffUntil, recentStarts, startBudget } from "../core/start-pacer";
 import { getRuleset } from "../rulesets";
@@ -87,6 +87,10 @@ const SPEND_CAP_BLOCKED = "League spend has reached the spend cap; raise or clea
 /** `{ matchNumber }` if there is one, else nothing (older Matches have none). */
 const numbered = (n: number | undefined) => (n === undefined ? {} : { matchNumber: n });
 const RECENT = 24;
+/** Settled Matches asked for their roles per role stats backfill batch (each is a Match DO call). */
+const ROLE_BACKFILL_BATCH = 25;
+/** Wait before another role stats backfill run after one that made no progress. */
+const ROLE_BACKFILL_RETRY_MS = 60_000;
 /** 429 reports kept on the League snapshot. */
 const RATE_LIMIT_EVENTS = 10;
 
@@ -293,17 +297,96 @@ export class LeagueDO extends DurableObject<Env> {
   /** Every current roster Agent plus every Agent with a rated Match, ranked by Overall Rating. */
   private leaderboard(): Leaderboard {
     const c = this.config;
-    const sides = [...getRuleset(c.rulesetId).sides];
+    const ruleset = getRuleset(c.rulesetId);
+    const sides = [...ruleset.sides];
+    const roles = ruleset.roles?.map((r) => ({ ...r }));
+    const roleIds = roles?.map((r) => r.id) ?? [];
     const records = this.agents;
     const names = new Map<string, string>(Object.entries(records).map(([id, r]) => [id, r.name]));
     for (const a of c.roster) names.set(a.id, a.name);
     for (const id of c.hiddenAgents ?? []) names.delete(id);
     const { byAgent: spent, matchesByAgent: costed = {} } = this.spendRecord;
-    const rows = rankStandings([...names].map(([id, name]) => standing(id, name, records[id], sides))).map((r) => {
+    const rows = rankStandings([...names].map(([id, name]) => standing(id, name, records[id], sides, roleIds))).map((r) => {
       const n = costed[r.agentId] ?? 0;
       return { ...r, costPerMatch: n > 0 ? (spent[r.agentId] ?? 0) / n : null };
     });
-    return { sides, rows };
+    if (!roles) return { sides, rows };
+    const rolesComplete = this.rolesBackfilled;
+    if (!rolesComplete) this.kickRolesBackfill();
+    return { sides, roles, rolesComplete, rows };
+  }
+
+  // ---- role stats backfill ---------------------------------------------------
+
+  /** True once every rated settlement carries its roles, so every record's role stats are complete. */
+  private get rolesBackfilled(): boolean {
+    return this.ctx.storage.kv.get<boolean>("rolesBackfilled") ?? false;
+  }
+
+  /** The running backfill, in memory: at most one at a time. A restarted League starts it again on the next read. */
+  private rolesBackfill: Promise<void> | null = null;
+  /** No backfill starts before this (epoch ms), after a run that made no progress. In memory. */
+  private rolesBackfillRetryAt = 0;
+
+  /** Start backfilling role stats in the background, if needed. Never awaited by reads or scheduling. */
+  private kickRolesBackfill(): void {
+    if (this.rolesBackfill || Date.now() < this.rolesBackfillRetryAt) return;
+    const run = (async () => {
+      for (;;) {
+        const { remaining, progressed } = await this.backfillRoles();
+        if (remaining === 0) return;
+        // Every Match call in the batch failed: don't retry on every read.
+        if (progressed === 0) return void (this.rolesBackfillRetryAt = Date.now() + ROLE_BACKFILL_RETRY_MS);
+      }
+    })()
+      .catch((err: unknown) => {
+        this.rolesBackfillRetryAt = Date.now() + ROLE_BACKFILL_RETRY_MS;
+        console.warn(`role stats backfill: ${String(err)}`);
+      })
+      .finally(() => (this.rolesBackfill = null));
+    this.rolesBackfill = run;
+    this.ctx.waitUntil(run);
+  }
+
+  /**
+   * One bounded batch of the role stats backfill: ask up to ROLE_BACKFILL_BATCH
+   * settled Matches that predate role stats for their roles, store the roles on
+   * each settlement and add them to the records. A settlement that has roles is
+   * never counted again, so the backfill is idempotent and resumable. A Match
+   * that can't say (no roles) is stored with none; a failed call is retried later.
+   */
+  async backfillRoles(): Promise<{ remaining: number; progressed: number }> {
+    if (this.rolesBackfilled) return { remaining: 0, progressed: 0 };
+    const pending = () =>
+      [...this.ctx.storage.kv.list<Settlement>({ prefix: "settled:" })].filter(([, s]) => s.ratings && !s.result.roles).map(([, s]) => s.matchId);
+    const batch = pending().slice(0, ROLE_BACKFILL_BATCH);
+    if (batch.length === 0) {
+      this.ctx.storage.kv.put("rolesBackfilled", true);
+      return { remaining: 0, progressed: 0 };
+    }
+    const found = await Promise.all(
+      batch.map((id) =>
+        this.env.MATCH.getByName(id)
+          .roles()
+          .catch(() => undefined),
+      ),
+    );
+    // Re-read after the awaits: Matches may have settled, or another batch run, meanwhile.
+    let records = this.agents;
+    let progressed = 0;
+    batch.forEach((matchId, i) => {
+      const s = this.ctx.storage.kv.get<Settlement>(`settled:${matchId}`);
+      const roles = found[i];
+      if (!s || s.result.roles || roles === undefined) return;
+      records = addSettlementRoles(records, s, roles ?? {});
+      this.ctx.storage.kv.put(`settled:${matchId}`, { ...s, result: { ...s.result, roles: roles ?? {} } });
+      progressed++;
+    });
+    this.agents = records;
+    const remaining = pending().length;
+    if (remaining === 0) this.ctx.storage.kv.put("rolesBackfilled", true);
+    if (progressed) this.broadcast();
+    return { remaining, progressed };
   }
 
   /** Overall and Side Ratings of every Agent after each of the last RATINGS_HISTORY_CAP rated settlements. */
@@ -537,6 +620,7 @@ export class LeagueDO extends DurableObject<Env> {
       names,
       timeoutsByAgent: s.result.timeouts?.byAgent ?? {},
       calibrationByAgent: calibrationByAgent(seats, s.result),
+      ...(s.result.roles ? { roles: s.result.roles } : {}),
     });
     this.agents = applied.records;
     return { ...s, ratings: applied.changes };

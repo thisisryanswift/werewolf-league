@@ -33,6 +33,39 @@ export interface AgentRecord {
   timeouts: number;
   /** Running Brier tally over the Agent's scored beliefs (absent on records from before Calibration). */
   brier?: BrierTally;
+  /** Rated Matches played and won per role id: once per Match per role the Agent held (absent before role stats; the League backfills it). */
+  roles?: RoleStats;
+}
+
+/** Played and won counts per Ruleset role id. */
+export type RoleStats = Record<string, { played: number; won: number }>;
+
+/**
+ * Which roles each Agent held in one Match, and whether it won in each: a role
+ * counts once per Match, won if any of the Agent's Players in that role won.
+ */
+export function rolesPlayed(
+  players: readonly Pick<PlayerRatingChange, "seat" | "agentId" | "won">[],
+  roles: Record<number, string>,
+): Record<string, Record<string, boolean>> {
+  const out: Record<string, Record<string, boolean>> = {};
+  for (const p of players) {
+    const role = roles[p.seat];
+    if (role === undefined) continue;
+    const held = (out[p.agentId] ??= {});
+    held[role] = (held[role] ?? false) || p.won;
+  }
+  return out;
+}
+
+/** Add one Match's roles (role id -> won) to an Agent's tallies. */
+export function addRoleStats(prev: RoleStats | undefined, match: Record<string, boolean>): RoleStats {
+  const out = { ...prev };
+  for (const [role, won] of Object.entries(match)) {
+    const cur = out[role] ?? { played: 0, won: 0 };
+    out[role] = { played: cur.played + 1, won: cur.won + (won ? 1 : 0) };
+  }
+  return out;
 }
 
 const ratingOf = (snap: RatingSnapshot, agentId: string, side: string): number => snap[agentId]?.[side] ?? INITIAL_RATING;
@@ -80,6 +113,8 @@ export function applyMatch(opts: {
   timeoutsByAgent: Record<string, number>;
   /** This Match's Brier tally per Agent (see `calibrationByAgent`). */
   calibrationByAgent?: Record<string, BrierTally>;
+  /** Each Player's role id by seat (from the Match result); without it role tallies are left alone. */
+  roles?: Record<number, string>;
 }): { records: Record<string, AgentRecord>; changes: RatingChanges } {
   const records = { ...opts.records };
   const net = new Map<string, AgentRatingChange>();
@@ -96,6 +131,7 @@ export function applyMatch(opts: {
     .map((c) => ({ ...c, after: c.before + c.delta }))
     .sort((a, b) => (a.agentId < b.agentId ? -1 : a.agentId > b.agentId ? 1 : opts.sideOrder.indexOf(a.side) - opts.sideOrder.indexOf(b.side)));
 
+  const held = opts.roles ? rolesPlayed(opts.players, opts.roles) : {};
   for (const agentId of new Set(opts.players.map((p) => p.agentId))) {
     const prev = records[agentId] ?? { name: agentId, ratings: {}, matches: 0, wins: {}, timeouts: 0 };
     const ratings = { ...prev.ratings };
@@ -111,6 +147,7 @@ export function applyMatch(opts: {
       played,
       timeouts: prev.timeouts + (opts.timeoutsByAgent[agentId] ?? 0),
       brier: addTally(prev.brier, opts.calibrationByAgent?.[agentId]),
+      ...(held[agentId] ? { roles: addRoleStats(prev.roles, held[agentId]) } : prev.roles ? { roles: prev.roles } : {}),
     };
   }
   return { records, changes: { players: opts.players, agents } };
@@ -134,6 +171,30 @@ function sidesPlayed(s: PlayedSource): Map<string, Set<string>> {
     const set = out.get(agentId) ?? new Set<string>();
     set.add(side);
     out.set(agentId, set);
+  }
+  return out;
+}
+
+/** A stored rated settlement, for counting its roles; older settlements may lack `ratings.players`. */
+export interface RolesSource {
+  ratings: { players?: { seat: number; agentId: string; won: boolean }[] } | null;
+  seats: { seat: number; agentId: string }[] | null;
+  result: { winner: string; sides: Record<number, string> };
+}
+
+/**
+ * Add one settled Match's roles (by seat) to the records of the Agents that
+ * played it. Unrated settlements, and Agents without a record, are skipped.
+ */
+export function addSettlementRoles(records: Record<string, AgentRecord>, s: RolesSource, roles: Record<number, string>): Record<string, AgentRecord> {
+  if (!s.ratings) return records;
+  const players = Array.isArray(s.ratings.players)
+    ? s.ratings.players
+    : (s.seats ?? []).map((x) => ({ seat: x.seat, agentId: x.agentId, won: s.result.sides[x.seat] === s.result.winner }));
+  const out = { ...records };
+  for (const [agentId, held] of Object.entries(rolesPlayed(players, roles))) {
+    const r = out[agentId];
+    if (r) out[agentId] = { ...r, roles: addRoleStats(r.roles, held) };
   }
   return out;
 }
@@ -186,7 +247,14 @@ export function calibrationByAgent(
 }
 
 /** An Agent's leaderboard row. */
-export function standing(agentId: string, name: string, record: AgentRecord | undefined, sides: readonly string[]): AgentStanding {
+export function standing(
+  agentId: string,
+  name: string,
+  record: AgentRecord | undefined,
+  sides: readonly string[],
+  roleIds: readonly string[] = [],
+): AgentStanding {
+  const roles = Object.fromEntries(roleIds.map((r) => [r, record?.roles?.[r] ?? { played: 0, won: 0 }]));
   const ratings = Object.fromEntries(sides.map((s) => [s, record?.ratings[s] ?? INITIAL_RATING]));
   const wins = Object.fromEntries(sides.map((s) => [s, record?.wins[s] ?? 0]));
   const played = Object.fromEntries(sides.map((s) => [s, record?.played?.[s] ?? 0]));
@@ -198,6 +266,7 @@ export function standing(agentId: string, name: string, record: AgentRecord | un
     matches: record?.matches ?? 0,
     wins,
     played,
+    roles,
     timeouts: record?.timeouts ?? 0,
     calibration: record?.brier?.n ? record.brier.sum / record.brier.n : null,
   };

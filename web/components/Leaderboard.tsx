@@ -1,66 +1,17 @@
 // Leaderboard panel: Agents ranked by Overall Rating, with sortable Side Rating
-// columns, Matches played, wins out of Matches played per Side, Calibration (Brier) and timeouts. It
+// columns, Matches played, wins out of Matches played per Side and per role, Calibration (Brier) and timeouts. It
 // renders whatever the League feed last sent, so it updates live as Matches settle.
 import { useState } from "react";
-import type { AgentStanding, Leaderboard as LeaderboardData } from "../../src/shared/protocol";
-import { formatUsd } from "../cost";
-import { formatWinFraction } from "../leaderboard/win-fraction";
+import type { Leaderboard as LeaderboardData } from "../../src/shared/protocol";
+import { columns } from "../leaderboard/columns";
 
-/** Display names for Side keys; unknown Sides are capitalised. */
-const SIDE_NAMES: Record<string, string> = { wolf: "Wolf", village: "Village" };
-export const sideName = (side: string): string => SIDE_NAMES[side] ?? side.charAt(0).toUpperCase() + side.slice(1);
-
-export const formatRating = (r: number): string => Math.round(r).toString();
-
-interface Column {
-  key: string;
-  label: string;
-  title?: string;
-  value: (row: AgentStanding) => number;
-  render: (row: AgentStanding) => string;
-}
-
-function columns(sides: string[]): Column[] {
-  return [
-    { key: "overall", label: "Overall", title: "Mean of the Side Ratings", value: (r) => r.overall, render: (r) => formatRating(r.overall) },
-    ...sides.map((s) => ({
-      key: `rating:${s}`,
-      label: sideName(s),
-      title: `${sideName(s)} Rating`,
-      value: (r: AgentStanding) => r.ratings[s] ?? 0,
-      render: (r: AgentStanding) => formatRating(r.ratings[s] ?? 0),
-    })),
-    { key: "matches", label: "Matches", value: (r) => r.matches, render: (r) => String(r.matches) },
-    ...sides.map((s) => ({
-      key: `wins:${s}`,
-      label: `${sideName(s)} wins`,
-      title: `Wins out of Matches played as ${sideName(s)}`,
-      value: (r: AgentStanding) => r.wins[s] ?? 0,
-      render: (r: AgentStanding) => formatWinFraction(r.wins[s] ?? 0, r.played?.[s] ?? 0),
-    })),
-    {
-      key: "calibration",
-      label: "Calibration",
-      title: "Brier score of village-side beliefs at each vote (lower is better)",
-      // Sorting is best-first: lower Brier first, Agents with no score last.
-      value: (r) => (r.calibration === null ? -Infinity : -r.calibration),
-      render: (r) => (r.calibration === null ? "—" : r.calibration.toFixed(3)),
-    },
-    { key: "timeouts", label: "Timeouts", title: "Turns that missed their deadline", value: (r) => r.timeouts, render: (r) => String(r.timeouts) },
-    {
-      key: "cost",
-      label: "$/Match",
-      title: "Measured model cost per Match, all of the Agent's seats",
-      // Sorting is cheapest first, Agents with no cost yet last.
-      value: (r) => (r.costPerMatch == null ? -Infinity : -r.costPerMatch),
-      render: (r) => (r.costPerMatch == null ? "—" : formatUsd(r.costPerMatch)),
-    },
-  ];
-}
+export { formatRating, sideName } from "../leaderboard/columns";
 
 export function Leaderboard({ data }: { data: LeaderboardData }) {
   const [sortKey, setSortKey] = useState("overall");
-  const cols = columns(data.sides);
+  const [showRoles, setShowRoles] = useState(true);
+  const roles = data.roles ?? [];
+  const cols = columns(data.sides, showRoles ? roles : []);
   const sortCol = cols.find((c) => c.key === sortKey) ?? cols[0]!;
   // Rank is always by Overall Rating (the League's order); sorting only reorders rows.
   const rank = new Map(data.rows.map((r, i) => [r.agentId, i + 1]));
@@ -68,6 +19,14 @@ export function Leaderboard({ data }: { data: LeaderboardData }) {
   return (
     <section className="leaderboard" data-testid="leaderboard">
       <h2>Leaderboard</h2>
+      {roles.length > 0 && rows.length > 0 && (
+        <p className="muted leaderboard-roles">
+          <label>
+            <input type="checkbox" checked={showRoles} onChange={(e) => setShowRoles(e.target.checked)} data-testid="show-role-wins" /> Wins by role
+          </label>
+          {showRoles && data.rolesComplete === false && <span> · still counting role wins from earlier Matches; the role columns are partial.</span>}
+        </p>
+      )}
       {rows.length === 0 ? (
         <p className="muted">No Agents yet.</p>
       ) : (

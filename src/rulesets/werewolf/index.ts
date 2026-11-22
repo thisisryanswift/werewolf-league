@@ -7,7 +7,7 @@ import { day } from "./day";
 import { night } from "./night";
 import { instructions } from "./instructions";
 import { briefing, renderObservation } from "./text";
-import type { PhaseModule, Side, WerewolfState } from "./types";
+import type { PhaseModule, Role, Side, WerewolfState } from "./types";
 import { summary } from "./summary";
 import { NARRATION_QUESTIONS, narrationLog } from "./narration";
 import { analysis } from "./analysis";
@@ -22,6 +22,14 @@ function phaseOf(s: WerewolfState): PhaseModule | null {
 export const werewolf: Ruleset<WerewolfState> = {
   id: "werewolf",
   sides: ["wolf", "village"] satisfies Side[],
+  roles: (
+    [
+      { id: "werewolf", name: "Werewolf" },
+      { id: "seer", name: "Seer" },
+      { id: "doctor", name: "Doctor" },
+      { id: "villager", name: "Villager" },
+    ] satisfies { id: Role; name: string }[]
+  ),
   setup,
   nextStep(s) {
     const result = this.result(s);

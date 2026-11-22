@@ -290,6 +290,61 @@ describe("Side Ratings", () => {
     expect(standing(after2, "pf-g").played).toEqual({ wolf: 1, village: 1 });
   });
 
+  it("counts per-role wins once per Match, and backfills Matches settled before role stats from each Match", async () => {
+    // F has one wolf seat and three village seats; G one wolf and two village. Village wins.
+    const m = seedWith("rs-m1", ["rs-f", "rs-g"], { wolves: ["rs-f", "rs-g"], village: ["rs-f", "rs-f", "rs-f", "rs-g", "rs-g"] });
+    const matchId = await playOne(m.seed, [villageWins("rs-f", m.wolfSeats), villageWins("rs-g", m.wolfSeats)]);
+
+    // Expected tallies from the Match's own role_assigned events: one per role held, won unless werewolf.
+    const matchStub = env.MATCH.getByName(matchId);
+    const events = await runInDurableObject(matchStub, (instance: { snapshot(): { events: MatchEvent[]; seats: { seat: number; agentId: string }[] } | null }) => instance.snapshot()!);
+    const expected: Record<string, Record<string, { played: number; won: number }>> = { "rs-f": {}, "rs-g": {} };
+    for (const e of events.events.filter((x) => x.kind === "role_assigned")) {
+      const agentId = events.seats.find((s) => s.seat === e.data.seat)!.agentId;
+      expected[agentId]![e.data.role as string] = { played: 1, won: e.data.role === "werewolf" ? 0 : 1 };
+    }
+    expect(Object.keys(expected["rs-f"]!)).toContain("werewolf");
+
+    const zero = { werewolf: { played: 0, won: 0 }, seer: { played: 0, won: 0 }, doctor: { played: 0, won: 0 }, villager: { played: 0, won: 0 } };
+    const before = await league();
+    expect(before.leaderboard.roles?.map((r) => r.name)).toEqual(["Werewolf", "Seer", "Doctor", "Villager"]);
+    expect(standing(before, "rs-f").roles).toEqual({ ...zero, ...expected["rs-f"] });
+    expect(standing(before, "rs-g").roles).toEqual({ ...zero, ...expected["rs-g"] });
+    const allBefore = before.leaderboard.rows.map((r) => [r.agentId, r.roles]);
+
+    // Simulate a League from before role stats: no role tallies, no roles on settlements or on this Match's result.
+    const stub = env.LEAGUE.getByName("default");
+    await runInDurableObject(stub, (instance: LeagueDO) => {
+      const kv = (instance as unknown as { ctx: DurableObjectState }).ctx.storage.kv;
+      const records = kv.get<Record<string, AgentRecord>>("agents")!;
+      kv.put("agents", Object.fromEntries(Object.entries(records).map(([id, { roles: _, ...r }]) => [id, r])));
+      for (const [key, s] of kv.list<{ result: { roles?: unknown } }>({ prefix: "settled:" })) {
+        const { roles: _, ...result } = s.result;
+        kv.put(key, { ...s, result });
+      }
+      kv.delete("rolesBackfilled");
+    });
+    await runInDurableObject(matchStub, (instance: unknown) => {
+      const kv = (instance as { ctx: DurableObjectState }).ctx.storage.kv;
+      const meta = kv.get<{ result: { roles?: unknown } }>("meta")!;
+      const { roles: _, ...result } = meta.result;
+      kv.put("meta", { ...meta, result });
+    });
+
+    // A read serves partial data and starts the backfill; it completes in the background.
+    const partial = await league();
+    expect(partial.leaderboard.rolesComplete).toBe(false);
+    const after = await waitFor(async () => {
+      const l = await league();
+      return l.leaderboard.rolesComplete ? l : null;
+    });
+    expect(after.leaderboard.rows.map((r) => [r.agentId, r.roles])).toEqual(allBefore);
+
+    // Idempotent: another batch finds nothing to do and changes nothing.
+    expect(await stub.backfillRoles()).toEqual({ remaining: 0, progressed: 0 });
+    expect((await league()).leaderboard.rows.map((r) => [r.agentId, r.roles])).toEqual(allBefore);
+  });
+
   it("leaves Matches the League did not start unrated", async () => {
     const stub = env.LEAGUE.getByName("default");
     const ack = await stub.reportMatchResult("one-off-unrated", {

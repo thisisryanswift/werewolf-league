@@ -243,6 +243,8 @@ export interface AgentStanding {
   wins: Record<string, number>;
   /** Rated Matches played per Side (once per Match per Side the Agent had a seat on). */
   played: Record<string, number>;
+  /** Rated Matches played and won per role id (once per Match per role the Agent held), for the Leaderboard's roles. */
+  roles: Record<string, { played: number; won: number }>;
   /** Turns that missed their deadline, summed from each Match result's per-Agent counts. */
   timeouts: number;
   /** Calibration: Brier score over the Agent's village-side beliefs (lower is better); null before any are scored. */
@@ -255,6 +257,10 @@ export interface AgentStanding {
 export interface Leaderboard {
   /** The Ruleset's Sides, in its order: the rating and win columns. */
   sides: string[];
+  /** The Ruleset's roles, in its display order: the per-role win columns. Absent if the Ruleset names none. */
+  roles?: { id: string; name: string }[];
+  /** False while the League is still recounting role stats from Matches settled before they were kept. */
+  rolesComplete?: boolean;
   /** Ranked by Overall Rating, highest first. */
   rows: AgentStanding[];
 }

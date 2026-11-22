@@ -52,6 +52,8 @@ export interface MatchResult {
   winner: string; // winning Side
   /** Side of every Player, by seat. */
   sides: Record<Seat, string>;
+  /** Role id of every Player, by seat (one of `Ruleset.roles`), for Rulesets with roles. */
+  roles?: Record<Seat, string>;
   /** Normalized belief ballots, for Rulesets that collect them (Calibration, Table Suspicion). */
   ballots?: BeliefBallot[];
   /** The Side the ballots guess at. Ballots from Players on other Sides are scored for Calibration. */
@@ -92,6 +94,8 @@ export interface Ruleset<S = unknown> {
   id: string;
   /** The Sides a Player can be on, in display order. Each Agent holds one Side Rating per Side. */
   sides: readonly string[];
+  /** Optional: the roles a Player can hold, in display order, for per-role win stats. Ids match `MatchResult.roles`. */
+  roles?: readonly { id: string; name: string }[];
   setup(config: Record<string, unknown>, seed: string, seats: SeatAgent[]): SetupResult<S>;
   /** Which Players must act now, or the final result. */
   nextStep(state: S): Step;
