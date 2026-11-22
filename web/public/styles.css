@@ -161,6 +161,14 @@ body:has(.leaderboard) {
 .leaderboard h2 {
   margin-top: 0;
 }
+.leaderboard-roles {
+  margin: 0 0 0.5rem;
+  font-size: 0.85rem;
+}
+/* Per-role win cells are a little smaller, so the wider table still fits at 1920px. */
+.leaderboard td[data-col^="role:"] {
+  font-size: 0.8rem;
+}
 .leaderboard table {
   border-collapse: collapse;
   width: 100%;
