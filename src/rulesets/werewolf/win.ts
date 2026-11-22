@@ -34,6 +34,7 @@ export function resultOf(s: WerewolfState): MatchResult | null {
   return {
     winner: s.winner,
     sides: Object.fromEntries(s.players.map((p) => [p.seat, SIDE_OF[p.role]])),
+    roles: Object.fromEntries(s.players.map((p) => [p.seat, p.role])),
     ballots: s.ballots,
     beliefSide: "wolf",
   };

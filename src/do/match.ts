@@ -335,6 +335,17 @@ export class MatchDO extends DurableObject<Env> {
     clearTimeout(timer);
   }
 
+  /**
+   * Each Player's role id by seat once the Match is over: from the result, or for a
+   * Match finished before results carried roles, from its final Ruleset state.
+   * Null if the Match is not over or its Ruleset names no roles. The League backfills role stats from it.
+   */
+  roles(): Record<Seat, string> | null {
+    const meta = this.meta;
+    if (!meta || meta.status !== "finished") return null;
+    return meta.result?.roles ?? this.ruleset(meta).result(this.rulesetState)?.roles ?? null;
+  }
+
   snapshot(): (MatchSnapshot & { events: MatchEvent[] }) | null {
     const meta = this.meta;
     if (!meta) return null;

@@ -39,7 +39,7 @@ describe("recent activity", () => {
 
 describe("leaderboard strip", () => {
   it("lists the top Agents by Overall Rating, rounded", () => {
-    const row = (agentId: string, overall: number) => ({ agentId, name: agentId.toUpperCase(), ratings: {}, overall, matches: 1, wins: {}, played: {}, timeouts: 0, calibration: null });
+    const row = (agentId: string, overall: number) => ({ agentId, name: agentId.toUpperCase(), ratings: {}, overall, matches: 1, wins: {}, played: {}, roles: {}, timeouts: 0, calibration: null });
     const board = { sides: ["wolf", "village"], rows: [row("a", 1250.6), row("b", 1210.2), row("c", 1200), row("d", 1190)] };
     expect(topAgents(board, 3)).toEqual([
       { agentId: "a", rank: 1, name: "A", rating: "1251" },
