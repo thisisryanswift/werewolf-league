@@ -1,6 +1,6 @@
 ---
 id: wl-xgp7
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-11-21T15:04:11Z
@@ -239,3 +239,7 @@ Final review fix pass merged (impl/review-fixes 182d584): Day thinking and timeo
 **2026-11-21T21:24:52Z**
 
 Live config 16:24 (human-approved): gemini-managed N=7 (TPM headroom for the Neon Analyst; 429s went from 35 to 41 after Neon came on) and turn deadline 75 s (firstTurn 90 s unchanged) to cut 3.8 Flash timeouts (21 vs 0-2 for the others). pi-open N=1 on the 7-model roster (40 GB Agent37 limit). Analyst on (Neon, concurrency 2); first deployed report: Match 82. Deployed version fc3c8293. main and integration/wl-xgp7 pushed by the human. Worktree cleanup deferred until after the demo video.
+
+**2026-11-22T01:19:37Z**
+
+SPEC COMPLETE (2026-11-21 20:19). Deployed at https://werewolf-league.rswift.workers.dev (Workers + League/Match/Player DOs, plus PiSeat DOs). Two Leagues: gemini-managed (Hydrogen, 3.8 Flash, 3.6 Flash, 3.5 Flash-Lite on Managed Agents; ~520 Matches) and pi-open (7 OpenRouter models on Pi + Agent37, one seat per Agent; reset at 17:19). Narrator (gemini-decision-1) and Neon Analyst live. Features beyond the original spec: Display Names, AGENTS.md mounting, Agent notes, cost tracking, Match Numbers, help modals, dense grid and modal, Accusation chips, /leaderboard Elo chart (Overall/Village/Wolf), per-Side and per-role win fractions. Both Leagues PAUSED; total spend ~$291 (Gemini $278.94, Pi $11.77). Backlog left open: wl-9u76, wl-oka5, wl-w5j0. Cleanup: 39 implementer worktrees and 78 merged branches removed; prototype/pi-spike and prototype/spectator-ui branches kept (spectator-ui has 2 unpushed commits).

@@ -1,6 +1,6 @@
 ---
 id: wl-z9v9
-status: open
+status: closed
 deps: [wl-t4no]
 links: []
 created: 2026-11-21T17:11:03Z
@@ -44,3 +44,7 @@ A ~60-second demo video for the hackathon submission, which also serves as the b
 **2026-11-21T20:18:27Z**
 
 Human decision 15:18: the human records with OBS and a live voiceover; no HyperFrames/agent polish pass.
+
+**2026-11-22T01:19:37Z**
+
+Done: the human recorded the demo video (OBS, live voiceover) on the deployed app.
