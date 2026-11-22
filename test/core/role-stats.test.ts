@@ -1,6 +1,6 @@
 // Per-role win stats: once per Match per role an Agent held, won if a Player in that role won.
 import { describe, expect, it } from "vitest";
-import { addRoleStats, applyMatch, rolesPlayed, type AgentRecord } from "../../src/core/ratings";
+import { addRoleStats, addSettlementRoles, applyMatch, rolesPlayed, type AgentRecord } from "../../src/core/ratings";
 import type { PlayerRatingChange } from "../../src/shared/protocol";
 
 const p = (seat: number, agentId: string, side: string, won: boolean): PlayerRatingChange => ({ seat, agentId, side, won, before: 1200, delta: 0 });
@@ -26,6 +26,19 @@ describe("role stats", () => {
   it("leaves role tallies alone for a result without roles", () => {
     const out = applyMatch({ records: {}, players, winner: "A", sideOrder: ["A", "B"], names: {}, timeoutsByAgent: {} }).records;
     expect(out.a!.roles).toBeUndefined();
+  });
+
+  it("addSettlementRoles counts a stored settlement, including older shapes without per-Player changes", () => {
+    const rec = (): AgentRecord => ({ name: "x", ratings: {}, matches: 1, wins: {}, timeouts: 0 });
+    const records = { a: rec(), b: rec() };
+    // Older rated shape: seats plus the result's Sides and winner say who won.
+    const old = { ratings: {}, seats: [{ seat: 1, agentId: "a" }, { seat: 2, agentId: "b" }, { seat: 3, agentId: "ghost" }], result: { winner: "A", sides: { 1: "A", 2: "B", 3: "A" } } };
+    const out = addSettlementRoles(records, old, { 1: "x", 2: "y", 3: "x" });
+    expect(out.a!.roles).toEqual({ x: { played: 1, won: 1 } });
+    expect(out.b!.roles).toEqual({ y: { played: 1, won: 0 } });
+    expect(out.ghost).toBeUndefined(); // no record, nothing invented
+    // Unrated: nothing counted.
+    expect(addSettlementRoles(records, { ...old, ratings: null }, { 1: "x" })).toBe(records);
   });
 
   it("addRoleStats adds one Match's roles to existing tallies", () => {

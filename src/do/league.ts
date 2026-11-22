@@ -89,6 +89,8 @@ const numbered = (n: number | undefined) => (n === undefined ? {} : { matchNumbe
 const RECENT = 24;
 /** Settled Matches asked for their roles per role stats backfill batch (each is a Match DO call). */
 const ROLE_BACKFILL_BATCH = 25;
+/** Wait before another role stats backfill run after one that made no progress. */
+const ROLE_BACKFILL_RETRY_MS = 60_000;
 /** 429 reports kept on the League snapshot. */
 const RATE_LIMIT_EVENTS = 10;
 
@@ -323,17 +325,24 @@ export class LeagueDO extends DurableObject<Env> {
 
   /** The running backfill, in memory: at most one at a time. A restarted League starts it again on the next read. */
   private rolesBackfill: Promise<void> | null = null;
+  /** No backfill starts before this (epoch ms), after a run that made no progress. In memory. */
+  private rolesBackfillRetryAt = 0;
 
   /** Start backfilling role stats in the background, if needed. Never awaited by reads or scheduling. */
   private kickRolesBackfill(): void {
-    if (this.rolesBackfill) return;
+    if (this.rolesBackfill || Date.now() < this.rolesBackfillRetryAt) return;
     const run = (async () => {
       for (;;) {
         const { remaining, progressed } = await this.backfillRoles();
-        if (remaining === 0 || progressed === 0) return;
+        if (remaining === 0) return;
+        // Every Match call in the batch failed: don't retry on every read.
+        if (progressed === 0) return void (this.rolesBackfillRetryAt = Date.now() + ROLE_BACKFILL_RETRY_MS);
       }
     })()
-      .catch((err: unknown) => console.warn(`role stats backfill: ${String(err)}`))
+      .catch((err: unknown) => {
+        this.rolesBackfillRetryAt = Date.now() + ROLE_BACKFILL_RETRY_MS;
+        console.warn(`role stats backfill: ${String(err)}`);
+      })
       .finally(() => (this.rolesBackfill = null));
     this.rolesBackfill = run;
     this.ctx.waitUntil(run);
